@@ -9,5 +9,6 @@ Start-Process `
   -FilePath 'cloudflared' `
   -ArgumentList @('tunnel', '--config', $configPath, 'run', 'terarium-tutorial') `
   -WorkingDirectory $root `
+  -WindowStyle Hidden `
   -RedirectStandardOutput $stdoutPath `
   -RedirectStandardError $stderrPath
