@@ -5,7 +5,7 @@ import emojiVSvg from './assets/emoji-v.svg'
 import speechBubbleSvg from './assets/speech-bubble.svg'
 import './App.css'
 
-const TEST_MODE_SKIP_CAPTURE_ANALYSIS = true
+const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -40,12 +40,28 @@ function App() {
   const [personaError, setPersonaError] = useState('')
   const [personaInput, setPersonaInput] = useState('')
   const [personaResult, setPersonaResult] = useState(null)
+  const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
+  const [selectedOption, setSelectedOption] = useState(null)
+  const [selectedAnswerMode, setSelectedAnswerMode] = useState('suggested')
+  const [answeredHistory, setAnsweredHistory] = useState([])
+  const [historyViewIndex, setHistoryViewIndex] = useState(null)
+  const [captureLocked, setCaptureLocked] = useState(false)
+  const [isQuestionTransitionLoading, setIsQuestionTransitionLoading] = useState(false)
+  const [isCaptureProcessing, setIsCaptureProcessing] = useState(false)
   const timeoutIdsRef = useRef([])
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const startInterviewInFlightRef = useRef(false)
+  const startInterviewRequestIdRef = useRef(0)
 
   const bubbleText =
-    analysisStatus === 'analyzing' ? '분석 중...' : analysisStatus === 'success' ? '분석 완료!' : '준비되면 가운데 카메라 버튼을 눌러주세요'
+    isCaptureProcessing
+      ? '분석 후 질문을 준비하고 있어요...'
+      : analysisStatus === 'analyzing'
+        ? '분석 중...'
+        : analysisStatus === 'success'
+          ? '분석 완료!'
+          : '준비되면 가운데 카메라 버튼을 눌러주세요'
 
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
@@ -64,12 +80,18 @@ function App() {
   }
 
   const resetPersonaSession = () => {
+    startInterviewRequestIdRef.current += 1
+    startInterviewInFlightRef.current = false
     setPersonaSessionId('')
     setPersonaQuestion(null)
     setPersonaLoading(false)
     setPersonaError('')
     setPersonaInput('')
     setPersonaResult(null)
+    setAnsweredHistory([])
+    setHistoryViewIndex(null)
+    setSelectedAnswerMode('suggested')
+    setIsCaptureProcessing(false)
   }
 
   const captureCurrentFrame = () => {
@@ -119,16 +141,27 @@ function App() {
       setAnalysisStatus('success')
       setAnalysisError('')
       console.log('Appearance JSON:', payload.result)
+      return payload.result
     } catch (error) {
       setAnalysisStatus('error')
       setAnalysisResult(null)
       setAnalysisError(error instanceof Error ? error.message : 'Unknown error during analysis.')
+      return null
     }
   }
 
-  const startPersonaInterview = useCallback(async () => {
+  const startPersonaInterview = useCallback(async (appearanceOverride = null) => {
+    if (startInterviewInFlightRef.current) {
+      return false
+    }
+
+    startInterviewInFlightRef.current = true
+    const requestId = startInterviewRequestIdRef.current + 1
+    startInterviewRequestIdRef.current = requestId
+
     setPersonaLoading(true)
     setPersonaError('')
+    const appearancePayload = appearanceOverride ?? analysisResult ?? null
 
     try {
       const response = await fetch('/api/persona/start', {
@@ -137,7 +170,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          appearance: analysisResult ?? MOCK_APPEARANCE_RESULT,
+          appearance: appearancePayload,
         }),
       })
 
@@ -151,15 +184,30 @@ function App() {
         throw new Error('Server returned an invalid persona start response.')
       }
 
+      if (requestId !== startInterviewRequestIdRef.current) {
+        return
+      }
+
       setPersonaSessionId(payload.sessionId)
       setPersonaQuestion(payload.question)
       setPersonaResult(null)
       setPersonaInput('')
       setPersonaError('')
+      setSelectedOption(null)
+      setSelectedAnswerMode('suggested')
+      setAnsweredHistory([])
+      setHistoryViewIndex(null)
+      return true
     } catch (error) {
-      setPersonaError(error instanceof Error ? error.message : 'Unknown error while starting persona interview.')
+      if (requestId === startInterviewRequestIdRef.current) {
+        setPersonaError(error instanceof Error ? error.message : 'Unknown error while starting persona interview.')
+      }
+      return false
     } finally {
-      setPersonaLoading(false)
+      if (requestId === startInterviewRequestIdRef.current) {
+        setPersonaLoading(false)
+      }
+      startInterviewInFlightRef.current = false
     }
   }, [analysisResult])
 
@@ -219,8 +267,12 @@ function App() {
       return
     }
 
+    if (analysisStatus === 'analyzing') {
+      return
+    }
+
     void startPersonaInterview()
-  }, [stage, personaQuestion, personaSessionId, personaResult, personaLoading, personaError, startPersonaInterview])
+  }, [stage, personaQuestion, personaSessionId, personaResult, personaLoading, personaError, analysisStatus, startPersonaInterview])
 
   const handleStart = () => {
     if (stage !== 'idle') {
@@ -229,6 +281,9 @@ function App() {
 
     clearTimers()
     resetPersonaSession()
+    setCaptureLocked(false)
+    setIsQuestionTransitionLoading(false)
+    setIsCaptureProcessing(false)
     setAnalysisStatus('idle')
     setAnalysisResult(null)
     setAnalysisError('')
@@ -242,10 +297,11 @@ function App() {
   }
 
   const handleCapture = () => {
-    if (stage !== 'webcam' || countdown !== null || flashOn) {
+    if (stage !== 'webcam' || countdown !== null || flashOn || captureLocked || isCaptureProcessing) {
       return
     }
 
+    setCaptureLocked(true)
     clearTimers()
     setBubbleVisible(false)
     setShowShutterText(false)
@@ -260,23 +316,43 @@ function App() {
       setCountdown(null)
       setFlashOn(true)
       setShowShutterText(true)
+      setIsCaptureProcessing(true)
 
-      if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
-        setAnalysisStatus('success')
-        setAnalysisResult(MOCK_APPEARANCE_RESULT)
-        setAnalysisError('')
-      } else {
-        if (!imageDataUrl) {
-          setAnalysisStatus('error')
-          setAnalysisError('Camera frame capture failed. Try again.')
+      void (async () => {
+        let appearancePayload = null
+
+        if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
+          setAnalysisStatus('success')
+          setAnalysisResult(MOCK_APPEARANCE_RESULT)
+          setAnalysisError('')
+          appearancePayload = MOCK_APPEARANCE_RESULT
+        } else {
+          if (!imageDataUrl) {
+            setAnalysisStatus('error')
+            setAnalysisError('Camera frame capture failed. Try again.')
+            setIsCaptureProcessing(false)
+            setCaptureLocked(false)
+            return
+          }
+
+          appearancePayload = await analyzePhotoWithOpenAI(imageDataUrl)
+          if (!appearancePayload) {
+            setIsCaptureProcessing(false)
+            setCaptureLocked(false)
+            return
+          }
+        }
+
+        const started = await startPersonaInterview(appearancePayload)
+        setIsCaptureProcessing(false)
+
+        if (started) {
+          setStage('persona')
           return
         }
 
-        void analyzePhotoWithOpenAI(imageDataUrl)
-      }
-
-      const personaStageTimer = window.setTimeout(() => setStage('persona'), 850)
-      timeoutIdsRef.current.push(personaStageTimer)
+        setCaptureLocked(false)
+      })()
     }, 3000)
 
     const flashOffTimer = window.setTimeout(() => setFlashOn(false), 3300)
@@ -297,6 +373,7 @@ function App() {
 
     setPersonaLoading(true)
     setPersonaError('')
+    const submittedQuestion = personaQuestion
 
     try {
       const response = await fetch('/api/persona/answer', {
@@ -321,8 +398,19 @@ function App() {
       setPersonaInput('')
 
       if (payload?.done) {
+        if (submittedQuestion) {
+          setAnsweredHistory((prev) => [
+            ...prev,
+            {
+              question: submittedQuestion,
+              answerText: trimmedInput,
+              answerMode,
+            },
+          ])
+        }
         setPersonaResult(payload.result ?? null)
         setPersonaQuestion(null)
+        setIsQuestionTransitionLoading(false)
         return
       }
 
@@ -330,30 +418,105 @@ function App() {
         throw new Error('Server returned an invalid next-question response.')
       }
 
+      if (submittedQuestion) {
+        setAnsweredHistory((prev) => [
+          ...prev,
+          {
+            question: submittedQuestion,
+            answerText: trimmedInput,
+            answerMode,
+          },
+        ])
+      }
+
       setPersonaQuestion(payload.question)
+      setSelectedOption(null)
+      setSelectedAnswerMode('suggested')
+      setIsPersonaCustomInputOpen(false)
+      setIsQuestionTransitionLoading(false)
     } catch (error) {
       setPersonaError(error instanceof Error ? error.message : 'Unknown error while processing persona answer.')
+      setIsQuestionTransitionLoading(false)
     } finally {
       setPersonaLoading(false)
     }
   }
 
   const handlePersonaOptionClick = (option) => {
-    void submitPersonaAnswer(option, 'suggested')
+    if (historyViewIndex !== null) {
+      return
+    }
+
+    setIsPersonaCustomInputOpen(false)
+    setSelectedAnswerMode('suggested')
+    if (selectedOption === option) {
+      setSelectedOption(null)
+    } else {
+      setSelectedOption(option)
+    }
   }
 
-  const handlePersonaInputChange = (event) => {
-    setPersonaInput(event.target.value)
+  const handleNextClick = () => {
+    if (historyViewIndex !== null) {
+      if (historyViewIndex < answeredHistory.length - 1) {
+        setHistoryViewIndex((prev) => (prev === null ? null : prev + 1))
+      } else {
+        setHistoryViewIndex(null)
+      }
+      return
+    }
+
+    if (isPersonaCustomInputOpen && personaInput.trim().length >= 3) {
+      setIsQuestionTransitionLoading(true)
+      void submitPersonaAnswer(personaInput.trim(), 'custom')
+      return
+    }
+
+    if (selectedOption) {
+      setIsQuestionTransitionLoading(true)
+      void submitPersonaAnswer(selectedOption, selectedAnswerMode)
+    }
   }
 
-  const handlePersonaSubmit = (event) => {
-    event.preventDefault()
-    void submitPersonaAnswer(personaInput, 'custom')
+  const resetCurrentSelection = () => {
+    setSelectedOption(null)
+    setSelectedAnswerMode('suggested')
+    setIsPersonaCustomInputOpen(false)
+    setPersonaInput('')
+  }
+
+  const handlePrevClick = () => {
+    if (personaLoading || isQuestionTransitionLoading) {
+      return
+    }
+
+    if (historyViewIndex !== null) {
+      if (historyViewIndex > 0) {
+        setHistoryViewIndex((prev) => (prev === null ? null : prev - 1))
+      } else {
+        setHistoryViewIndex(null)
+      }
+      return
+    }
+
+    if (answeredHistory.length > 0) {
+      setHistoryViewIndex(answeredHistory.length - 1)
+      setIsPersonaCustomInputOpen(false)
+      return
+    }
+
+    if (selectedOption || isPersonaCustomInputOpen || personaInput.trim()) {
+      resetCurrentSelection()
+    }
   }
 
   const currentQuestion = personaQuestion
-  const personaQuestionText = personaQuestion?.question ?? ''
-  const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${personaQuestion?.turn ?? 0}`
+  const viewingHistoryEntry = historyViewIndex !== null ? answeredHistory[historyViewIndex] ?? null : null
+  const displayQuestion = viewingHistoryEntry?.question ?? currentQuestion
+  const personaQuestionText = displayQuestion?.question ?? ''
+  const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
+  const isViewingHistory = historyViewIndex !== null
+  const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
 
   return (
     <div
@@ -393,7 +556,13 @@ function App() {
             <img className="emoji-badge" src={emojiVSvg} alt="" aria-hidden="true" />
 
             <div className="capture-panel">
-              <button className="capture-button" type="button" onClick={handleCapture} aria-label="촬영 카운트 시작">
+              <button
+                className={`capture-button ${captureLocked ? 'is-locked' : ''}`}
+                type="button"
+                onClick={handleCapture}
+                aria-label="촬영 카운트 시작"
+                disabled={captureLocked || isCaptureProcessing}
+              >
                 <img src={cameraButtonSvg} alt="" aria-hidden="true" />
               </button>
             </div>
@@ -403,25 +572,33 @@ function App() {
 
       {stage === 'persona' && (
         <section className="persona-stage" aria-label="페르소나 인터뷰 화면">
-          <header className="persona-top">
-            <img className="persona-emoji-top" src={emojiVSvg} alt="" aria-hidden="true" />
-            <p className="persona-brand">TERARIUM</p>
+          <div className="persona-brand-bg">TERARiUM</div>
+
+          <header className="persona-header">
+            <div className="persona-question-meta">
+              <span className="persona-meta-label">Question</span>
+              <span className="persona-meta-count">{displayQuestion ? displayQuestion.turn : 1}/6</span>
+            </div>
+            <p className="persona-question">
+              {personaResult
+                ? '페르소나 분석이 완료되었습니다.'
+                : isQuestionTransitionLoading
+                  ? ''
+                : personaQuestionText || (personaLoading ? '질문을 생성하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
+            </p>
+            {isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
+            <img className="persona-header-emoji" src={emojiVSvg} alt="" aria-hidden="true" />
           </header>
 
           <section className="persona-board" aria-live="polite">
             <div key={personaTurnKey} className="persona-turn-block">
-              <p className="persona-question">
-                {personaResult
-                  ? '페르소나 분석이 완료되었습니다.'
-                  : personaQuestionText || (personaLoading ? '질문을 생성하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
-              </p>
 
               {personaResult ? (
                 <article className="persona-result-card">
                   <p className="persona-result-title">페르소나 결과 JSON</p>
                   <pre className="persona-result-json">{JSON.stringify(personaResult, null, 2)}</pre>
                 </article>
-              ) : !currentQuestion ? (
+              ) : !displayQuestion ? (
                 <article className="persona-status-card">
                   <p className="persona-status-text">
                     {personaLoading ? '다음 질문을 생성하고 있습니다...' : personaError || '질문을 다시 불러와주세요.'}
@@ -432,46 +609,103 @@ function App() {
                     </button>
                   )}
                 </article>
+              ) : isQuestionTransitionLoading ? (
+                <section className="persona-options" aria-label="다음 질문 생성 중">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div
+                      key={`persona-option-skeleton-${index}`}
+                      className="persona-option-skeleton"
+                      style={{ animationDelay: `${index * 0.08}s` }}
+                    />
+                  ))}
+                  <div className="persona-custom-skeleton" />
+                </section>
+              ) : isViewingHistory ? (
+                <section className="persona-options" aria-label="이전 질문 답변 보기">
+                  <article className="persona-answer-review-card">
+                    <p className="persona-answer-review-label">
+                      {viewingHistoryEntry?.answerMode === 'custom' ? '사용자가 입력한 답변' : '선택한 답변'}
+                    </p>
+                    <p className="persona-answer-review-text">{viewingHistoryEntry?.answerText ?? ''}</p>
+                  </article>
+                </section>
               ) : (
                 <section className="persona-options" aria-label="선택지">
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
 
-                  {currentQuestion.options.map((option, index) => (
+                  {!isPersonaCustomInputOpen &&
+                    displayQuestion.options.map((option, index) => (
+                      <button
+                        key={`persona-option-${displayQuestion.turn}-${index}`}
+                        type="button"
+                        className={`persona-option ${selectedOption === option ? 'is-selected' : selectedOption ? 'is-dimmed' : ''}`}
+                        style={{ animationDelay: `${0.1 + index * 0.07}s` }}
+                        onClick={() => handlePersonaOptionClick(option)}
+                        disabled={personaLoading}
+                      >
+                        <span className="persona-option-text">{option}</span>
+                      </button>
+                    ))}
+
+                  {isPersonaCustomInputOpen ? (
+                    <div className="persona-custom-editor" style={{ animationDelay: '0.1s' }}>
+                      <div className="persona-custom-editor-inner">
+                        <textarea
+                          className="persona-custom-editor-textarea"
+                          value={personaInput}
+                          onChange={(e) => setPersonaInput(e.target.value)}
+                          placeholder="직접 입력하세요 (3글자 이상)"
+                          disabled={personaLoading}
+                        />
+                      </div>
+                    </div>
+                  ) : (
                     <button
-                      key={`persona-option-${currentQuestion.turn}-${index}`}
+                      className={`persona-custom-trigger ${selectedOption ? 'is-dimmed' : ''}`}
                       type="button"
-                      className="persona-option"
-                      style={{ animationDelay: `${0.1 + index * 0.07}s` }}
-                      onClick={() => handlePersonaOptionClick(option)}
+                      style={{ animationDelay: '0.38s' }}
+                      onClick={() => {
+                        setIsPersonaCustomInputOpen(true)
+                        setSelectedOption(null)
+                        setSelectedAnswerMode('suggested')
+                      }}
                       disabled={personaLoading}
                     >
-                      <span className="persona-option-text">{option}</span>
+                      직접 입력하기
                     </button>
-                  ))}
-
-                  <form className="persona-option persona-option-input" style={{ animationDelay: '0.38s' }} onSubmit={handlePersonaSubmit}>
-                    <input
-                      className="persona-option-custom-input"
-                      type="text"
-                      value={personaInput}
-                      onChange={handlePersonaInputChange}
-                      placeholder="직접 입력해서 답변"
-                      disabled={personaLoading}
-                    />
-                  </form>
+                  )}
                 </section>
               )}
             </div>
-
-            <aside className="persona-json-float" aria-live="polite">
-              <p className="persona-json-float-title">GPT JSON</p>
-              {analysisStatus === 'error' ? (
-                <p className="analysis-error">{analysisError}</p>
-              ) : (
-                <pre className="persona-json-float-body">{JSON.stringify(analysisResult ?? MOCK_APPEARANCE_RESULT, null, 2)}</pre>
-              )}
-            </aside>
           </section>
+
+          {!personaResult && displayQuestion && (
+            <nav className="persona-bottom-nav">
+              {isViewingHistory || answeredHistory.length > 0 || selectedOption || isPersonaCustomInputOpen || personaInput.trim() ? (
+                <button
+                  className="nav-btn prev-btn"
+                  type="button"
+                  onClick={handlePrevClick}
+                  disabled={personaLoading || isQuestionTransitionLoading}
+                >
+                  ← 이전으로
+                </button>
+              ) : (
+                <div />
+              )}
+              {(selectedOption || canSubmitCustomInput || isQuestionTransitionLoading || isViewingHistory) && (
+                <button
+                  className="nav-btn next-btn is-active"
+                  type="button"
+                  onClick={handleNextClick}
+                  disabled={personaLoading || isQuestionTransitionLoading || (!selectedOption && !canSubmitCustomInput && !isViewingHistory)}
+                >
+                  {isQuestionTransitionLoading ? '다음 질문 생성 중...' : '다음으로 →'}
+                </button>
+              )}
+            </nav>
+          )}
+
         </section>
       )}
 
@@ -484,6 +718,15 @@ function App() {
       {stage === 'webcam' && showShutterText && <p className="shutter-text">찰칵!</p>}
 
       {stage === 'webcam' && flashOn && <div className="flash-overlay" aria-hidden="true" />}
+
+      {stage === 'webcam' && isCaptureProcessing && (
+        <section className="capture-processing-overlay" aria-live="polite">
+          <div className="capture-processing-pill">
+            <span className="capture-processing-dot" />
+            <p className="capture-processing-text">분석 및 질문 생성 중...</p>
+          </div>
+        </section>
+      )}
     </div>
   )
 }
