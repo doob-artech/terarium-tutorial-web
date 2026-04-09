@@ -43,6 +43,7 @@ function App() {
   const [nicknameInput, setNicknameInput] = useState('')
   const [nicknameError, setNicknameError] = useState('')
   const [nicknameStatus, setNicknameStatus] = useState('idle')
+  const [enterUrl, setEnterUrl] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
   const [selectedAnswerMode, setSelectedAnswerMode] = useState('suggested')
@@ -94,6 +95,7 @@ function App() {
     setNicknameInput('')
     setNicknameError('')
     setNicknameStatus('idle')
+    setEnterUrl('')
     setAnsweredHistory([])
     setHistoryViewIndex(null)
     setSelectedAnswerMode('suggested')
@@ -528,6 +530,7 @@ function App() {
   const isViewingHistory = historyViewIndex !== null
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
   const canSubmitNickname = /^[가-힣0-9 ]{2,12}$/.test(nicknameInput.trim())
+  const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
 
   const handleNicknameClaim = async () => {
     if (!personaSessionId || !canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success') {
@@ -555,8 +558,8 @@ function App() {
         throw new Error(payload?.error ?? '닉네임 저장에 실패했습니다.')
       }
 
+      setEnterUrl(payload.enterUrl ?? '')
       setNicknameStatus('success')
-      window.location.href = payload.enterUrl
     } catch (error) {
       setNicknameStatus('error')
       setNicknameError(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
@@ -643,31 +646,45 @@ function App() {
                   <p className="persona-result-title">페르소나 결과 JSON</p>
                   <pre className="persona-result-json">{JSON.stringify(personaResult, null, 2)}</pre>
                   <div className="nickname-card">
-                    <p className="nickname-card-title">한글 닉네임을 정하고 테라리움에 입장하세요</p>
-                    <p className="nickname-card-copy">2-12자, 한글과 숫자만 사용할 수 있으며 중복될 수 없습니다.</p>
-                    <input
-                      className="nickname-input"
-                      type="text"
-                      inputMode="text"
-                      autoComplete="off"
-                      placeholder="예: 도브테빈"
-                      value={nicknameInput}
-                      onChange={(event) => {
-                        setNicknameInput(event.target.value)
-                        setNicknameError('')
-                        setNicknameStatus('idle')
-                      }}
-                      disabled={nicknameStatus === 'checking' || nicknameStatus === 'success'}
-                    />
-                    {nicknameError && <p className="nickname-error">{nicknameError}</p>}
-                    <button
-                      className="nickname-submit-btn"
-                      type="button"
-                      onClick={() => void handleNicknameClaim()}
-                      disabled={!canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success'}
-                    >
-                      {nicknameStatus === 'checking' ? '입장 준비 중...' : '테라리움 입장'}
-                    </button>
+                    {!enterUrl ? (
+                      <>
+                        <p className="nickname-card-title">한글 닉네임을 정하고 내 링크를 발급하세요</p>
+                        <p className="nickname-card-copy">2-12자, 한글과 숫자만 사용할 수 있으며 중복될 수 없습니다.</p>
+                        <input
+                          className="nickname-input"
+                          type="text"
+                          inputMode="text"
+                          autoComplete="off"
+                          placeholder="예: 도브테빈"
+                          value={nicknameInput}
+                          onChange={(event) => {
+                            setNicknameInput(event.target.value)
+                            setNicknameError('')
+                            setNicknameStatus('idle')
+                            setEnterUrl('')
+                          }}
+                          disabled={nicknameStatus === 'checking' || nicknameStatus === 'success'}
+                        />
+                        {nicknameError && <p className="nickname-error">{nicknameError}</p>}
+                        <button
+                          className="nickname-submit-btn"
+                          type="button"
+                          onClick={() => void handleNicknameClaim()}
+                          disabled={!canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success'}
+                        >
+                          {nicknameStatus === 'checking' ? '링크 발급 중...' : '내 링크 발급'}
+                        </button>
+                      </>
+                    ) : (
+                      <div className="nickname-qr-wrap">
+                        <p className="nickname-card-title">{nicknameInput.trim()}님의 개인 입장 QR입니다</p>
+                        <p className="nickname-card-copy">핸드폰으로 스캔하면 내 아바타로 로그인된 상태로 테라리움에 들어갑니다.</p>
+                        <img className="nickname-qr-image" src={qrImageUrl} alt="개인 입장 QR 코드" />
+                        <a className="nickname-link" href={enterUrl} target="_blank" rel="noreferrer">
+                          {enterUrl}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </article>
               ) : !displayQuestion ? (

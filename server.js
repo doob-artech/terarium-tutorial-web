@@ -609,7 +609,7 @@ const fetchDbApi = async (pathname, options = {}) => {
 }
 
 const buildTerariumEnterUrl = (sessionId) =>
-  `https://terarium.team-doob.com/?sessionId=${encodeURIComponent(sessionId)}`
+  `https://terarium.team-doob.com/#sessionId=${encodeURIComponent(sessionId)}`
 
 const APPEARANCE_VALUE_LABELS = {
   hair_style: {
