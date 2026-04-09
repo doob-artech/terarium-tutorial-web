@@ -31,6 +31,7 @@
   transition:
     inset 0.8s cubic-bezier(0.22, 1, 0.36, 1),
     border-radius 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  
 }
 
 .panel-content {
@@ -347,7 +348,7 @@
   align-items: center;
   width: 100%;
   margin: 0;
-  min-height: clamp(184px, 21cqh, 248px);
+  min-height: clamp(160px, 19.5vh, 200px);
   padding: clamp(24px, 2.4cqh, 34px) clamp(160px, 12vw, 240px);
   background: #ffeb67;
   border-radius: 0 0 clamp(24px, 2.4cqw, 40px) clamp(24px, 2.4cqw, 40px);
@@ -390,7 +391,7 @@
   background: transparent;
   padding: clamp(24px, 4vh, 48px) clamp(20px, 2vw, 40px);
   padding-bottom: clamp(120px, 16vh, 170px);
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
@@ -407,18 +408,25 @@
 }
 
 .persona-question {
-  margin: 0;
-  color: #474747;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-  font-size: clamp(24px, 1.5cqw + 1cqh, 42px);
-  font-weight: 500;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  text-align: center;
+  margin: 0 auto;
+  max-width: 80%;
+  width: 90%;
+
+  font-size: clamp(25px, 3.3vh, 40px); 
+  
+  color: #464646;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 700;
+  line-height: 1.5;
+  
+  text-align: center;         
   white-space: pre-wrap;
   word-break: keep-all;
-  max-width: 100%;
-  justify-self: center;
+  
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .persona-question-loading {
@@ -500,10 +508,10 @@
 
 .persona-custom-trigger {
   width: 100%;
-  min-height: clamp(56px, 9vh, 100px);
+  min-height: clamp(30px, 5vw, 75px);
   border: 0;
-  border-radius: clamp(12px, 1.2cqw, 16px);
-  background: #fbf8e4;
+  border-radius: clamp(16px, 1.5vw, 28px);
+  background: #FCFCD4;
   box-shadow: 0 8px 16px rgba(44, 114, 160, 0.1);
   display: flex;
   align-items: center;
@@ -526,25 +534,32 @@
 }
 
 .persona-custom-trigger:hover {
-  transform: translateY(-1px);
+transform: scale(1.01) translateY(-2px) !important;
+
+  box-sizing: border-box;
   box-shadow: 0 12px 20px rgba(62, 56, 19, 0.2);
-  background: #f5eed3;
+  background-color: #FFEE69;
 }
 
 .persona-option {
   width: 100%;
-  min-height: clamp(56px, 9vh, 100px);
+  min-height: clamp(80px, 7vh, 120px); 
+  height: auto; 
+  
   border: 0;
-  border-radius: clamp(12px, 1.2cqw, 16px);
+  border-radius: clamp(16px, 1.5vw, 28px);
   background: #ffffff;
-  box-shadow: 0 8px 16px rgba(44, 114, 160, 0.1);
+  
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(12px, 1.2vh, 18px) clamp(28px, 2.1vw, 38px);
-  color: #3d3d3d;
-  text-align: center;
+  padding: clamp(12px, 1.8vh, 26px) clamp(30px, 4.1vw, 60px);
+  
   cursor: pointer;
+  word-break: break-all; 
+  overflow-wrap: break-word; 
+  border: 8px solid transparent;
+
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -553,9 +568,11 @@
 }
 
 .persona-option:hover {
-  transform: translateY(-1px);
+transform: scale(1.01) translateY(-2px) !important;
+  border: 8px solid #FFEE69;
+  box-sizing: border-box;
   box-shadow: 0 12px 20px rgba(62, 56, 19, 0.2);
-  background: #f6efbb;
+  /* background: #f6efbb; */
 }
 
 .persona-option:disabled {
@@ -566,20 +583,21 @@
 }
 
 .persona-option-text {
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-  font-size: clamp(13px, 1.8vw, 24px);
+  font-family: 'Pretendard', sans-serif;
+  font-size: clamp(20px, 2.9vh, 30px); 
+  
+  color: #464646;
   font-weight: 500;
-  line-height: 1.32;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+  display: block;
   width: 100%;
 }
 
 
-
 .persona-option:nth-of-type(odd) {
-  background: #eaf1ed;
+  background: #E6F4F1;
 }
 
 .persona-custom-editor {
@@ -665,7 +683,7 @@
 
 .persona-option.is-selected {
   background: #ffffff;
-  border: 4px solid #ffe942;
+  border: 8px solid #ffe942;
   box-shadow: 0 10px 20px rgba(255, 233, 66, 0.3);
   transform: translateY(-2px);
 }
