@@ -40,6 +40,9 @@ function App() {
   const [personaError, setPersonaError] = useState('')
   const [personaInput, setPersonaInput] = useState('')
   const [personaResult, setPersonaResult] = useState(null)
+  const [nicknameInput, setNicknameInput] = useState('')
+  const [nicknameError, setNicknameError] = useState('')
+  const [nicknameStatus, setNicknameStatus] = useState('idle')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
   const [selectedAnswerMode, setSelectedAnswerMode] = useState('suggested')
@@ -88,6 +91,9 @@ function App() {
     setPersonaError('')
     setPersonaInput('')
     setPersonaResult(null)
+    setNicknameInput('')
+    setNicknameError('')
+    setNicknameStatus('idle')
     setAnsweredHistory([])
     setHistoryViewIndex(null)
     setSelectedAnswerMode('suggested')
@@ -486,6 +492,10 @@ function App() {
   }
 
   const handlePrevClick = () => {
+    if (personaResult) {
+      return
+    }
+
     if (personaLoading || isQuestionTransitionLoading) {
       return
     }
@@ -517,6 +527,41 @@ function App() {
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
   const isViewingHistory = historyViewIndex !== null
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
+  const canSubmitNickname = /^[가-힣0-9 ]{2,12}$/.test(nicknameInput.trim())
+
+  const handleNicknameClaim = async () => {
+    if (!personaSessionId || !canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success') {
+      return
+    }
+
+    setNicknameStatus('checking')
+    setNicknameError('')
+
+    try {
+      const response = await fetch('/api/nickname/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: personaSessionId,
+          nickname: nicknameInput.trim(),
+        }),
+      })
+
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? '닉네임 저장에 실패했습니다.')
+      }
+
+      setNicknameStatus('success')
+      window.location.href = payload.enterUrl
+    } catch (error) {
+      setNicknameStatus('error')
+      setNicknameError(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
+    }
+  }
 
   return (
     <div
@@ -597,6 +642,33 @@ function App() {
                 <article className="persona-result-card">
                   <p className="persona-result-title">페르소나 결과 JSON</p>
                   <pre className="persona-result-json">{JSON.stringify(personaResult, null, 2)}</pre>
+                  <div className="nickname-card">
+                    <p className="nickname-card-title">한글 닉네임을 정하고 테라리움에 입장하세요</p>
+                    <p className="nickname-card-copy">2-12자, 한글과 숫자만 사용할 수 있으며 중복될 수 없습니다.</p>
+                    <input
+                      className="nickname-input"
+                      type="text"
+                      inputMode="text"
+                      autoComplete="off"
+                      placeholder="예: 도브테빈"
+                      value={nicknameInput}
+                      onChange={(event) => {
+                        setNicknameInput(event.target.value)
+                        setNicknameError('')
+                        setNicknameStatus('idle')
+                      }}
+                      disabled={nicknameStatus === 'checking' || nicknameStatus === 'success'}
+                    />
+                    {nicknameError && <p className="nickname-error">{nicknameError}</p>}
+                    <button
+                      className="nickname-submit-btn"
+                      type="button"
+                      onClick={() => void handleNicknameClaim()}
+                      disabled={!canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success'}
+                    >
+                      {nicknameStatus === 'checking' ? '입장 준비 중...' : '테라리움 입장'}
+                    </button>
+                  </div>
                 </article>
               ) : !displayQuestion ? (
                 <article className="persona-status-card">

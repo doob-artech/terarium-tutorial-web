@@ -1,7 +1,0 @@
-tunnel: 098506f1-1be0-403a-a5bc-65cc2f5b4de8
-credentials-file: C:\Users\VILAB\.cloudflared\098506f1-1be0-403a-a5bc-65cc2f5b4de8.json
-
-ingress:
-  - hostname: tutorial.team-doob.com
-    service: http://127.0.0.1:8787
-  - service: http_status:404

@@ -828,6 +828,71 @@
   word-break: break-word;
 }
 
+.nickname-card {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nickname-card-title {
+  margin: 0;
+  color: #242424;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size: clamp(20px, 1.3vw, 26px);
+  font-weight: 700;
+}
+
+.nickname-card-copy {
+  margin: 0;
+  color: #4f4f4f;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size: clamp(14px, 1vw, 18px);
+  line-height: 1.4;
+}
+
+.nickname-input {
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  padding: 16px 18px;
+  background: #fffef8;
+  color: #2d2d2d;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size: clamp(18px, 1.2vw, 24px);
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.nickname-error {
+  margin: 0;
+  color: #c12b2b;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size: clamp(14px, 1vw, 18px);
+  font-weight: 600;
+}
+
+.nickname-submit-btn {
+  align-self: flex-start;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 22px;
+  background: #ffec67;
+  color: #313131;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size: clamp(16px, 1vw, 20px);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.nickname-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 
 @keyframes persona-turn-enter {
   0% {

@@ -20,6 +20,7 @@ const PERSONA_RESULT_APPEARANCE_HINT_PROMPT = promptTemplates.persona.result_app
 const PERSONA_RESULT_USER_INSTRUCTION_LINES = promptTemplates.persona.result_user_instructions
 const APPEARANCE_ANALYSIS_SYSTEM_PROMPT = promptTemplates.appearance_analysis.system_prompt
 const APPEARANCE_ANALYSIS_USER_PROMPT = promptTemplates.appearance_analysis.user_prompt
+const DB_API_BASE_URL = (process.env.DB_API_BASE_URL || 'http://127.0.0.1:18010').replace(/\/+$/, '')
 
 const HAIR_COLOR_ENUM = [
   'black',
@@ -584,6 +585,32 @@ const serializePersonaHistory = (answers) =>
     answerRiskSignals: Number.isInteger(entry.answerRiskSignals) ? entry.answerRiskSignals : 0,
   }))
 
+const fetchDbApi = async (pathname, options = {}) => {
+  const response = await fetch(`${DB_API_BASE_URL}${pathname}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
+  })
+
+  let payload = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.detail || payload?.error || `DB API request failed: ${response.status}`)
+  }
+
+  return payload
+}
+
+const buildTerariumEnterUrl = (sessionId) =>
+  `https://terarium.team-doob.com/?sessionId=${encodeURIComponent(sessionId)}`
+
 const APPEARANCE_VALUE_LABELS = {
   hair_style: {
     short_cut: 'short cut',
@@ -928,6 +955,13 @@ app.post('/api/persona/start', async (req, res) => {
     const firstQuestion = await generatePersonaQuestion({ apiKey, session, turn: 1 })
     session.currentQuestion = firstQuestion
     personaSessions.set(sessionId, session)
+    await fetchDbApi('/v1/tutorial/session/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        appearance,
+      }),
+    })
 
     res.json({
       sessionId,
@@ -1012,6 +1046,15 @@ app.post('/api/persona/answer', async (req, res) => {
       session.result = result
       session.currentQuestion = null
       session.updatedAt = Date.now()
+      await fetchDbApi('/v1/tutorial/session/complete', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId,
+          appearance: session.appearance,
+          personaResult: result,
+          answers: serializePersonaHistory(session.answers),
+        }),
+      })
 
       res.json({
         done: true,
@@ -1033,6 +1076,56 @@ app.post('/api/persona/answer', async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate next persona turn.' })
+  }
+})
+
+app.get('/api/nickname/check', async (req, res) => {
+  const nickname = typeof req.query.nickname === 'string' ? req.query.nickname.trim() : ''
+
+  if (!nickname) {
+    res.status(400).json({ error: 'nickname is required.' })
+    return
+  }
+
+  try {
+    const payload = await fetchDbApi(`/v1/users/check-nickname?nickname=${encodeURIComponent(nickname)}`)
+    res.json(payload)
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to check nickname.' })
+  }
+})
+
+app.post('/api/nickname/claim', async (req, res) => {
+  const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : ''
+  const nickname = typeof req.body?.nickname === 'string' ? req.body.nickname.trim() : ''
+
+  if (!sessionId) {
+    res.status(400).json({ error: 'sessionId is required.' })
+    return
+  }
+
+  if (!nickname) {
+    res.status(400).json({ error: 'nickname is required.' })
+    return
+  }
+
+  try {
+    const payload = await fetchDbApi('/v1/users/claim-nickname', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        nickname,
+      }),
+    })
+
+    res.json({
+      ...payload,
+      enterUrl: buildTerariumEnterUrl(sessionId),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to claim nickname.'
+    const statusCode = message.includes('already exists') ? 409 : 500
+    res.status(statusCode).json({ error: message })
   }
 })
 
