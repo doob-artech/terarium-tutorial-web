@@ -223,152 +223,103 @@ const PERSONA_RESULT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    agent_profile_title: {
+    agentId: {
       type: 'string',
       minLength: 1,
+      maxLength: 64,
     },
-    simulation_brief: {
+    profileLabel: {
       type: 'string',
       minLength: 1,
+      maxLength: 80,
     },
-    communication_signature: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        tone_default: { type: 'string', minLength: 1 },
-        response_pacing: { type: 'string', minLength: 1 },
-        preferred_phrases: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 6,
-          items: { type: 'string', minLength: 1 },
-        },
-        avoid_phrases: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 6,
-          items: { type: 'string', minLength: 1 },
-        },
-      },
-      required: ['tone_default', 'response_pacing', 'preferred_phrases', 'avoid_phrases'],
-    },
-    decision_policy: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        priority_weights: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            relationship: { type: 'integer', minimum: 0, maximum: 100 },
-            speed: { type: 'integer', minimum: 0, maximum: 100 },
-            risk: { type: 'integer', minimum: 0, maximum: 100 },
-            fairness: { type: 'integer', minimum: 0, maximum: 100 },
-            self_protection: { type: 'integer', minimum: 0, maximum: 100 },
-          },
-          required: ['relationship', 'speed', 'risk', 'fairness', 'self_protection'],
-        },
-        if_then_rules: {
-          type: 'array',
-          minItems: 4,
-          maxItems: 8,
-          items: { type: 'string', minLength: 1 },
-        },
-      },
-      required: ['priority_weights', 'if_then_rules'],
-    },
-    scenario_playbook: {
+    prioritizedValues: {
       type: 'array',
       minItems: 3,
-      maxItems: 5,
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          scenario: { type: 'string', minLength: 1 },
-          likely_action: { type: 'string', minLength: 1 },
-          fallback_action: { type: 'string', minLength: 1 },
-          refusal_boundary: { type: 'string', minLength: 1 },
-        },
-        required: ['scenario', 'likely_action', 'fallback_action', 'refusal_boundary'],
-      },
+      maxItems: 6,
+      items: { type: 'string', minLength: 1 },
     },
-    trigger_map: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        stress_triggers: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 5,
-          items: { type: 'string', minLength: 1 },
-        },
-        motivation_triggers: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 5,
-          items: { type: 'string', minLength: 1 },
-        },
-        recovery_protocol: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 5,
-          items: { type: 'string', minLength: 1 },
-        },
-      },
-      required: ['stress_triggers', 'motivation_triggers', 'recovery_protocol'],
+    outlookBias: {
+      type: 'string',
+      minLength: 1,
     },
-    boundary_and_values: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        non_negotiables: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 6,
-          items: { type: 'string', minLength: 1 },
-        },
-        negotiables: {
-          type: 'array',
-          minItems: 2,
-          maxItems: 6,
-          items: { type: 'string', minLength: 1 },
-        },
-      },
-      required: ['non_negotiables', 'negotiables'],
+    socialTemperature: {
+      type: 'string',
+      minLength: 1,
     },
-    clone_prompts: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        system_seed: { type: 'string', minLength: 1 },
-        reply_style_guide: { type: 'string', minLength: 1 },
-        fewshot_user_like_replies: {
-          type: 'array',
-          minItems: 3,
-          maxItems: 3,
-          items: { type: 'string', minLength: 1 },
-        },
-      },
-      required: ['system_seed', 'reply_style_guide', 'fewshot_user_like_replies'],
+    speechStyle: {
+      type: 'string',
+      minLength: 1,
     },
-    confidence_notes: {
+    interjections: {
       type: 'array',
       minItems: 2,
-      maxItems: 5,
+      maxItems: 6,
       items: { type: 'string', minLength: 1 },
+    },
+    idleBehavior: {
+      type: 'string',
+      minLength: 1,
+    },
+    idleBehaviorDetail: {
+      type: 'string',
+      minLength: 1,
+    },
+    anxietyTrigger: {
+      type: 'string',
+      minLength: 1,
+    },
+    thinkingTrigger: {
+      type: 'string',
+      minLength: 1,
+    },
+    interests: {
+      type: 'array',
+      minItems: 2,
+      maxItems: 8,
+      items: { type: 'string', minLength: 1 },
+    },
+    skills: {
+      type: 'array',
+      minItems: 2,
+      maxItems: 8,
+      items: { type: 'string', minLength: 1 },
+    },
+    shortTermPlan: {
+      type: 'string',
+      minLength: 1,
+    },
+    longTermPlan: {
+      type: 'string',
+      minLength: 1,
+    },
+    initialThought: {
+      type: 'string',
+      minLength: 1,
+    },
+    baseEmotionTone: {
+      type: 'string',
+      minLength: 1,
     },
   },
   required: [
-    'agent_profile_title',
-    'simulation_brief',
-    'communication_signature',
-    'decision_policy',
-    'scenario_playbook',
-    'trigger_map',
-    'boundary_and_values',
-    'clone_prompts',
-    'confidence_notes',
+    'agentId',
+    'profileLabel',
+    'prioritizedValues',
+    'outlookBias',
+    'socialTemperature',
+    'speechStyle',
+    'interjections',
+    'idleBehavior',
+    'idleBehaviorDetail',
+    'anxietyTrigger',
+    'thinkingTrigger',
+    'interests',
+    'skills',
+    'shortTermPlan',
+    'longTermPlan',
+    'initialThought',
+    'baseEmotionTone',
   ],
 }
 
@@ -784,6 +735,119 @@ const buildAppearanceHintText = (appearance) => {
   return `Low-confidence camera hint: ${hints.slice(0, 8).join(', ')}`
 }
 
+const normalizeListStrings = (items, { min = 0, max = 8, fallback = [] } = {}) => {
+  const normalized = Array.isArray(items)
+    ? items
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+    : []
+
+  const unique = [...new Set(normalized)]
+  if (unique.length >= min) {
+    return unique.slice(0, max)
+  }
+
+  return [...fallback].slice(0, max)
+}
+
+const buildAgentId = ({ sessionId, nickname }) => {
+  const trimmedNickname = typeof nickname === 'string' ? nickname.trim() : ''
+  if (trimmedNickname) {
+    return trimmedNickname
+  }
+  return `session-${String(sessionId || '').trim()}`
+}
+
+const normalizeAgentProfileResult = ({ rawResult, sessionId, nickname, appearance }) => {
+  const possibleRoleTags = Array.isArray(appearance?.context_hypothesis?.possible_role_tags)
+    ? appearance.context_hypothesis.possible_role_tags
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+    : []
+
+  const fallbackInterests = normalizeListStrings(
+    [
+      ...possibleRoleTags,
+      appearance?.context_hypothesis?.likely_activity_context,
+      appearance?.context_hypothesis?.attire_formality,
+    ],
+    { max: 6 },
+  )
+
+  const fallbackSkills = normalizeListStrings(
+    [
+      '관찰',
+      '상황 판단',
+      '의사결정',
+      '관계 조율',
+    ],
+    { min: 2, max: 6, fallback: ['관찰', '의사결정'] },
+  )
+
+  const agentId = buildAgentId({ sessionId, nickname })
+  const profileLabel = typeof rawResult?.profileLabel === 'string' && rawResult.profileLabel.trim()
+    ? rawResult.profileLabel.trim()
+    : `${nickname || '방문자'} 페르소나`
+
+  return {
+    agentId,
+    profileLabel,
+    prioritizedValues: normalizeListStrings(rawResult?.prioritizedValues, {
+      min: 3,
+      max: 6,
+      fallback: ['정중한 소통', '상황 판단', '관계 유지'],
+    }),
+    outlookBias:
+      (typeof rawResult?.outlookBias === 'string' && rawResult.outlookBias.trim()) ||
+      `${nickname || '이 사용자'}는 상황을 빠르게 해석하고 자신의 기준에 맞춰 행동하려는 경향이 있습니다.`,
+    socialTemperature:
+      (typeof rawResult?.socialTemperature === 'string' && rawResult.socialTemperature.trim()) ||
+      '상황을 살핀 뒤 신중하게 거리를 조절합니다.',
+    speechStyle:
+      (typeof rawResult?.speechStyle === 'string' && rawResult.speechStyle.trim()) ||
+      '정중하고 자연스러운 한국어 말투를 사용합니다.',
+    interjections: normalizeListStrings(rawResult?.interjections, {
+      min: 2,
+      max: 6,
+      fallback: ['음', '일단', '아마도'],
+    }),
+    idleBehavior:
+      (typeof rawResult?.idleBehavior === 'string' && rawResult.idleBehavior.trim()) ||
+      '주변을 관찰하며 다음 행동을 천천히 정합니다.',
+    idleBehaviorDetail:
+      (typeof rawResult?.idleBehaviorDetail === 'string' && rawResult.idleBehaviorDetail.trim()) ||
+      '혼자 있을 때는 주변 분위기와 사람들의 흐름을 보며 행동 우선순위를 가다듬습니다.',
+    anxietyTrigger:
+      (typeof rawResult?.anxietyTrigger === 'string' && rawResult.anxietyTrigger.trim()) ||
+      '예상 밖의 충돌이나 통제 불가능한 상황',
+    thinkingTrigger:
+      (typeof rawResult?.thinkingTrigger === 'string' && rawResult.thinkingTrigger.trim()) ||
+      '선택지를 비교해야 하는 현실적인 상황',
+    interests: normalizeListStrings(rawResult?.interests, {
+      min: 2,
+      max: 8,
+      fallback: fallbackInterests.length > 0 ? fallbackInterests : ['사람 관찰', '일상 판단'],
+    }),
+    skills: normalizeListStrings(rawResult?.skills, {
+      min: 2,
+      max: 8,
+      fallback: fallbackSkills,
+    }),
+    shortTermPlan:
+      (typeof rawResult?.shortTermPlan === 'string' && rawResult.shortTermPlan.trim()) ||
+      '현재 공간에서 자신의 역할에 맞는 행동 흐름을 빠르게 잡기',
+    longTermPlan:
+      (typeof rawResult?.longTermPlan === 'string' && rawResult.longTermPlan.trim()) ||
+      '일관된 태도와 말투로 자신의 캐릭터를 유지하기',
+    initialThought:
+      (typeof rawResult?.initialThought === 'string' && rawResult.initialThought.trim()) ||
+      `${nickname || '이 캐릭터'}답게 행동하려면 지금 무엇을 먼저 봐야 할지 생각합니다.`,
+    baseEmotionTone:
+      (typeof rawResult?.baseEmotionTone === 'string' && rawResult.baseEmotionTone.trim()) ||
+      '차분하지만 상황에 따라 민감하게 반응하는 편',
+  }
+}
+
 const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
   const turnMeta = getTurnMeta(turn)
   const previousEntry = session.answers[session.answers.length - 1] ?? null
@@ -867,7 +931,7 @@ const generatePersonaResult = async ({ apiKey, session }) => {
   const interviewHistory = serializePersonaHistory(session.answers)
   const appearanceHintText = buildAppearanceHintText(session.appearance)
 
-  return requestStructuredJson({
+  const generated = await requestStructuredJson({
     apiKey,
     schemaName: 'persona_final_result',
     schema: PERSONA_RESULT_SCHEMA,
@@ -915,6 +979,13 @@ const generatePersonaResult = async ({ apiKey, session }) => {
     ],
     safetyIdentifier: session.id,
   })
+
+  return normalizeAgentProfileResult({
+    rawResult: generated,
+    sessionId: session.id,
+    nickname: session.nickname,
+    appearance: session.appearance,
+  })
 }
 
 const app = express()
@@ -945,6 +1016,7 @@ app.post('/api/persona/start', async (req, res) => {
     createdAt: now,
     updatedAt: now,
     appearance,
+    nickname: '',
     answers: [],
     currentTurn: 1,
     currentQuestion: null,
@@ -1117,6 +1189,12 @@ app.post('/api/nickname/claim', async (req, res) => {
         nickname,
       }),
     })
+
+    const session = personaSessions.get(sessionId)
+    if (session) {
+      session.nickname = payload?.user?.nickname || nickname
+      session.updatedAt = Date.now()
+    }
 
     res.json({
       ...payload,
