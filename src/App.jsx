@@ -43,6 +43,7 @@ function App() {
   const [nicknameInput, setNicknameInput] = useState('')
   const [nicknameError, setNicknameError] = useState('')
   const [nicknameStatus, setNicknameStatus] = useState('idle')
+  const [nicknameValue, setNicknameValue] = useState('')
   const [enterUrl, setEnterUrl] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
@@ -95,6 +96,7 @@ function App() {
     setNicknameInput('')
     setNicknameError('')
     setNicknameStatus('idle')
+    setNicknameValue('')
     setEnterUrl('')
     setAnsweredHistory([])
     setHistoryViewIndex(null)
@@ -271,7 +273,7 @@ function App() {
   }, [stage])
 
   useEffect(() => {
-    if (stage !== 'persona' || personaQuestion || personaSessionId || personaResult || personaLoading || personaError) {
+    if (!['nickname', 'persona'].includes(stage) || personaQuestion || personaSessionId || personaResult || personaLoading || personaError) {
       return
     }
 
@@ -351,15 +353,9 @@ function App() {
           }
         }
 
-        const started = await startPersonaInterview(appearancePayload)
+        void startPersonaInterview(appearancePayload)
         setIsCaptureProcessing(false)
-
-        if (started) {
-          setStage('persona')
-          return
-        }
-
-        setCaptureLocked(false)
+        setStage('nickname')
       })()
     }, 3000)
 
@@ -531,9 +527,15 @@ function App() {
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
   const canSubmitNickname = /^[가-힣0-9 ]{2,12}$/.test(nicknameInput.trim())
   const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
+  const isNicknameStage = stage === 'nickname'
 
   const handleNicknameClaim = async () => {
-    if (!personaSessionId || !canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success') {
+    if (!canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success') {
+      return
+    }
+
+    if (!personaSessionId) {
+      setNicknameError('질문을 준비하고 있습니다. 잠시만 기다려 주세요.')
       return
     }
 
@@ -559,7 +561,9 @@ function App() {
       }
 
       setEnterUrl(payload.enterUrl ?? '')
+      setNicknameValue(nicknameInput.trim())
       setNicknameStatus('success')
+      setStage('persona')
     } catch (error) {
       setNicknameStatus('error')
       setNicknameError(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
@@ -618,72 +622,77 @@ function App() {
         </section>
       )}
 
-      {stage === 'persona' && (
+      {(stage === 'nickname' || stage === 'persona') && (
         <section className="persona-stage" aria-label="페르소나 인터뷰 화면">
           <div className="persona-brand-bg">TERARiUM</div>
 
           <header className="persona-header">
             <div className="persona-question-meta">
-              <span className="persona-meta-label">Question</span>
-              <span className="persona-meta-count">{displayQuestion ? displayQuestion.turn : 1}/6</span>
+              <span className="persona-meta-label">{isNicknameStage ? 'Profile' : 'Question'}</span>
+              <span className="persona-meta-count">{isNicknameStage ? '이름' : `${displayQuestion ? displayQuestion.turn : 1}/6`}</span>
             </div>
             <p className="persona-question">
-              {personaResult
+              {isNicknameStage
+                ? '한글 이름을 먼저 정해주세요. 입력하는 동안 첫 질문을 준비하고 있습니다.'
+                : personaResult
                 ? '페르소나 분석이 완료되었습니다.'
                 : isQuestionTransitionLoading
                   ? ''
                 : personaQuestionText || (personaLoading ? '질문을 생성하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
             </p>
-            {isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
+            {!isNicknameStage && isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
             <img className="persona-header-emoji" src={emojiVSvg} alt="" aria-hidden="true" />
           </header>
 
           <section className="persona-board" aria-live="polite">
             <div key={personaTurnKey} className="persona-turn-block">
 
-              {personaResult ? (
+              {isNicknameStage ? (
+                <article className="persona-result-card">
+                  <div className="nickname-card">
+                    <p className="nickname-card-title">한글 이름을 정하고 시작하세요</p>
+                    <p className="nickname-card-copy">이름을 입력하는 동안 첫 질문을 미리 생성합니다.</p>
+                    <input
+                      className="nickname-input"
+                      type="text"
+                      inputMode="text"
+                      autoComplete="off"
+                      placeholder="예: 태빈"
+                      value={nicknameInput}
+                      onChange={(event) => {
+                        setNicknameInput(event.target.value)
+                        setNicknameError('')
+                        setNicknameStatus('idle')
+                      }}
+                      disabled={nicknameStatus === 'checking'}
+                    />
+                    {nicknameError && <p className="nickname-error">{nicknameError}</p>}
+                    <button
+                      className="nickname-submit-btn"
+                      type="button"
+                      onClick={() => void handleNicknameClaim()}
+                      disabled={!canSubmitNickname || nicknameStatus === 'checking'}
+                    >
+                      {nicknameStatus === 'checking' ? '이름 저장 중...' : personaLoading ? '질문 준비 중...' : '다음으로'}
+                    </button>
+                  </div>
+                </article>
+              ) : personaResult ? (
                 <article className="persona-result-card">
                   <p className="persona-result-title">페르소나 결과 JSON</p>
                   <pre className="persona-result-json">{JSON.stringify(personaResult, null, 2)}</pre>
                   <div className="nickname-card">
-                    {!enterUrl ? (
-                      <>
-                        <p className="nickname-card-title">한글 닉네임을 정하고 내 링크를 발급하세요</p>
-                        <p className="nickname-card-copy">2-12자, 한글과 숫자만 사용할 수 있으며 중복될 수 없습니다.</p>
-                        <input
-                          className="nickname-input"
-                          type="text"
-                          inputMode="text"
-                          autoComplete="off"
-                          placeholder="예: 도브테빈"
-                          value={nicknameInput}
-                          onChange={(event) => {
-                            setNicknameInput(event.target.value)
-                            setNicknameError('')
-                            setNicknameStatus('idle')
-                            setEnterUrl('')
-                          }}
-                          disabled={nicknameStatus === 'checking' || nicknameStatus === 'success'}
-                        />
-                        {nicknameError && <p className="nickname-error">{nicknameError}</p>}
-                        <button
-                          className="nickname-submit-btn"
-                          type="button"
-                          onClick={() => void handleNicknameClaim()}
-                          disabled={!canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success'}
-                        >
-                          {nicknameStatus === 'checking' ? '링크 발급 중...' : '내 링크 발급'}
-                        </button>
-                      </>
-                    ) : (
+                    {enterUrl ? (
                       <div className="nickname-qr-wrap">
-                        <p className="nickname-card-title">{nicknameInput.trim()}님의 개인 입장 QR입니다</p>
+                        <p className="nickname-card-title">{nicknameValue || nicknameInput.trim()}님의 개인 입장 QR입니다</p>
                         <p className="nickname-card-copy">핸드폰으로 스캔하면 내 아바타로 로그인된 상태로 테라리움에 들어갑니다.</p>
                         <img className="nickname-qr-image" src={qrImageUrl} alt="개인 입장 QR 코드" />
                         <a className="nickname-link" href={enterUrl} target="_blank" rel="noreferrer">
                           {enterUrl}
                         </a>
                       </div>
+                    ) : (
+                      <p className="nickname-card-copy">링크를 준비하는 중입니다.</p>
                     )}
                   </div>
                 </article>
@@ -768,7 +777,7 @@ function App() {
             </div>
           </section>
 
-          {!personaResult && displayQuestion && (
+          {!isNicknameStage && !personaResult && displayQuestion && (
             <nav className="persona-bottom-nav">
               {isViewingHistory || answeredHistory.length > 0 || selectedOption || isPersonaCustomInputOpen || personaInput.trim() ? (
                 <button
