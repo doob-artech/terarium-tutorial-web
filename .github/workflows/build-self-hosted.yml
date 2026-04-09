@@ -1,0 +1,34 @@
+name: Deploy on Self-Hosted Runner
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terarium-tutorial-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - windows
+      - terarium-builder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write environment file
+        shell: pwsh
+        run: Set-Content -Path .env -Value "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
+
+      - name: Build and restart container
+        shell: pwsh
+        run: docker compose up --build -d
