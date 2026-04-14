@@ -6,6 +6,8 @@ import speechBubbleSvg from './assets/speech-bubble.svg'
 import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
+const AGE_MIN = 18
+const AGE_MAX = 60
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -44,6 +46,7 @@ function App() {
   const [nicknameError, setNicknameError] = useState('')
   const [nicknameStatus, setNicknameStatus] = useState('idle')
   const [nicknameValue, setNicknameValue] = useState('')
+  const [ageValue, setAgeValue] = useState(24)
   const [enterUrl, setEnterUrl] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
@@ -58,6 +61,7 @@ function App() {
   const streamRef = useRef(null)
   const startInterviewInFlightRef = useRef(false)
   const startInterviewRequestIdRef = useRef(0)
+  const syncedAppearanceSessionRef = useRef('')
 
   const bubbleText =
     isCaptureProcessing
@@ -71,6 +75,16 @@ function App() {
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
     timeoutIdsRef.current = []
+  }
+
+  const ageLabelFromValue = (value) => {
+    if (value <= AGE_MIN) {
+      return '18세 이하'
+    }
+    if (value >= AGE_MAX) {
+      return '60세 이상'
+    }
+    return `${value}세`
   }
 
   const stopCamera = () => {
@@ -87,6 +101,7 @@ function App() {
   const resetPersonaSession = () => {
     startInterviewRequestIdRef.current += 1
     startInterviewInFlightRef.current = false
+    syncedAppearanceSessionRef.current = ''
     setPersonaSessionId('')
     setPersonaQuestion(null)
     setPersonaLoading(false)
@@ -97,6 +112,7 @@ function App() {
     setNicknameError('')
     setNicknameStatus('idle')
     setNicknameValue('')
+    setAgeValue(24)
     setEnterUrl('')
     setAnsweredHistory([])
     setHistoryViewIndex(null)
@@ -160,6 +176,36 @@ function App() {
     }
   }
 
+  const syncAppearanceToSession = useCallback(
+    async (sessionId, appearance) => {
+      if (!sessionId || !appearance || typeof appearance !== 'object') {
+        return
+      }
+
+      const syncKey = `${sessionId}:${JSON.stringify(appearance)}`
+      if (syncedAppearanceSessionRef.current === syncKey) {
+        return
+      }
+
+      try {
+        const response = await fetch('/api/persona/appearance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sessionId, appearance }),
+        })
+        if (!response.ok) {
+          return
+        }
+        syncedAppearanceSessionRef.current = syncKey
+      } catch {
+        // best-effort sync only
+      }
+    },
+    [],
+  )
+
   const startPersonaInterview = useCallback(async (appearanceOverride = null) => {
     if (startInterviewInFlightRef.current) {
       return false
@@ -181,6 +227,8 @@ function App() {
         },
         body: JSON.stringify({
           appearance: appearancePayload,
+          ageValue,
+          ageLabel: ageLabelFromValue(ageValue),
         }),
       })
 
@@ -219,7 +267,7 @@ function App() {
       }
       startInterviewInFlightRef.current = false
     }
-  }, [analysisResult])
+  }, [analysisResult, ageValue])
 
   useEffect(() => {
     return () => {
@@ -277,12 +325,15 @@ function App() {
       return
     }
 
-    if (analysisStatus === 'analyzing') {
+    void startPersonaInterview()
+  }, [stage, personaQuestion, personaSessionId, personaResult, personaLoading, personaError, startPersonaInterview])
+
+  useEffect(() => {
+    if (!personaSessionId || !analysisResult) {
       return
     }
-
-    void startPersonaInterview()
-  }, [stage, personaQuestion, personaSessionId, personaResult, personaLoading, personaError, analysisStatus, startPersonaInterview])
+    void syncAppearanceToSession(personaSessionId, analysisResult)
+  }, [personaSessionId, analysisResult, syncAppearanceToSession])
 
   const handleStart = () => {
     if (stage !== 'idle') {
@@ -327,35 +378,25 @@ function App() {
       setFlashOn(true)
       setShowShutterText(true)
       setIsCaptureProcessing(true)
+      setStage('nickname')
 
       void (async () => {
-        let appearancePayload = null
+        void startPersonaInterview()
 
         if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
           setAnalysisStatus('success')
           setAnalysisResult(MOCK_APPEARANCE_RESULT)
           setAnalysisError('')
-          appearancePayload = MOCK_APPEARANCE_RESULT
         } else {
           if (!imageDataUrl) {
             setAnalysisStatus('error')
             setAnalysisError('Camera frame capture failed. Try again.')
-            setIsCaptureProcessing(false)
-            setCaptureLocked(false)
-            return
-          }
-
-          appearancePayload = await analyzePhotoWithOpenAI(imageDataUrl)
-          if (!appearancePayload) {
-            setIsCaptureProcessing(false)
-            setCaptureLocked(false)
-            return
+          } else {
+            await analyzePhotoWithOpenAI(imageDataUrl)
           }
         }
 
-        void startPersonaInterview(appearancePayload)
         setIsCaptureProcessing(false)
-        setStage('nickname')
       })()
     }, 3000)
 
@@ -551,6 +592,8 @@ function App() {
         body: JSON.stringify({
           sessionId: personaSessionId,
           nickname: nicknameInput.trim(),
+          ageValue,
+          ageLabel: ageLabelFromValue(ageValue),
         }),
       })
 
@@ -633,7 +676,7 @@ function App() {
             </div>
             <p className="persona-question">
               {isNicknameStage
-                ? '한글 이름을 먼저 정해주세요. 입력하는 동안 첫 질문을 준비하고 있습니다.'
+                ? '아바타의 이름을 정해주세요'
                 : personaResult
                 ? '페르소나 분석이 완료되었습니다.'
                 : isQuestionTransitionLoading
@@ -650,20 +693,32 @@ function App() {
               {isNicknameStage ? (
                 <article className="persona-result-card">
                   <div className="nickname-card">
-                    <p className="nickname-card-title">한글 이름을 정하고 시작하세요</p>
-                    <p className="nickname-card-copy">이름을 입력하는 동안 첫 질문을 미리 생성합니다.</p>
                     <input
                       className="nickname-input"
                       type="text"
                       inputMode="text"
                       autoComplete="off"
-                      placeholder="예: 태빈"
+                      placeholder="이름"
                       value={nicknameInput}
                       onChange={(event) => {
                         setNicknameInput(event.target.value)
                         setNicknameError('')
                         setNicknameStatus('idle')
                       }}
+                      disabled={nicknameStatus === 'checking'}
+                    />
+                    <label className="nickname-card-copy" htmlFor="age-slider">
+                      나이대: {ageLabelFromValue(ageValue)}
+                    </label>
+                    <input
+                      id="age-slider"
+                      className="age-slider"
+                      type="range"
+                      min={AGE_MIN}
+                      max={AGE_MAX}
+                      step="1"
+                      value={ageValue}
+                      onChange={(event) => setAgeValue(Number(event.target.value))}
                       disabled={nicknameStatus === 'checking'}
                     />
                     {nicknameError && <p className="nickname-error">{nicknameError}</p>}
@@ -679,8 +734,6 @@ function App() {
                 </article>
               ) : personaResult ? (
                 <article className="persona-result-card">
-                  <p className="persona-result-title">페르소나 결과 JSON</p>
-                  <pre className="persona-result-json">{JSON.stringify(personaResult, null, 2)}</pre>
                   <div className="nickname-card">
                     {enterUrl ? (
                       <div className="nickname-qr-wrap">

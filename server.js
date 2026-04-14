@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
+import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -10,6 +11,7 @@ const PERSONA_TOTAL_TURNS = 6
 const PERSONA_SESSION_TTL_MS = 30 * 60 * 1000
 const PERSONA_MAX_ANSWER_CHARS = 320
 const PERSONA_MAX_MODEL_DATA_CHARS = 180
+const OPENAI_MAX_RATE_LIMIT_RETRIES = 3
 
 const PERSONA_INTERVIEW_SYSTEM_PROMPT = promptTemplates.persona.system_prompt_lines.join('\n').trim()
 const PERSONA_QUESTION_GENERATION_GUARD_PROMPT = promptTemplates.persona.question_generation_guard_prompt
@@ -20,7 +22,17 @@ const PERSONA_RESULT_APPEARANCE_HINT_PROMPT = promptTemplates.persona.result_app
 const PERSONA_RESULT_USER_INSTRUCTION_LINES = promptTemplates.persona.result_user_instructions
 const APPEARANCE_ANALYSIS_SYSTEM_PROMPT = promptTemplates.appearance_analysis.system_prompt
 const APPEARANCE_ANALYSIS_USER_PROMPT = promptTemplates.appearance_analysis.user_prompt
-const DB_API_BASE_URL = (process.env.DB_API_BASE_URL || 'http://127.0.0.1:18010').replace(/\/+$/, '')
+const defaultDbApiBaseUrl = fs.existsSync('/.dockerenv') ? 'http://terarium-db:18010' : 'http://127.0.0.1:18010'
+const DB_API_BASE_URL_CANDIDATES = [
+  process.env.DB_API_BASE_URL,
+  defaultDbApiBaseUrl,
+  'http://host.docker.internal:18010',
+  'http://127.0.0.1:18010',
+]
+  .map((value) => String(value || '').trim())
+  .filter(Boolean)
+  .map((value) => value.replace(/\/+$/, ''))
+  .filter((value, index, array) => array.indexOf(value) === index)
 
 const HAIR_COLOR_ENUM = [
   'black',
@@ -223,103 +235,101 @@ const PERSONA_RESULT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    agentId: {
+    age: {
       type: 'string',
       minLength: 1,
-      maxLength: 64,
+      maxLength: 20,
+      description: 'Trusted age-range context reflected as natural Korean phrase.',
     },
-    profileLabel: {
+    character_tag: {
       type: 'string',
       minLength: 1,
-      maxLength: 80,
+      maxLength: 32,
+      description: 'Compact Korean archetype label that captures romantic behavior signature.',
     },
-    prioritizedValues: {
-      type: 'array',
-      minItems: 3,
-      maxItems: 6,
-      items: { type: 'string', minLength: 1 },
-    },
-    outlookBias: {
+    romance_drive: {
       type: 'string',
       minLength: 1,
+      maxLength: 140,
+      description: 'What fundamentally motivates this person in romance.',
     },
-    socialTemperature: {
+    approach_style: {
       type: 'string',
       minLength: 1,
+      maxLength: 140,
+      description: 'How this person initiates or approaches someone they like.',
     },
-    speechStyle: {
+    contact_style: {
       type: 'string',
       minLength: 1,
+      maxLength: 140,
+      description: 'Preferred messaging frequency, pace, and emotional cadence.',
     },
-    interjections: {
+    boundary_rule: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 140,
+      description: 'Core boundary rule this person expects to be respected.',
+    },
+    jealousy_trigger: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 140,
+      description: 'Signals that destabilize trust or trigger jealousy.',
+    },
+    conflict_style: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 140,
+      description: 'How this person tends to communicate during conflict.',
+    },
+    repair_style: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 140,
+      description: 'How this person repairs trust after conflict.',
+    },
+    commitment_goal: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 140,
+      description: 'Desired relationship trajectory and commitment preference.',
+    },
+    hard_limits: {
       type: 'array',
       minItems: 2,
-      maxItems: 6,
-      items: { type: 'string', minLength: 1 },
+      maxItems: 5,
+      items: { type: 'string', minLength: 1, maxLength: 32 },
+      description:
+        'Non-negotiables that, once crossed, are treated as irreversible deal-breakers (e.g., repeated lying, betrayal).',
     },
-    idleBehavior: {
+    decision_bias: {
       type: 'string',
       minLength: 1,
+      maxLength: 140,
+      description: 'What evidence this person prioritizes when making relationship decisions.',
     },
-    idleBehaviorDetail: {
+    one_line_core: {
       type: 'string',
       minLength: 1,
-    },
-    anxietyTrigger: {
-      type: 'string',
-      minLength: 1,
-    },
-    thinkingTrigger: {
-      type: 'string',
-      minLength: 1,
-    },
-    interests: {
-      type: 'array',
-      minItems: 2,
-      maxItems: 8,
-      items: { type: 'string', minLength: 1 },
-    },
-    skills: {
-      type: 'array',
-      minItems: 2,
-      maxItems: 8,
-      items: { type: 'string', minLength: 1 },
-    },
-    shortTermPlan: {
-      type: 'string',
-      minLength: 1,
-    },
-    longTermPlan: {
-      type: 'string',
-      minLength: 1,
-    },
-    initialThought: {
-      type: 'string',
-      minLength: 1,
-    },
-    baseEmotionTone: {
-      type: 'string',
-      minLength: 1,
+      maxLength: 100,
+      description: 'One-line Korean core summary that can steer agent behavior immediately.',
     },
   },
   required: [
-    'agentId',
-    'profileLabel',
-    'prioritizedValues',
-    'outlookBias',
-    'socialTemperature',
-    'speechStyle',
-    'interjections',
-    'idleBehavior',
-    'idleBehaviorDetail',
-    'anxietyTrigger',
-    'thinkingTrigger',
-    'interests',
-    'skills',
-    'shortTermPlan',
-    'longTermPlan',
-    'initialThought',
-    'baseEmotionTone',
+    'age',
+    'character_tag',
+    'romance_drive',
+    'approach_style',
+    'contact_style',
+    'boundary_rule',
+    'jealousy_trigger',
+    'conflict_style',
+    'repair_style',
+    'commitment_goal',
+    'hard_limits',
+    'decision_bias',
+    'one_line_core',
   ],
 }
 
@@ -424,6 +434,38 @@ const extractStructuredJson = (payload) => {
 const isMaxTokensIncomplete = (payload) =>
   payload?.status === 'incomplete' && payload?.incomplete_details?.reason === 'max_output_tokens'
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const parseRetryAfterMs = (retryAfterHeader) => {
+  if (!retryAfterHeader) {
+    return null
+  }
+
+  const seconds = Number(retryAfterHeader)
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.round(seconds * 1000)
+  }
+
+  const absoluteTime = Date.parse(retryAfterHeader)
+  if (Number.isFinite(absoluteTime)) {
+    const diff = absoluteTime - Date.now()
+    return diff > 0 ? diff : null
+  }
+
+  return null
+}
+
+const computeRateLimitRetryDelayMs = (response, attempt) => {
+  const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
+  if (retryAfterMs) {
+    return Math.min(retryAfterMs, 12_000)
+  }
+
+  const exponentialMs = 700 * Math.pow(2, attempt - 1)
+  const jitterMs = Math.floor(Math.random() * 400)
+  return Math.min(exponentialMs + jitterMs, 12_000)
+}
+
 const requestStructuredJson = async ({ apiKey, schemaName, schema, input, maxOutputTokens = 700, safetyIdentifier }) => {
   const buildRequestBody = (requestInput, tokenBudget) => {
     const requestBody = {
@@ -460,7 +502,22 @@ const requestStructuredJson = async ({ apiKey, schemaName, schema, input, maxOut
     const payload = await response.json()
 
     if (!response.ok) {
-      throw new Error(payload?.error?.message || 'OpenAI request failed.')
+      const message = payload?.error?.message || 'OpenAI request failed.'
+      const errorCode = typeof payload?.error?.code === 'string' ? payload.error.code : ''
+      const status = Number(response.status) || 0
+      const isRateLimited = status === 429
+      const isQuotaExceeded =
+        errorCode === 'insufficient_quota' ||
+        /insufficient[_\s-]?quota/i.test(message) ||
+        /quota/i.test(message)
+
+      if (isRateLimited && !isQuotaExceeded && attempt <= OPENAI_MAX_RATE_LIMIT_RETRIES) {
+        const delayMs = computeRateLimitRetryDelayMs(response, attempt)
+        await sleep(delayMs)
+        return doRequest(attempt + 1, requestInput, tokenBudget)
+      }
+
+      throw new Error(message)
     }
 
     try {
@@ -504,12 +561,30 @@ const getTurnMeta = (turn) => ({
 })
 
 const TURN_FOCUS_DIRECTIVES = {
-  1: 'Focus axis: role and life-structure calibration from weak appearance hints.',
-  2: 'Focus axis: prioritization under schedule pressure (speed vs quality vs coordination).',
-  3: 'Focus axis: disruption recovery (mistake handling, replanning, ownership).',
-  4: 'Focus axis: communication strategy (tone, escalation, wording, channel choice).',
-  5: 'Focus axis: digital behavior (response timing, visibility control, social signaling).',
-  6: 'Focus axis: boundary and non-negotiable policy in a realistic request scenario.',
+  1: 'Focus axis: first-attraction signal and initiative rhythm.',
+  2: 'Focus axis: contact frequency and emotional response latency.',
+  3: 'Focus axis: jealousy trigger and trust calibration.',
+  4: 'Focus axis: conflict conversation style under emotional load.',
+  5: 'Focus axis: boundary setting and respect expectation.',
+  6: 'Focus axis: commitment preference and relationship goal clarity.',
+}
+
+const normalizeAgeValue = (value) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) {
+    return 24
+  }
+  return Math.min(60, Math.max(18, Math.round(numeric)))
+}
+
+const ageLabelFromValue = (value) => {
+  if (value <= 18) {
+    return '18세 이하'
+  }
+  if (value >= 60) {
+    return '60세 이상'
+  }
+  return `${value}세`
 }
 
 const cleanupExpiredPersonaSessions = () => {
@@ -537,27 +612,49 @@ const serializePersonaHistory = (answers) =>
   }))
 
 const fetchDbApi = async (pathname, options = {}) => {
-  const response = await fetch(`${DB_API_BASE_URL}${pathname}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-  })
+  let lastNetworkError = null
 
-  let payload = null
-  try {
-    payload = await response.json()
-  } catch {
-    payload = null
+  for (const baseUrl of DB_API_BASE_URL_CANDIDATES) {
+    let response
+    try {
+      response = await fetch(`${baseUrl}${pathname}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers ?? {}),
+        },
+      })
+    } catch (error) {
+      lastNetworkError = error
+      continue
+    }
+
+    let payload = null
+    try {
+      payload = await response.json()
+    } catch {
+      payload = null
+    }
+
+    if (!response.ok) {
+      throw new Error(payload?.detail || payload?.error || `DB API request failed: ${response.status}`)
+    }
+
+    return payload
   }
 
-  if (!response.ok) {
-    throw new Error(payload?.detail || payload?.error || `DB API request failed: ${response.status}`)
+  if (lastNetworkError instanceof Error) {
+    throw lastNetworkError
   }
 
-  return payload
+  throw new Error('DB API request failed: no reachable DB API base URL')
 }
+
+const isDbUnavailableError = (message) =>
+  /fetch failed|econnrefused|db api request failed|timed out|network|connection/i.test(String(message || ''))
+
+const isSessionMissingError = (message) =>
+  /session not found|agent session not found|not found/i.test(String(message || ''))
 
 const buildTerariumEnterUrl = (sessionId) =>
   `https://terarium.team-doob.com/#sessionId=${encodeURIComponent(sessionId)}`
@@ -751,100 +848,63 @@ const normalizeListStrings = (items, { min = 0, max = 8, fallback = [] } = {}) =
 }
 
 const buildAgentId = ({ sessionId, nickname }) => {
-  const trimmedNickname = typeof nickname === 'string' ? nickname.trim() : ''
-  if (trimmedNickname) {
-    return trimmedNickname
-  }
-  return `session-${String(sessionId || '').trim()}`
+  return String(sessionId || '').trim()
 }
 
-const normalizeAgentProfileResult = ({ rawResult, sessionId, nickname, appearance }) => {
-  const possibleRoleTags = Array.isArray(appearance?.context_hypothesis?.possible_role_tags)
-    ? appearance.context_hypothesis.possible_role_tags
-        .map((item) => (typeof item === 'string' ? item.trim() : ''))
-        .filter(Boolean)
-    : []
+const normalizeAgentProfileResult = ({ rawResult, sessionId, nickname, appearance, ageValue, ageLabel }) => {
+  const clean = (value, fallback = '') =>
+    typeof value === 'string' && value.trim() ? value.trim() : fallback
+  const cleanList = (value, fallback = []) => normalizeListStrings(value, { min: 1, max: 8, fallback })
 
-  const fallbackInterests = normalizeListStrings(
-    [
-      ...possibleRoleTags,
-      appearance?.context_hypothesis?.likely_activity_context,
-      appearance?.context_hypothesis?.attire_formality,
-    ],
-    { max: 6 },
-  )
-
-  const fallbackSkills = normalizeListStrings(
-    [
-      '관찰',
-      '상황 판단',
-      '의사결정',
-      '관계 조율',
-    ],
-    { min: 2, max: 6, fallback: ['관찰', '의사결정'] },
-  )
-
+  const resolvedAgeValue = normalizeAgeValue(ageValue)
+  const resolvedAgeLabel = clean(ageLabel, ageLabelFromValue(resolvedAgeValue))
   const agentId = buildAgentId({ sessionId, nickname })
-  const profileLabel = typeof rawResult?.profileLabel === 'string' && rawResult.profileLabel.trim()
-    ? rawResult.profileLabel.trim()
-    : `${nickname || '방문자'} 페르소나`
+  const profileLabel = ''
+
+  const persona = {
+    age: clean(rawResult?.age, resolvedAgeLabel),
+    character_tag: clean(rawResult?.character_tag, '안정추구형'),
+    romance_drive: clean(rawResult?.romance_drive, '호감이 생기면 천천히 신뢰를 쌓으며 관계를 발전시킨다.'),
+    approach_style: clean(rawResult?.approach_style, '관심을 표현하되 상대 반응을 보며 속도를 맞춘다.'),
+    contact_style: clean(rawResult?.contact_style, '연락은 규칙적으로 이어가되 과도한 압박은 피한다.'),
+    boundary_rule: clean(rawResult?.boundary_rule, '불편한 지점은 미루지 않고 명확히 말한다.'),
+    jealousy_trigger: clean(rawResult?.jealousy_trigger, '관계 우선순위가 흔들리는 신호에 민감하다.'),
+    conflict_style: clean(rawResult?.conflict_style, '감정이 올라와도 비난보다 대화를 우선한다.'),
+    repair_style: clean(rawResult?.repair_style, '갈등 이후에는 행동으로 신뢰를 회복하려고 한다.'),
+    commitment_goal: clean(rawResult?.commitment_goal, '가벼운 관계보다 책임감 있는 관계를 지향한다.'),
+    hard_limits: cleanList(rawResult?.hard_limits, ['거짓말', '반복적인 무시']),
+    decision_bias: clean(rawResult?.decision_bias, '말보다 반복되는 행동을 더 신뢰한다.'),
+    one_line_core: clean(rawResult?.one_line_core, '따뜻하지만 기준이 분명한 관계형 인물이다.'),
+    age_value: resolvedAgeValue,
+    age_label: resolvedAgeLabel,
+  }
 
   return {
     agentId,
     profileLabel,
-    prioritizedValues: normalizeListStrings(rawResult?.prioritizedValues, {
-      min: 3,
-      max: 6,
-      fallback: ['정중한 소통', '상황 판단', '관계 유지'],
-    }),
-    outlookBias:
-      (typeof rawResult?.outlookBias === 'string' && rawResult.outlookBias.trim()) ||
-      `${nickname || '이 사용자'}는 상황을 빠르게 해석하고 자신의 기준에 맞춰 행동하려는 경향이 있습니다.`,
-    socialTemperature:
-      (typeof rawResult?.socialTemperature === 'string' && rawResult.socialTemperature.trim()) ||
-      '상황을 살핀 뒤 신중하게 거리를 조절합니다.',
-    speechStyle:
-      (typeof rawResult?.speechStyle === 'string' && rawResult.speechStyle.trim()) ||
-      '정중하고 자연스러운 한국어 말투를 사용합니다.',
-    interjections: normalizeListStrings(rawResult?.interjections, {
-      min: 2,
-      max: 6,
-      fallback: ['음', '일단', '아마도'],
-    }),
-    idleBehavior:
-      (typeof rawResult?.idleBehavior === 'string' && rawResult.idleBehavior.trim()) ||
-      '주변을 관찰하며 다음 행동을 천천히 정합니다.',
-    idleBehaviorDetail:
-      (typeof rawResult?.idleBehaviorDetail === 'string' && rawResult.idleBehaviorDetail.trim()) ||
-      '혼자 있을 때는 주변 분위기와 사람들의 흐름을 보며 행동 우선순위를 가다듬습니다.',
-    anxietyTrigger:
-      (typeof rawResult?.anxietyTrigger === 'string' && rawResult.anxietyTrigger.trim()) ||
-      '예상 밖의 충돌이나 통제 불가능한 상황',
-    thinkingTrigger:
-      (typeof rawResult?.thinkingTrigger === 'string' && rawResult.thinkingTrigger.trim()) ||
-      '선택지를 비교해야 하는 현실적인 상황',
-    interests: normalizeListStrings(rawResult?.interests, {
-      min: 2,
-      max: 8,
-      fallback: fallbackInterests.length > 0 ? fallbackInterests : ['사람 관찰', '일상 판단'],
-    }),
-    skills: normalizeListStrings(rawResult?.skills, {
-      min: 2,
-      max: 8,
-      fallback: fallbackSkills,
-    }),
-    shortTermPlan:
-      (typeof rawResult?.shortTermPlan === 'string' && rawResult.shortTermPlan.trim()) ||
-      '현재 공간에서 자신의 역할에 맞는 행동 흐름을 빠르게 잡기',
-    longTermPlan:
-      (typeof rawResult?.longTermPlan === 'string' && rawResult.longTermPlan.trim()) ||
-      '일관된 태도와 말투로 자신의 캐릭터를 유지하기',
-    initialThought:
-      (typeof rawResult?.initialThought === 'string' && rawResult.initialThought.trim()) ||
-      `${nickname || '이 캐릭터'}답게 행동하려면 지금 무엇을 먼저 봐야 할지 생각합니다.`,
-    baseEmotionTone:
-      (typeof rawResult?.baseEmotionTone === 'string' && rawResult.baseEmotionTone.trim()) ||
-      '차분하지만 상황에 따라 민감하게 반응하는 편',
+    prioritizedValues: cleanList([persona.commitment_goal, persona.boundary_rule, persona.decision_bias], [
+      '신뢰와 일관성',
+      '존중과 경계',
+      '감정의 명확성',
+    ]),
+    outlookBias: persona.romance_drive,
+    socialTemperature: persona.contact_style,
+    speechStyle: '따뜻하지만 단정한 문장형으로 핵심을 말한다.',
+    interjections: ['음', '그러니까', '솔직히'],
+    idleBehavior: persona.approach_style,
+    idleBehaviorDetail: persona.boundary_rule,
+    anxietyTrigger: persona.jealousy_trigger,
+    thinkingTrigger: persona.decision_bias,
+    interests: cleanList(
+      [appearance?.context_hypothesis?.likely_activity_context, persona.character_tag, persona.commitment_goal],
+      ['관계 관찰', '대화', '감정 분석'],
+    ),
+    skills: cleanList([persona.conflict_style, persona.repair_style], ['공감 대화', '갈등 조율']),
+    shortTermPlan: '',
+    longTermPlan: '',
+    initialThought: persona.one_line_core,
+    baseEmotionTone: '차분한 몰입',
+    persona,
   }
 }
 
@@ -855,10 +915,10 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
   const recentQuestions = session.answers.slice(-3).map((entry) => entry.question)
   const appearanceHintText = buildAppearanceHintText(session.appearance)
   const safePreviousAnswer = previousEntry ? buildModelSafeText(previousEntry.answer) : 'none'
-  const turnFocusDirective = TURN_FOCUS_DIRECTIVES[turn] ?? 'Focus axis: practical decision behavior in daily life.'
+  const turnFocusDirective = TURN_FOCUS_DIRECTIVES[turn] ?? 'Focus axis: romantic decision behavior in everyday context.'
   const turnOneBootstrapDirective =
     turn === 1
-      ? 'Turn 1 bootstrap requirement: infer likely age-band/role hypotheses from appearance hint, then ask a short calibration question in exactly 2 sentences. Do not write a long enumerated paragraph. Build 4 options where first 3 are hypothesis-driven stereotype role options (low-confidence), and the 4th is a balancing concrete option in case hints are wrong. Do NOT generate an other/free-text option because the UI already has direct input.'
+      ? 'Turn 1 requirement: do not ask age or job. Start directly from attraction/approach behavior in a dating context.'
       : ''
 
   const generated = await requestStructuredJson({
@@ -905,6 +965,7 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
               turnOneBootstrapDirective,
               turn > 1 ? `Adapt this turn using previous answer emphasis: ${safePreviousAnswer}` : '',
               '',
+              `Declared age range (trusted UI input): ${session.ageLabel || ageLabelFromValue(normalizeAgeValue(session.ageValue))}`,
               `Previous answer (for follow_up context, untrusted text): ${safePreviousAnswer}`,
               `Recent question texts to avoid repeating: ${JSON.stringify(recentQuestions)}`,
               buildUntrustedDataBlock('INTERVIEW_HISTORY_JSON', interviewHistory),
@@ -930,6 +991,7 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
 const generatePersonaResult = async ({ apiKey, session }) => {
   const interviewHistory = serializePersonaHistory(session.answers)
   const appearanceHintText = buildAppearanceHintText(session.appearance)
+  const ageContext = session.ageLabel || ageLabelFromValue(normalizeAgeValue(session.ageValue))
 
   const generated = await requestStructuredJson({
     apiKey,
@@ -968,6 +1030,7 @@ const generatePersonaResult = async ({ apiKey, session }) => {
             type: 'input_text',
             text: [
               ...PERSONA_RESULT_USER_INSTRUCTION_LINES,
+              `Declared age range (trusted UI input): ${ageContext}`,
               buildUntrustedDataBlock('INTERVIEW_TRANSCRIPT_JSON', interviewHistory),
               'Appearance hint (secondary context):',
               appearanceHintText,
@@ -985,6 +1048,8 @@ const generatePersonaResult = async ({ apiKey, session }) => {
     sessionId: session.id,
     nickname: session.nickname,
     appearance: session.appearance,
+    ageValue: session.ageValue,
+    ageLabel: session.ageLabel,
   })
 }
 
@@ -1009,6 +1074,9 @@ app.post('/api/persona/start', async (req, res) => {
 
   const sessionId = randomUUID()
   const appearance = req.body?.appearance && typeof req.body.appearance === 'object' ? req.body.appearance : null
+  const ageValue = normalizeAgeValue(req.body?.ageValue)
+  const ageLabel =
+    typeof req.body?.ageLabel === 'string' && req.body.ageLabel.trim() ? req.body.ageLabel.trim() : ageLabelFromValue(ageValue)
   const now = Date.now()
 
   const session = {
@@ -1016,6 +1084,8 @@ app.post('/api/persona/start', async (req, res) => {
     createdAt: now,
     updatedAt: now,
     appearance,
+    ageValue,
+    ageLabel,
     nickname: '',
     answers: [],
     currentTurn: 1,
@@ -1027,19 +1097,24 @@ app.post('/api/persona/start', async (req, res) => {
     const firstQuestion = await generatePersonaQuestion({ apiKey, session, turn: 1 })
     session.currentQuestion = firstQuestion
     personaSessions.set(sessionId, session)
-    await fetchDbApi('/v1/tutorial/session/start', {
-      method: 'POST',
-      body: JSON.stringify({
-        sessionId,
-        appearance,
-      }),
-    })
+    try {
+      await fetchDbApi('/v1/tutorial/session/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId,
+          appearance,
+        }),
+      })
+    } catch (dbError) {
+      console.error('[persona/start] failed to persist tutorial session start:', dbError)
+    }
 
     res.json({
       sessionId,
       question: firstQuestion,
     })
   } catch (error) {
+    console.error('[persona/start] failed:', error)
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to start persona interview.' })
   }
 })
@@ -1118,15 +1193,19 @@ app.post('/api/persona/answer', async (req, res) => {
       session.result = result
       session.currentQuestion = null
       session.updatedAt = Date.now()
-      await fetchDbApi('/v1/tutorial/session/complete', {
-        method: 'POST',
-        body: JSON.stringify({
-          sessionId,
-          appearance: session.appearance,
-          personaResult: result,
-          answers: serializePersonaHistory(session.answers),
-        }),
-      })
+      try {
+        await fetchDbApi('/v1/tutorial/session/complete', {
+          method: 'POST',
+          body: JSON.stringify({
+            sessionId,
+            appearance: session.appearance,
+            personaResult: result,
+            answers: serializePersonaHistory(session.answers),
+          }),
+        })
+      } catch (dbError) {
+        console.error('[persona/answer] failed to persist tutorial session complete:', dbError)
+      }
 
       res.json({
         done: true,
@@ -1147,8 +1226,49 @@ app.post('/api/persona/answer', async (req, res) => {
       question: nextQuestion,
     })
   } catch (error) {
+    console.error('[persona/answer] failed:', error)
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to generate next persona turn.' })
   }
+})
+
+app.post('/api/persona/appearance', async (req, res) => {
+  const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : ''
+  const appearance = req.body?.appearance && typeof req.body.appearance === 'object' ? req.body.appearance : null
+
+  if (!sessionId) {
+    res.status(400).json({ error: 'sessionId is required.' })
+    return
+  }
+
+  if (!appearance) {
+    res.status(400).json({ error: 'appearance is required.' })
+    return
+  }
+
+  cleanupExpiredPersonaSessions()
+
+  const session = personaSessions.get(sessionId)
+  if (!session) {
+    res.status(404).json({ error: 'Persona session not found or expired.' })
+    return
+  }
+
+  session.appearance = appearance
+  session.updatedAt = Date.now()
+
+  try {
+    await fetchDbApi('/v1/tutorial/session/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        appearance,
+      }),
+    })
+  } catch (dbError) {
+    console.error('[persona/appearance] failed to persist appearance:', dbError)
+  }
+
+  res.json({ ok: true })
 })
 
 app.get('/api/nickname/check', async (req, res) => {
@@ -1163,13 +1283,25 @@ app.get('/api/nickname/check', async (req, res) => {
     const payload = await fetchDbApi(`/v1/users/check-nickname?nickname=${encodeURIComponent(nickname)}`)
     res.json(payload)
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to check nickname.' })
+    const message = error instanceof Error ? error.message : 'Failed to check nickname.'
+    if (isDbUnavailableError(message)) {
+      res.json({
+        available: true,
+        warning: 'DB temporarily unavailable; nickname uniqueness check was skipped.',
+        dbFallback: true,
+      })
+      return
+    }
+    res.status(500).json({ error: message })
   }
 })
 
 app.post('/api/nickname/claim', async (req, res) => {
   const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : ''
   const nickname = typeof req.body?.nickname === 'string' ? req.body.nickname.trim() : ''
+  const ageValue = normalizeAgeValue(req.body?.ageValue)
+  const ageLabel =
+    typeof req.body?.ageLabel === 'string' && req.body.ageLabel.trim() ? req.body.ageLabel.trim() : ageLabelFromValue(ageValue)
 
   if (!sessionId) {
     res.status(400).json({ error: 'sessionId is required.' })
@@ -1181,8 +1313,9 @@ app.post('/api/nickname/claim', async (req, res) => {
     return
   }
 
-  try {
-    const payload = await fetchDbApi('/v1/users/claim-nickname', {
+  const session = personaSessions.get(sessionId)
+  const tryClaimNickname = async () =>
+    fetchDbApi('/v1/users/claim-nickname', {
       method: 'POST',
       body: JSON.stringify({
         sessionId,
@@ -1190,9 +1323,12 @@ app.post('/api/nickname/claim', async (req, res) => {
       }),
     })
 
-    const session = personaSessions.get(sessionId)
+  try {
+    const payload = await tryClaimNickname()
     if (session) {
       session.nickname = payload?.user?.nickname || nickname
+      session.ageValue = ageValue
+      session.ageLabel = ageLabel
       session.updatedAt = Date.now()
     }
 
@@ -1202,6 +1338,49 @@ app.post('/api/nickname/claim', async (req, res) => {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to claim nickname.'
+
+    if (isSessionMissingError(message) && session) {
+      try {
+        await fetchDbApi('/v1/tutorial/session/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            sessionId,
+            appearance: session.appearance ?? null,
+          }),
+        })
+        const retryPayload = await tryClaimNickname()
+        session.nickname = retryPayload?.user?.nickname || nickname
+        session.ageValue = ageValue
+        session.ageLabel = ageLabel
+        session.updatedAt = Date.now()
+        res.json({
+          ...retryPayload,
+          enterUrl: buildTerariumEnterUrl(sessionId),
+        })
+        return
+      } catch (retryError) {
+        console.error('[nickname/claim] retry after session bootstrap failed:', retryError)
+      }
+    }
+
+    if (isDbUnavailableError(message) && session) {
+      session.nickname = nickname
+      session.ageValue = ageValue
+      session.ageLabel = ageLabel
+      session.updatedAt = Date.now()
+      res.json({
+        ok: true,
+        user: {
+          sessionId,
+          nickname,
+        },
+        enterUrl: buildTerariumEnterUrl(sessionId),
+        dbFallback: true,
+        warning: 'DB temporarily unavailable; nickname was stored in-memory only.',
+      })
+      return
+    }
+
     const statusCode = message.includes('already exists') ? 409 : 500
     res.status(statusCode).json({ error: message })
   }
@@ -1222,74 +1401,55 @@ app.post('/api/analyze-appearance', async (req, res) => {
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        input: [
-          {
-            role: 'system',
-            content: [
-              {
-                type: 'input_text',
-                text: APPEARANCE_ANALYSIS_SYSTEM_PROMPT,
-              },
-            ],
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: APPEARANCE_ANALYSIS_USER_PROMPT,
-              },
-              {
-                type: 'input_image',
-                image_url: imageDataUrl,
-              },
-            ],
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'appearance_attributes',
-            strict: true,
-            schema: APPEARANCE_SCHEMA,
-          },
+    const result = await requestStructuredJson({
+      apiKey,
+      schemaName: 'appearance_attributes',
+      schema: APPEARANCE_SCHEMA,
+      input: [
+        {
+          role: 'system',
+          content: [
+            {
+              type: 'input_text',
+              text: APPEARANCE_ANALYSIS_SYSTEM_PROMPT,
+            },
+          ],
         },
-        max_output_tokens: 500,
-      }),
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: APPEARANCE_ANALYSIS_USER_PROMPT,
+            },
+            {
+              type: 'input_image',
+              image_url: imageDataUrl,
+              detail: 'low',
+            },
+          ],
+        },
+      ],
+      maxOutputTokens: 500,
+      safetyIdentifier: 'tutorial-appearance-analysis',
     })
-
-    const payload = await response.json()
-
-    if (!response.ok) {
-      res.status(response.status).json({ error: payload?.error?.message || 'OpenAI request failed.' })
-      return
-    }
-
-    const structuredText = extractStructuredText(payload)
-    if (!structuredText) {
-      res.status(502).json({ error: 'No structured JSON was returned by the model.' })
-      return
-    }
-
-    let parsed
-    try {
-      parsed = JSON.parse(structuredText)
-    } catch {
-      res.status(502).json({ error: 'Model returned non-JSON output unexpectedly.' })
-      return
-    }
-
-    res.json({ result: parsed })
+    res.json({ result })
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown server error.' })
+    const message = error instanceof Error ? error.message : 'Unknown server error.'
+    const normalized = message.toLowerCase()
+    const isRateLimitError =
+      normalized.includes('rate limit') ||
+      normalized.includes('too many requests') ||
+      normalized.includes('quota')
+
+    if (isRateLimitError) {
+      res.status(429).json({
+        error: 'OpenAI rate limit/quota exceeded. Wait a moment and retry. If this persists, check project billing/quota.',
+      })
+      return
+    }
+
+    res.status(500).json({ error: message })
   }
 })
 
