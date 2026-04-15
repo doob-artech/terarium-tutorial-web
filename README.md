@@ -44,7 +44,7 @@ docker build -t doob-terarium-tutorial:local .
 
 ## 배포
 
-이 레포에 push하면 GitHub Actions가 `ghcr.io/doob-artech/terarium-tutorial:latest` 이미지를 발행합니다. 실제 컨테이너 실행과 Cloudflared 라우팅은 `terarium-deploy`에서 처리합니다.
+이 레포에 push하면 `DESKTOP-3B84I03` self-hosted runner가 `D:\doob`의 로컬 레포들을 pull한 뒤 `terarium-deploy`의 Compose 스택을 직접 재빌드/재기동합니다.
 
 ## 관련 레포
 

@@ -1,61 +1,40 @@
-name: Publish Tutorial Image
+name: Deploy From Local Runner
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
-
 concurrency:
-  group: terarium-tutorial-publish-${{ github.ref }}
-  cancel-in-progress: true
+  group: terarium-local-deploy
+  cancel-in-progress: false
 
 jobs:
-  publish:
-    runs-on:
-      - self-hosted
-      - windows
-      - terarium-builder
-
+  deploy:
+    runs-on: [self-hosted, Windows, X64, terarium-builder]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/doob-artech/terarium-tutorial:latest
-            ghcr.io/doob-artech/terarium-tutorial:${{ github.sha }}
-
-      - name: Trigger deploy repo
-        if: ${{ secrets.DEPLOY_REPO_TOKEN != '' }}
-        shell: pwsh
+      - name: Pull local repos and rebuild stack
+        shell: powershell
         run: |
-          $headers = @{
-            Accept = 'application/vnd.github+json'
-            Authorization = 'Bearer ${{ secrets.DEPLOY_REPO_TOKEN }}'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          }
-          $body = @{
-            event_type = 'tutorial-updated'
-            client_payload = @{
-              source_repo = '${{ github.repository }}'
-              sha = '${{ github.sha }}'
+          $ErrorActionPreference = 'Stop'
+          $root = 'D:\doob'
+          $repos = @(
+            'terarium-social-web',
+            'terarium-tutorial',
+            'terarium-world-server',
+            'terarium-world-viewer',
+            'terarium-deploy'
+          )
+
+          foreach ($repo in $repos) {
+            $path = Join-Path $root $repo
+            if (!(Test-Path $path)) {
+              throw "Missing local repo: $path"
             }
-          } | ConvertTo-Json -Depth 5
-          Invoke-RestMethod -Method Post -Uri 'https://api.github.com/repos/doob-artech/terarium-deploy/dispatches' -Headers $headers -Body $body
+            git -C $path fetch origin
+            git -C $path checkout main
+            git -C $path pull --ff-only origin main
+          }
+
+          powershell -ExecutionPolicy Bypass -File (Join-Path $root 'terarium-deploy\start-terarium-stack.ps1')
+          powershell -ExecutionPolicy Bypass -File (Join-Path $root 'terarium-deploy\start-cloudflared.ps1')
