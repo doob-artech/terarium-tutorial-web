@@ -31,10 +31,20 @@ jobs:
             if (!(Test-Path $path)) {
               throw "Missing local repo: $path"
             }
+            git config --global --add safe.directory ($path -replace '\\', '/')
+          }
+
+          foreach ($repo in $repos) {
+            $path = Join-Path $root $repo
             git -C $path fetch origin
+            if ($LASTEXITCODE -ne 0) { throw "git fetch failed: $repo" }
             git -C $path checkout main
+            if ($LASTEXITCODE -ne 0) { throw "git checkout main failed: $repo" }
             git -C $path pull --ff-only origin main
+            if ($LASTEXITCODE -ne 0) { throw "git pull failed: $repo" }
           }
 
           powershell -ExecutionPolicy Bypass -File (Join-Path $root 'terarium-deploy\start-terarium-stack.ps1')
+          if ($LASTEXITCODE -ne 0) { throw 'start-terarium-stack.ps1 failed' }
           powershell -ExecutionPolicy Bypass -File (Join-Path $root 'terarium-deploy\start-cloudflared.ps1')
+          if ($LASTEXITCODE -ne 0) { throw 'start-cloudflared.ps1 failed' }
