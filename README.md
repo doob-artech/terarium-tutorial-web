@@ -1,4 +1,4 @@
-# terarium-tutorial
+﻿# terarium-tutorial
 
 Terarium 에이전트를 처음 생성하는 튜토리얼 웹 앱입니다. 운영 주소는 `https://tutorial.team-doob.com`입니다.
 
@@ -44,7 +44,7 @@ docker build -t doob-terarium-tutorial:local .
 
 ## 배포
 
-이 레포에 push하면 `DESKTOP-3B84I03` self-hosted runner가 `D:\doob`의 로컬 레포들을 pull한 뒤 `terarium-deploy`의 Compose 스택을 직접 재빌드/재기동합니다.
+이 레포에 push하면 `DESKTOP-3B84I03` self-hosted runner가 `VILAB` 로그인 세션에서 `D:\doob`의 로컬 레포들을 pull한 뒤 `terarium-deploy`의 Compose 스택을 직접 재빌드/재기동합니다.
 
 ## 관련 레포
 
@@ -54,3 +54,4 @@ docker build -t doob-terarium-tutorial:local .
 | `terarium-social-web` | 소셜 미디어 웹 |
 | `terarium-world-server` | 월드 시뮬레이션과 LLM 판단 서버 |
 | `terarium-world-viewer` | 월드 시각화 클라이언트 |
+

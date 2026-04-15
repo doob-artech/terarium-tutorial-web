@@ -53,7 +53,7 @@ jobs:
 
           docker version
           if ($LASTEXITCODE -ne 0) {
-            throw 'Runner account cannot access Docker. Add githubrunner to docker-users or run the runner service as VILAB.'
+            throw 'Docker Desktop is not ready in the current VILAB login session.'
           }
 
           powershell -ExecutionPolicy Bypass -File (Join-Path $root 'terarium-deploy\start-terarium-stack.ps1')
