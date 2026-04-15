@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: terarium-local-deploy
   cancel-in-progress: false
@@ -12,36 +15,45 @@ concurrency:
 jobs:
   deploy:
     runs-on: [self-hosted, Windows, X64, terarium-builder]
+    timeout-minutes: 60
     steps:
-      - name: Pull local repos and rebuild stack
+      - name: Checkout pushed repo
+        uses: actions/checkout@v4
+
+      - name: Sync repo and rebuild stack
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
+          $repoName = 'terarium-tutorial'
+          $isDeployRepo = $false
           $root = 'D:\doob'
-          $repos = @(
-            'terarium-social-web',
-            'terarium-tutorial',
-            'terarium-world-server',
-            'terarium-world-viewer',
-            'terarium-deploy'
-          )
+          $target = Join-Path $root $repoName
 
-          foreach ($repo in $repos) {
-            $path = Join-Path $root $repo
-            if (!(Test-Path $path)) {
-              throw "Missing local repo: $path"
-            }
-            git config --global --add safe.directory ($path -replace '\\', '/')
+          if (!(Test-Path $target)) {
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
           }
 
-          foreach ($repo in $repos) {
-            $path = Join-Path $root $repo
-            git -C $path fetch origin
-            if ($LASTEXITCODE -ne 0) { throw "git fetch failed: $repo" }
-            git -C $path checkout main
-            if ($LASTEXITCODE -ne 0) { throw "git checkout main failed: $repo" }
-            git -C $path pull --ff-only origin main
-            if ($LASTEXITCODE -ne 0) { throw "git pull failed: $repo" }
+          $excludeDirs = @('.git', 'node_modules', 'dist', 'dist-ssr')
+          $excludeFiles = @('.env', '*.log')
+          if ($isDeployRepo) {
+            $excludeDirs += @('env', '.cloudflared')
+            $excludeFiles += @('cloudflared.stdout.log', 'cloudflared.stderr.log')
+          }
+
+          robocopy $env:GITHUB_WORKSPACE $target /MIR /XD $excludeDirs /XF $excludeFiles /NFL /NDL /NJH /NJS /NP
+          $copyCode = $LASTEXITCODE
+          if ($copyCode -gt 7) { throw "robocopy failed with exit code $copyCode" }
+
+          if ($isDeployRepo) {
+            robocopy (Join-Path $env:GITHUB_WORKSPACE 'env') (Join-Path $target 'env') *.example /E /NFL /NDL /NJH /NJS /NP
+            if ($LASTEXITCODE -gt 7) { throw 'env example sync failed' }
+            robocopy (Join-Path $env:GITHUB_WORKSPACE '.cloudflared') (Join-Path $target '.cloudflared') *.example.yml /E /NFL /NDL /NJH /NJS /NP
+            if ($LASTEXITCODE -gt 7) { throw 'cloudflared example sync failed' }
+          }
+
+          docker version
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Runner account cannot access Docker. Add githubrunner to docker-users or run the runner service as VILAB.'
           }
 
           powershell -ExecutionPolicy Bypass -File (Join-Path $root 'terarium-deploy\start-terarium-stack.ps1')
