@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import mascotSvg from './assets/image-10.svg'
 import cameraButtonSvg from './assets/camera-button.svg'
 import emojiVSvg from './assets/emoji-v.svg'
@@ -36,7 +36,7 @@ function App() {
   const [analysisResult, setAnalysisResult] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
   const [bubbleVisible, setBubbleVisible] = useState(true)
-  const [personaSessionId, setPersonaSessionId] = useState('')
+  const [personaAgentId, setPersonaAgentId] = useState('')
   const [personaQuestion, setPersonaQuestion] = useState(null)
   const [personaLoading, setPersonaLoading] = useState(false)
   const [personaError, setPersonaError] = useState('')
@@ -61,16 +61,16 @@ function App() {
   const streamRef = useRef(null)
   const startInterviewInFlightRef = useRef(false)
   const startInterviewRequestIdRef = useRef(0)
-  const syncedAppearanceSessionRef = useRef('')
+  const syncedAppearanceAgentRef = useRef('')
 
   const bubbleText =
     isCaptureProcessing
-      ? '분석 후 질문을 준비하고 있어요...'
+      ? '분석과 질문을 준비하고 있습니다...'
       : analysisStatus === 'analyzing'
-        ? '분석 중...'
+        ? '분석 중입니다...'
         : analysisStatus === 'success'
           ? '분석 완료!'
-          : '준비되면 가운데 카메라 버튼을 눌러주세요'
+          : '준비되면 가운데 카메라 버튼을 눌러주세요.'
 
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
@@ -101,8 +101,8 @@ function App() {
   const resetPersonaSession = () => {
     startInterviewRequestIdRef.current += 1
     startInterviewInFlightRef.current = false
-    syncedAppearanceSessionRef.current = ''
-    setPersonaSessionId('')
+    syncedAppearanceAgentRef.current = ''
+    setPersonaAgentId('')
     setPersonaQuestion(null)
     setPersonaLoading(false)
     setPersonaError('')
@@ -176,14 +176,14 @@ function App() {
     }
   }
 
-  const syncAppearanceToSession = useCallback(
-    async (sessionId, appearance) => {
-      if (!sessionId || !appearance || typeof appearance !== 'object') {
+  const syncAppearanceToAgent = useCallback(
+    async (agentId, appearance) => {
+      if (!agentId || !appearance || typeof appearance !== 'object') {
         return
       }
 
-      const syncKey = `${sessionId}:${JSON.stringify(appearance)}`
-      if (syncedAppearanceSessionRef.current === syncKey) {
+      const syncKey = `${agentId}:${JSON.stringify(appearance)}`
+      if (syncedAppearanceAgentRef.current === syncKey) {
         return
       }
 
@@ -193,12 +193,12 @@ function App() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ sessionId, appearance }),
+          body: JSON.stringify({ agentId, appearance }),
         })
         if (!response.ok) {
           return
         }
-        syncedAppearanceSessionRef.current = syncKey
+        syncedAppearanceAgentRef.current = syncKey
       } catch {
         // best-effort sync only
       }
@@ -238,7 +238,7 @@ function App() {
         throw new Error(payload?.error ?? 'Persona start request failed.')
       }
 
-      if (!payload?.sessionId || !payload?.question) {
+      if (!payload?.agentId || !payload?.question) {
         throw new Error('Server returned an invalid persona start response.')
       }
 
@@ -246,7 +246,7 @@ function App() {
         return
       }
 
-      setPersonaSessionId(payload.sessionId)
+      setPersonaAgentId(payload.agentId)
       setPersonaQuestion(payload.question)
       setPersonaResult(null)
       setPersonaInput('')
@@ -287,7 +287,7 @@ function App() {
 
     const startCamera = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('이 브라우저에서는 웹캠을 지원하지 않습니다.')
+        setCameraError('??釉뚮씪?곗??먯꽌???뱀틺??吏?먰븯吏 ?딆뒿?덈떎.')
         return
       }
 
@@ -308,7 +308,7 @@ function App() {
         }
         setCameraError('')
       } catch {
-        setCameraError('웹캠 권한을 허용해주세요.')
+        setCameraError('?뱀틺 沅뚰븳???덉슜?댁＜?몄슂.')
       }
     }
 
@@ -321,19 +321,19 @@ function App() {
   }, [stage])
 
   useEffect(() => {
-    if (!['nickname', 'persona'].includes(stage) || personaQuestion || personaSessionId || personaResult || personaLoading || personaError) {
+    if (!['nickname', 'persona'].includes(stage) || personaQuestion || personaAgentId || personaResult || personaLoading || personaError) {
       return
     }
 
     void startPersonaInterview()
-  }, [stage, personaQuestion, personaSessionId, personaResult, personaLoading, personaError, startPersonaInterview])
+  }, [stage, personaQuestion, personaAgentId, personaResult, personaLoading, personaError, startPersonaInterview])
 
   useEffect(() => {
-    if (!personaSessionId || !analysisResult) {
+    if (!personaAgentId || !analysisResult) {
       return
     }
-    void syncAppearanceToSession(personaSessionId, analysisResult)
-  }, [personaSessionId, analysisResult, syncAppearanceToSession])
+    void syncAppearanceToAgent(personaAgentId, analysisResult)
+  }, [personaAgentId, analysisResult, syncAppearanceToAgent])
 
   const handleStart = () => {
     if (stage !== 'idle') {
@@ -407,7 +407,7 @@ function App() {
   }
 
   const submitPersonaAnswer = async (answerText, answerMode = 'suggested') => {
-    if (!personaQuestion || !personaSessionId || personaResult || personaLoading) {
+    if (!personaQuestion || !personaAgentId || personaResult || personaLoading) {
       return
     }
 
@@ -427,7 +427,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sessionId: personaSessionId,
+          agentId: personaAgentId,
           answer: trimmedInput,
           answerMode,
           turn: personaQuestion.turn,
@@ -566,7 +566,7 @@ function App() {
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
   const isViewingHistory = historyViewIndex !== null
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
-  const canSubmitNickname = /^[가-힣0-9 ]{2,12}$/.test(nicknameInput.trim())
+  const canSubmitNickname = /^[A-Za-z0-9가-힣 ]{2,12}$/.test(nicknameInput.trim())
   const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
   const isNicknameStage = stage === 'nickname'
 
@@ -575,8 +575,8 @@ function App() {
       return
     }
 
-    if (!personaSessionId) {
-      setNicknameError('질문을 준비하고 있습니다. 잠시만 기다려 주세요.')
+    if (!personaAgentId) {
+      setNicknameError('吏덈Ц??以鍮꾪븯怨??덉뒿?덈떎. ?좎떆留?湲곕떎??二쇱꽭??')
       return
     }
 
@@ -590,7 +590,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sessionId: personaSessionId,
+          agentId: personaAgentId,
           nickname: nicknameInput.trim(),
           ageValue,
           ageLabel: ageLabelFromValue(ageValue),
@@ -600,7 +600,7 @@ function App() {
       const payload = await response.json()
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? '닉네임 저장에 실패했습니다.')
+        throw new Error(payload?.error ?? '?됰꽕????μ뿉 ?ㅽ뙣?덉뒿?덈떎.')
       }
 
       setEnterUrl(payload.enterUrl ?? '')
@@ -609,7 +609,7 @@ function App() {
       setStage('persona')
     } catch (error) {
       setNicknameStatus('error')
-      setNicknameError(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
+      setNicknameError(error instanceof Error ? error.message : '?됰꽕????μ뿉 ?ㅽ뙣?덉뒿?덈떎.')
     }
   }
 
@@ -629,7 +629,7 @@ function App() {
             시작
           </button>
 
-          <p className="description">튜토리얼을 시청하려면 시작버튼을 클릭해주세요</p>
+          <p className="description">튜토리얼을 시작하려면 시작 버튼을 눌러주세요.</p>
         </div>
       </main>
 
@@ -655,7 +655,7 @@ function App() {
                 className={`capture-button ${captureLocked ? 'is-locked' : ''}`}
                 type="button"
                 onClick={handleCapture}
-                aria-label="촬영 카운트 시작"
+                aria-label="촬영 시작"
                 disabled={captureLocked || isCaptureProcessing}
               >
                 <img src={cameraButtonSvg} alt="" aria-hidden="true" />
@@ -676,12 +676,12 @@ function App() {
             </div>
             <p className="persona-question">
               {isNicknameStage
-                ? '아바타의 이름을 정해주세요'
+                ? '프로필에 사용할 이름을 정해주세요.'
                 : personaResult
                 ? '페르소나 분석이 완료되었습니다.'
                 : isQuestionTransitionLoading
                   ? ''
-                : personaQuestionText || (personaLoading ? '질문을 생성하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
+                : personaQuestionText || (personaLoading ? '질문을 준비하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
             </p>
             {!isNicknameStage && isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
             <img className="persona-header-emoji" src={emojiVSvg} alt="" aria-hidden="true" />
@@ -728,7 +728,7 @@ function App() {
                       onClick={() => void handleNicknameClaim()}
                       disabled={!canSubmitNickname || nicknameStatus === 'checking'}
                     >
-                      {nicknameStatus === 'checking' ? '이름 저장 중...' : personaLoading ? '질문 준비 중...' : '다음으로'}
+                      {nicknameStatus === 'checking' ? '이름 확인 중...' : personaLoading ? '질문 준비 중...' : '다음으로'}
                     </button>
                   </div>
                 </article>
@@ -737,22 +737,22 @@ function App() {
                   <div className="nickname-card">
                     {enterUrl ? (
                       <div className="nickname-qr-wrap">
-                        <p className="nickname-card-title">{nicknameValue || nicknameInput.trim()}님의 개인 입장 QR입니다</p>
-                        <p className="nickname-card-copy">핸드폰으로 스캔하면 내 아바타로 로그인된 상태로 테라리움에 들어갑니다.</p>
+                        <p className="nickname-card-title">{nicknameValue || nicknameInput.trim()}님의 개인 입장 QR입니다.</p>
+                        <p className="nickname-card-copy">모바일로 스캔하면 로그인된 상태로 테라리움에 들어갑니다.</p>
                         <img className="nickname-qr-image" src={qrImageUrl} alt="개인 입장 QR 코드" />
                         <a className="nickname-link" href={enterUrl} target="_blank" rel="noreferrer">
                           {enterUrl}
                         </a>
                       </div>
                     ) : (
-                      <p className="nickname-card-copy">링크를 준비하는 중입니다.</p>
+                      <p className="nickname-card-copy">링크를 준비하고 있습니다.</p>
                     )}
                   </div>
                 </article>
               ) : !displayQuestion ? (
                 <article className="persona-status-card">
                   <p className="persona-status-text">
-                    {personaLoading ? '다음 질문을 생성하고 있습니다...' : personaError || '질문을 다시 불러와주세요.'}
+                    {personaLoading ? '다음 질문을 준비하고 있습니다...' : personaError || '질문을 다시 불러와 주세요.'}
                   </p>
                   {!personaLoading && (
                     <button className="persona-retry-button" type="button" onClick={() => void startPersonaInterview()}>
@@ -775,7 +775,7 @@ function App() {
                 <section className="persona-options" aria-label="이전 질문 답변 보기">
                   <article className="persona-answer-review-card">
                     <p className="persona-answer-review-label">
-                      {viewingHistoryEntry?.answerMode === 'custom' ? '사용자가 입력한 답변' : '선택한 답변'}
+                      {viewingHistoryEntry?.answerMode === 'custom' ? '직접 입력한 답변' : '선택한 답변'}
                     </p>
                     <p className="persona-answer-review-text">{viewingHistoryEntry?.answerText ?? ''}</p>
                   </article>
@@ -805,7 +805,7 @@ function App() {
                           className="persona-custom-editor-textarea"
                           value={personaInput}
                           onChange={(e) => setPersonaInput(e.target.value)}
-                          placeholder="직접 입력하세요 (3글자 이상)"
+                          placeholder="직접 입력하세요. (3글자 이상)"
                           disabled={personaLoading}
                         />
                       </div>
@@ -839,7 +839,7 @@ function App() {
                   onClick={handlePrevClick}
                   disabled={personaLoading || isQuestionTransitionLoading}
                 >
-                  ← 이전으로
+                  이전으로
                 </button>
               ) : (
                 <div />
@@ -851,7 +851,7 @@ function App() {
                   onClick={handleNextClick}
                   disabled={personaLoading || isQuestionTransitionLoading || (!selectedOption && !canSubmitCustomInput && !isViewingHistory)}
                 >
-                  {isQuestionTransitionLoading ? '다음 질문 생성 중...' : '다음으로 →'}
+                  {isQuestionTransitionLoading ? '다음 질문 생성 중...' : '다음으로'}
                 </button>
               )}
             </nav>
@@ -874,7 +874,7 @@ function App() {
         <section className="capture-processing-overlay" aria-live="polite">
           <div className="capture-processing-pill">
             <span className="capture-processing-dot" />
-            <p className="capture-processing-text">분석 및 질문 생성 중...</p>
+            <p className="capture-processing-text">분석과 질문 생성 중...</p>
           </div>
         </section>
       )}
@@ -883,3 +883,4 @@ function App() {
 }
 
 export default App
+
