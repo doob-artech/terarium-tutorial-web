@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url'
 import promptTemplates from './src/persona_interview_prompts.json' with { type: 'json' }
 
 const OPENAI_MODEL = 'gpt-4.1-mini'
+const APPEARANCE_LLM_SERVER_URL = String(process.env.LLM_SERVER_URL || 'http://terarium-llm-server:18200').replace(/\/+$/, '')
+const APPEARANCE_LLM_SERVER_API_KEY = String(process.env.LLM_SERVER_API_KEY || process.env.LLM_API_KEY || '').trim()
+const APPEARANCE_LLM_MODEL = String(process.env.TUTORIAL_APPEARANCE_MODEL || 'qwen3-vl:2b').trim()
+const APPEARANCE_TEXT_MODEL = String(process.env.TUTORIAL_APPEARANCE_TEXT_MODEL || 'gemma4:e4b').trim()
 const PERSONA_TOTAL_TURNS = 6
 const PERSONA_SESSION_TTL_MS = 30 * 60 * 1000
 const PERSONA_MAX_ANSWER_CHARS = 320
@@ -504,6 +508,330 @@ const extractStructuredJson = (payload) => {
 
     throw new Error('Model returned non-JSON output unexpectedly.')
   }
+}
+
+const extractStructuredJsonFromText = (text) => {
+  const normalized = String(text || '').trim()
+  if (!normalized) {
+    throw new Error('No structured JSON was returned by the model.')
+  }
+
+  try {
+    return JSON.parse(normalized)
+  } catch {
+    const fenceMatch = normalized.match(/```(?:json)?\s*([\s\S]*?)```/i)
+    const fenced = fenceMatch?.[1]?.trim()
+    if (fenced) {
+      try {
+        return JSON.parse(fenced)
+      } catch {
+        // fall through
+      }
+    }
+
+    const firstBraceIndex = normalized.indexOf('{')
+    const lastBraceIndex = normalized.lastIndexOf('}')
+    if (firstBraceIndex !== -1 && lastBraceIndex !== -1 && firstBraceIndex < lastBraceIndex) {
+      const candidate = normalized.slice(firstBraceIndex, lastBraceIndex + 1)
+      try {
+        return JSON.parse(candidate)
+      } catch {
+        // fall through
+      }
+    }
+
+    throw new Error('Model returned non-JSON output unexpectedly.')
+  }
+}
+
+const normalizeEnumValue = (value, allowedValues, fallback = 'unknown') => {
+  if (typeof value !== 'string') return fallback
+  const normalized = value.trim()
+  return allowedValues.includes(normalized) ? normalized : fallback
+}
+
+const normalizeBooleanValue = (value) => Boolean(value)
+
+const normalizeStringArray = (value, maxItems = 3) => {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item) => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, maxItems)
+}
+
+const normalizeAppearanceResult = (raw = {}) => ({
+  hair_style: normalizeEnumValue(raw.hair_style, APPEARANCE_SCHEMA.properties.hair_style.enum),
+  hair_part_direction: normalizeEnumValue(raw.hair_part_direction, APPEARANCE_SCHEMA.properties.hair_part_direction.enum),
+  bangs_type: normalizeEnumValue(raw.bangs_type, APPEARANCE_SCHEMA.properties.bangs_type.enum),
+  hair_color: normalizeEnumValue(raw.hair_color, HAIR_COLOR_ENUM),
+  eye_type: normalizeEnumValue(raw.eye_type, APPEARANCE_SCHEMA.properties.eye_type.enum),
+  eye_color: normalizeEnumValue(raw.eye_color, EYE_COLOR_ENUM),
+  mouth_type: normalizeEnumValue(raw.mouth_type, APPEARANCE_SCHEMA.properties.mouth_type.enum),
+  top_type: normalizeEnumValue(raw.top_type, APPEARANCE_SCHEMA.properties.top_type.enum),
+  bottom_type: normalizeEnumValue(raw.bottom_type, APPEARANCE_SCHEMA.properties.bottom_type.enum),
+  accessories: {
+    glasses_type: normalizeEnumValue(raw?.accessories?.glasses_type, APPEARANCE_SCHEMA.properties.accessories.properties.glasses_type.enum),
+    has_necklace: normalizeBooleanValue(raw?.accessories?.has_necklace),
+    has_earrings: normalizeBooleanValue(raw?.accessories?.has_earrings),
+  },
+  context_hypothesis: {
+    attire_formality: normalizeEnumValue(
+      raw?.context_hypothesis?.attire_formality,
+      APPEARANCE_SCHEMA.properties.context_hypothesis.properties.attire_formality.enum,
+    ),
+    likely_activity_context: normalizeEnumValue(
+      raw?.context_hypothesis?.likely_activity_context,
+      APPEARANCE_SCHEMA.properties.context_hypothesis.properties.likely_activity_context.enum,
+    ),
+    possible_role_tags: normalizeStringArray(raw?.context_hypothesis?.possible_role_tags, 3),
+  },
+})
+
+const inferAppearanceFromDescription = (description) => {
+  const text = String(description || '').toLowerCase()
+  const has = (pattern) => pattern.test(text)
+
+  let hair_style = 'unknown'
+  if (has(/\bcrew cut\b/)) hair_style = 'crew_cut'
+  else if (has(/\btwo-block\b|\btwo block\b/)) hair_style = 'two_block'
+  else if (has(/\bdandy cut\b/)) hair_style = 'dandy_cut'
+  else if (has(/\bpomade\b|slicked back/)) hair_style = 'pomade'
+  else if (has(/\bbob\b/)) hair_style = 'bob_straight'
+  else if (has(/\blong wavy\b|\blong wave\b|\bwavy hair\b/)) hair_style = 'long_wave'
+  else if (has(/\blong hair\b/)) hair_style = 'long_straight'
+  else if (has(/\bhigh ponytail\b/)) hair_style = 'ponytail_high'
+  else if (has(/\blow ponytail\b|\bponytail\b/)) hair_style = 'ponytail_low'
+  else if (has(/\bpigtails\b/)) hair_style = 'pigtails'
+  else if (has(/\bhalf-up\b|\bhalf up\b/)) hair_style = 'half_up'
+  else if (has(/\bbun\b/)) hair_style = 'bun'
+  else if (has(/\bshort hair\b|\bshort\b/)) hair_style = 'short_cut'
+
+  let hair_part_direction = 'unknown'
+  if (has(/\bcenter part\b|parted in the middle/)) hair_part_direction = 'center'
+  else if (has(/\bparted to (the )?left\b|\bleft part\b/)) hair_part_direction = 'left'
+  else if (has(/\bparted to (the )?right\b|\bright part\b/)) hair_part_direction = 'right'
+  else if (has(/\bno part\b|without a visible part/)) hair_part_direction = 'none'
+
+  let bangs_type = 'unknown'
+  if (has(/\bsee-through bangs\b|\bsee through bangs\b/)) bangs_type = 'see_through'
+  else if (has(/\bfull bangs\b|\bheavy bangs\b/)) bangs_type = 'full_bang'
+  else if (has(/\bbangs\b/)) bangs_type = 'full_bang'
+  else if (has(/\bno bangs\b|without bangs/)) bangs_type = 'none'
+
+  let hair_color = 'unknown'
+  if (has(/\bblack hair\b/)) hair_color = 'black'
+  else if (has(/\bdark brown\b/)) hair_color = 'dark_brown'
+  else if (has(/\bbrown hair\b/)) hair_color = 'brown'
+  else if (has(/\bash brown\b/)) hair_color = 'ash_brown'
+  else if (has(/\bblonde\b|platinum/)) hair_color = 'blonde'
+  else if (has(/\borange hair\b/)) hair_color = 'orange'
+  else if (has(/\bred hair\b/)) hair_color = 'red'
+  else if (has(/\bpink hair\b/)) hair_color = 'pink'
+  else if (has(/\bblue hair\b/)) hair_color = 'blue'
+  else if (has(/\bgray hair\b|\bgrey hair\b/)) hair_color = 'gray'
+  else if (has(/\bwhite hair\b/)) hair_color = 'white'
+
+  let eye_type = 'unknown'
+  if (has(/\bcat[- ]?eyes\b|upturned eyes/)) eye_type = 'upturned_cat_eyes'
+  else if (has(/\bround eyes\b/)) eye_type = 'round_dog_eyes'
+  else if (has(/\bnarrow eyes\b|\blong eyes\b/)) eye_type = 'narrow_long_eyes'
+  else if (has(/\bsmiling eyes\b|\bcrescent eyes\b/)) eye_type = 'smiling_crescent_eyes'
+  else if (has(/\bsleepy eyes\b/)) eye_type = 'sleepy_eyes'
+  else if (has(/\bdark circles\b/)) eye_type = 'dark_circles_eyes'
+
+  let eye_color = 'unknown'
+  if (has(/\bblack eyes\b/)) eye_color = 'black'
+  else if (has(/\bdark brown eyes\b|\bdark eyes\b/)) eye_color = 'dark_brown'
+  else if (has(/\bbrown eyes\b/)) eye_color = 'brown'
+  else if (has(/\bhazel eyes\b/)) eye_color = 'hazel'
+  else if (has(/\bgreen eyes\b/)) eye_color = 'green'
+  else if (has(/\bblue eyes\b/)) eye_color = 'blue'
+  else if (has(/\bgray eyes\b|\bgrey eyes\b/)) eye_color = 'gray'
+  else if (has(/\bamber eyes\b/)) eye_color = 'amber'
+
+  let mouth_type = 'unknown'
+  if (has(/\bbig smile\b|\bwide smile\b|\bgrin\b/)) mouth_type = 'big_smile'
+  else if (has(/\bsmile\b|\bsmiling\b/)) mouth_type = 'closed_smile'
+  else if (has(/\bsmirk\b/)) mouth_type = 'smirk'
+  else if (has(/\bpout\b/)) mouth_type = 'pout'
+  else if (has(/\bw-shaped mouth\b/)) mouth_type = 'w_shape'
+  else if (has(/\bsurprised\b|\bopen mouth\b/)) mouth_type = 'surprised'
+  else if (has(/\bflat mouth\b|neutral mouth/)) mouth_type = 'flat'
+
+  let top_type = 'unknown'
+  if (has(/\bhoodie\b/)) top_type = 'hoodie'
+  else if (has(/\bzip jacket\b|\bjacket\b/)) top_type = 'casual_zip_jacket'
+  else if (has(/\bshirt\b|button[- ]?up/)) top_type = 'shirt'
+  else if (has(/\blong-sleeve\b|\blong sleeve\b/)) top_type = 'long_sleeve_tshirt'
+  else if (has(/\bt-shirt\b|\btshirt\b|\btee\b|\bsleeveless top\b|\btop\b/)) top_type = 'short_sleeve_tshirt'
+
+  let bottom_type = 'unknown'
+  if (has(/\bshorts\b/)) bottom_type = 'shorts'
+  else if (has(/\blong skirt\b|\bmaxi skirt\b/)) bottom_type = 'long_skirt'
+  else if (has(/\bshort skirt\b|\bmini skirt\b/)) bottom_type = 'short_skirt'
+  else if (has(/\bpants\b|\btrousers\b|\bjeans\b/)) bottom_type = 'wide_long_pants'
+
+  const negGlasses = has(/\bno glasses\b|without glasses|no eyewear/)
+  const glasses_type = negGlasses ? 'none' : has(/\bround glasses\b/) ? 'round' : has(/\bsquare glasses\b/) ? 'square' : 'unknown'
+  const has_necklace = has(/\bnecklace\b/) && !has(/\bno necklace\b|without necklace/)
+  const has_earrings = has(/\bearrings\b/) && !has(/\bno earrings\b|without earrings/)
+
+  let attire_formality = 'unknown'
+  if (has(/\bcasual\b|t-shirt|sleeveless top|hoodie/)) attire_formality = 'casual'
+  else if (has(/\bsmart casual\b/)) attire_formality = 'smart_casual'
+  else if (has(/\bformal\b|\bsuit\b/)) attire_formality = 'formal'
+  else if (has(/\buniform\b/)) attire_formality = 'uniform_like'
+  else if (has(/\bactivewear\b|\bathletic\b|\bsportswear\b/)) attire_formality = 'activewear'
+
+  let likely_activity_context = 'unknown'
+  if (has(/\bcampus\b|\bstudy\b|\bstudent\b/)) likely_activity_context = 'campus_or_study'
+  else if (has(/\boffice\b|\badmin\b/)) likely_activity_context = 'office_or_admin'
+  else if (has(/\bcustomer\b|\bservice\b|\bstore\b|\bcafe\b/)) likely_activity_context = 'customer_facing_service'
+  else if (has(/\bcreative\b|\bmedia\b|\bstudio\b/)) likely_activity_context = 'creative_or_media'
+  else if (has(/\boutdoor\b|\bfield\b|\bpark\b/)) likely_activity_context = 'outdoor_or_field'
+  else if (has(/\bhome\b|\bpersonal\b|\bportrait\b|\bneutral background\b/)) likely_activity_context = 'home_or_personal'
+
+  return normalizeAppearanceResult({
+    hair_style,
+    hair_part_direction,
+    bangs_type,
+    hair_color,
+    eye_type,
+    eye_color,
+    mouth_type,
+    top_type,
+    bottom_type,
+    accessories: {
+      glasses_type,
+      has_necklace,
+      has_earrings,
+    },
+    context_hypothesis: {
+      attire_formality,
+      likely_activity_context,
+      possible_role_tags: [],
+    },
+  })
+}
+
+const buildAppearanceExtractionPrompt = () => {
+  const lines = [
+    'Return exactly one JSON object with these keys only.',
+    `hair_style: ${APPEARANCE_SCHEMA.properties.hair_style.enum.join(', ')}`,
+    `hair_part_direction: ${APPEARANCE_SCHEMA.properties.hair_part_direction.enum.join(', ')}`,
+    `bangs_type: ${APPEARANCE_SCHEMA.properties.bangs_type.enum.join(', ')}`,
+    `hair_color: ${HAIR_COLOR_ENUM.join(', ')}`,
+    `eye_type: ${APPEARANCE_SCHEMA.properties.eye_type.enum.join(', ')}`,
+    `eye_color: ${EYE_COLOR_ENUM.join(', ')}`,
+    `mouth_type: ${APPEARANCE_SCHEMA.properties.mouth_type.enum.join(', ')}`,
+    `top_type: ${APPEARANCE_SCHEMA.properties.top_type.enum.join(', ')}`,
+    `bottom_type: ${APPEARANCE_SCHEMA.properties.bottom_type.enum.join(', ')}`,
+    `accessories.glasses_type: ${APPEARANCE_SCHEMA.properties.accessories.properties.glasses_type.enum.join(', ')}`,
+    `context_hypothesis.attire_formality: ${APPEARANCE_SCHEMA.properties.context_hypothesis.properties.attire_formality.enum.join(', ')}`,
+    `context_hypothesis.likely_activity_context: ${APPEARANCE_SCHEMA.properties.context_hypothesis.properties.likely_activity_context.enum.join(', ')}`,
+    'accessories.has_necklace: true or false',
+    'accessories.has_earrings: true or false',
+    'context_hypothesis.possible_role_tags: array of 0 to 3 short strings',
+    'Map each field to the closest allowed enum when the description gives enough evidence.',
+    'Use unknown only when the description does not provide enough evidence.',
+    'Do not infer age or protected traits.',
+    'Do not add markdown, comments, or code fences.',
+    'Use this exact shape:',
+    '{"hair_style":"unknown","hair_part_direction":"unknown","bangs_type":"unknown","hair_color":"unknown","eye_type":"unknown","eye_color":"unknown","mouth_type":"unknown","top_type":"unknown","bottom_type":"unknown","accessories":{"glasses_type":"unknown","has_necklace":false,"has_earrings":false},"context_hypothesis":{"attire_formality":"unknown","likely_activity_context":"unknown","possible_role_tags":[]}}',
+  ]
+  return lines.join('\n')
+}
+
+const requestAppearanceDescriptionViaLlmServer = async ({ imageDataUrl }) => {
+  if (!APPEARANCE_LLM_SERVER_API_KEY) {
+    throw new Error('LLM_SERVER_API_KEY is not configured on the server.')
+  }
+
+  const response = await fetch(`${APPEARANCE_LLM_SERVER_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${APPEARANCE_LLM_SERVER_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: APPEARANCE_LLM_MODEL,
+      temperature: 0.1,
+      num_predict: 220,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Describe only visible appearance facts from one image. Focus on hair, bangs, eye impression, mouth expression, top clothing, bottom clothing if visible, accessories, and likely setting cues. If no person is visible, answer only NO_PERSON.',
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'What visible person appearance do you see? Return 4 to 7 short English sentences about hair, face, clothing, accessories, and background. Mention only visible facts.',
+            },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        },
+      ],
+    }),
+  })
+
+  const payload = await response.json()
+  if (!response.ok) {
+    const message = payload?.error?.message || 'Appearance VLM request failed.'
+    throw new Error(message)
+  }
+
+  return String(payload?.choices?.[0]?.message?.content || '').trim()
+}
+
+const requestAppearanceStructuringViaLlmServer = async ({ description }) => {
+  const extractionPrompt = buildAppearanceExtractionPrompt()
+  const repairInstruction = 'Previous output was invalid. Return only the JSON object in the required shape.'
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const extraRepair = attempt === 1 ? '' : `\n${repairInstruction}`
+    const response = await fetch(`${APPEARANCE_LLM_SERVER_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${APPEARANCE_LLM_SERVER_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: APPEARANCE_TEXT_MODEL,
+        temperature: 0.1,
+        num_predict: 400,
+        messages: [
+          {
+            role: 'system',
+            content: `Convert a visible-person description into the required appearance JSON.\n${extractionPrompt}${extraRepair}`,
+          },
+          {
+            role: 'user',
+            content: `Visible description:\n${description}`,
+          },
+        ],
+      }),
+    })
+
+    const payload = await response.json()
+    if (!response.ok) {
+      const message = payload?.error?.message || 'Appearance structuring request failed.'
+      throw new Error(message)
+    }
+
+    const text = payload?.choices?.[0]?.message?.content || ''
+    try {
+      return normalizeAppearanceResult(extractStructuredJsonFromText(text))
+    } catch (error) {
+      if (attempt >= 2) throw error
+    }
+  }
+
+  throw new Error('Appearance structuring request failed.')
 }
 
 const isMaxTokensIncomplete = (payload) =>
@@ -1778,13 +2106,7 @@ app.post('/api/nickname/claim', async (req, res) => {
 })
 
 app.post('/api/analyze-appearance', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY
   const imageDataUrl = req.body?.imageDataUrl
-
-  if (!apiKey) {
-    res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' })
-    return
-  }
 
   if (typeof imageDataUrl !== 'string' || !imageDataUrl.startsWith('data:image/')) {
     res.status(400).json({ error: 'Invalid imageDataUrl.' })
@@ -1792,38 +2114,11 @@ app.post('/api/analyze-appearance', async (req, res) => {
   }
 
   try {
-    const result = await requestStructuredJson({
-      apiKey,
-      schemaName: 'appearance_attributes',
-      schema: APPEARANCE_SCHEMA,
-      input: [
-        {
-          role: 'system',
-          content: [
-            {
-              type: 'input_text',
-              text: APPEARANCE_ANALYSIS_SYSTEM_PROMPT,
-            },
-          ],
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: APPEARANCE_ANALYSIS_USER_PROMPT,
-            },
-            {
-              type: 'input_image',
-              image_url: imageDataUrl,
-              detail: 'low',
-            },
-          ],
-        },
-      ],
-      maxOutputTokens: 500,
-      safetyIdentifier: 'tutorial-appearance-analysis',
-    })
+    const description = await requestAppearanceDescriptionViaLlmServer({ imageDataUrl })
+    const result =
+      description === 'NO_PERSON' || !description
+        ? normalizeAppearanceResult({})
+        : inferAppearanceFromDescription(description)
     res.json({ result })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown server error.'
@@ -1835,7 +2130,7 @@ app.post('/api/analyze-appearance', async (req, res) => {
 
     if (isRateLimitError) {
       res.status(429).json({
-        error: 'OpenAI rate limit/quota exceeded. Wait a moment and retry. If this persists, check project billing/quota.',
+        error: 'Appearance VLM is currently busy. Wait a moment and retry.',
       })
       return
     }
