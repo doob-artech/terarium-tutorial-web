@@ -1,0 +1,8 @@
+﻿[
+  { "set": "attraction", "questionType": "initiative_rhythm", "focus": "Focus axis: first-attraction signal, initiative rhythm, and early interest expression." },
+  { "set": "contact", "questionType": "contact_style", "focus": "Focus axis: contact rhythm, reply latency expectation, and texting tone." },
+  { "set": "taste", "questionType": "lifestyle_taste", "focus": "Focus axis: daily lifestyle anchors, solo recharge, hobbies, likes, dislikes, and date texture." },
+  { "set": "boundaries", "questionType": "boundary_heat", "focus": "Focus axis: boundary setting, jealousy trigger, respect expectation, and physical-distance comfort." },
+  { "set": "conflict", "questionType": "repair_pattern", "focus": "Focus axis: conflict style, defensive habit, apology standard, and repair threshold." },
+  { "set": "commitment", "questionType": "future_shape", "focus": "Focus axis: relationship goal clarity, intimacy pace, certainty threshold, and partner role expectation." }
+]

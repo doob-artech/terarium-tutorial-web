@@ -6,8 +6,7 @@ import speechBubbleSvg from './assets/speech-bubble.svg'
 import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
-const AGE_MIN = 18
-const AGE_MAX = 60
+const PERSONA_TOTAL_TURNS = 6
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -34,7 +33,6 @@ function App() {
   const [cameraError, setCameraError] = useState('')
   const [analysisStatus, setAnalysisStatus] = useState('idle')
   const [analysisResult, setAnalysisResult] = useState(null)
-  const [analysisError, setAnalysisError] = useState('')
   const [bubbleVisible, setBubbleVisible] = useState(true)
   const [personaAgentId, setPersonaAgentId] = useState('')
   const [personaQuestion, setPersonaQuestion] = useState(null)
@@ -46,7 +44,6 @@ function App() {
   const [nicknameError, setNicknameError] = useState('')
   const [nicknameStatus, setNicknameStatus] = useState('idle')
   const [nicknameValue, setNicknameValue] = useState('')
-  const [ageValue, setAgeValue] = useState(24)
   const [enterUrl, setEnterUrl] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
@@ -77,16 +74,6 @@ function App() {
     timeoutIdsRef.current = []
   }
 
-  const ageLabelFromValue = (value) => {
-    if (value <= AGE_MIN) {
-      return '18세 이하'
-    }
-    if (value >= AGE_MAX) {
-      return '60세 이상'
-    }
-    return `${value}세`
-  }
-
   const stopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
@@ -112,11 +99,11 @@ function App() {
     setNicknameError('')
     setNicknameStatus('idle')
     setNicknameValue('')
-    setAgeValue(24)
     setEnterUrl('')
     setAnsweredHistory([])
     setHistoryViewIndex(null)
     setSelectedAnswerMode('suggested')
+    setSelectedOption(null)
     setIsCaptureProcessing(false)
   }
 
@@ -142,7 +129,6 @@ function App() {
 
   const analyzePhotoWithOpenAI = async (imageDataUrl) => {
     setAnalysisStatus('analyzing')
-    setAnalysisError('')
 
     try {
       const response = await fetch('/api/analyze-appearance', {
@@ -165,13 +151,10 @@ function App() {
 
       setAnalysisResult(payload.result)
       setAnalysisStatus('success')
-      setAnalysisError('')
-      console.log('Appearance JSON:', payload.result)
       return payload.result
-    } catch (error) {
+    } catch {
       setAnalysisStatus('error')
       setAnalysisResult(null)
-      setAnalysisError(error instanceof Error ? error.message : 'Unknown error during analysis.')
       return null
     }
   }
@@ -227,8 +210,6 @@ function App() {
         },
         body: JSON.stringify({
           appearance: appearancePayload,
-          ageValue,
-          ageLabel: ageLabelFromValue(ageValue),
         }),
       })
 
@@ -267,7 +248,7 @@ function App() {
       }
       startInterviewInFlightRef.current = false
     }
-  }, [analysisResult, ageValue])
+  }, [analysisResult])
 
   useEffect(() => {
     return () => {
@@ -347,7 +328,6 @@ function App() {
     setIsCaptureProcessing(false)
     setAnalysisStatus('idle')
     setAnalysisResult(null)
-    setAnalysisError('')
     setStage('expanding')
 
     const expandTimer = window.setTimeout(() => {
@@ -386,11 +366,9 @@ function App() {
         if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
           setAnalysisStatus('success')
           setAnalysisResult(MOCK_APPEARANCE_RESULT)
-          setAnalysisError('')
         } else {
           if (!imageDataUrl) {
             setAnalysisStatus('error')
-            setAnalysisError('Camera frame capture failed. Try again.')
           } else {
             await analyzePhotoWithOpenAI(imageDataUrl)
           }
@@ -566,6 +544,8 @@ function App() {
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
   const isViewingHistory = historyViewIndex !== null
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
+  const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
+  const canSubmitSelection = Boolean(selectedOption)
   const canSubmitNickname = /^[A-Za-z0-9가-힣 ]{2,12}$/.test(nicknameInput.trim())
   const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
   const isNicknameStage = stage === 'nickname'
@@ -592,8 +572,6 @@ function App() {
         body: JSON.stringify({
           agentId: personaAgentId,
           nickname: nicknameInput.trim(),
-          ageValue,
-          ageLabel: ageLabelFromValue(ageValue),
         }),
       })
 
@@ -672,7 +650,7 @@ function App() {
           <header className="persona-header">
             <div className="persona-question-meta">
               <span className="persona-meta-label">{isNicknameStage ? 'Profile' : 'Question'}</span>
-              <span className="persona-meta-count">{isNicknameStage ? '이름' : `${displayQuestion ? displayQuestion.turn : 1}/6`}</span>
+              <span className="persona-meta-count">{isNicknameStage ? '이름' : `${displayQuestion ? displayQuestion.turn : 1}/${PERSONA_TOTAL_TURNS}`}</span>
             </div>
             <p className="persona-question">
               {isNicknameStage
@@ -705,20 +683,6 @@ function App() {
                         setNicknameError('')
                         setNicknameStatus('idle')
                       }}
-                      disabled={nicknameStatus === 'checking'}
-                    />
-                    <label className="nickname-card-copy" htmlFor="age-slider">
-                      나이대: {ageLabelFromValue(ageValue)}
-                    </label>
-                    <input
-                      id="age-slider"
-                      className="age-slider"
-                      type="range"
-                      min={AGE_MIN}
-                      max={AGE_MAX}
-                      step="1"
-                      value={ageValue}
-                      onChange={(event) => setAgeValue(Number(event.target.value))}
                       disabled={nicknameStatus === 'checking'}
                     />
                     {nicknameError && <p className="nickname-error">{nicknameError}</p>}
@@ -785,7 +749,7 @@ function App() {
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
 
                   {!isPersonaCustomInputOpen &&
-                    displayQuestion.options.map((option, index) => (
+                    displayOptions.map((option, index) => (
                       <button
                         key={`persona-option-${displayQuestion.turn}-${index}`}
                         type="button"
@@ -844,12 +808,12 @@ function App() {
               ) : (
                 <div />
               )}
-              {(selectedOption || canSubmitCustomInput || isQuestionTransitionLoading || isViewingHistory) && (
+              {(canSubmitSelection || canSubmitCustomInput || isQuestionTransitionLoading || isViewingHistory) && (
                 <button
                   className="nav-btn next-btn is-active"
                   type="button"
                   onClick={handleNextClick}
-                  disabled={personaLoading || isQuestionTransitionLoading || (!selectedOption && !canSubmitCustomInput && !isViewingHistory)}
+                  disabled={personaLoading || isQuestionTransitionLoading || (!canSubmitSelection && !canSubmitCustomInput && !isViewingHistory)}
                 >
                   {isQuestionTransitionLoading ? '다음 질문 생성 중...' : '다음으로'}
                 </button>

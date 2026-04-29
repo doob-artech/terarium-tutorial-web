@@ -5,12 +5,19 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import promptTemplates from './src/persona_interview_prompts.json' with { type: 'json' }
+import {
+  PERSONA_RESULT_SCHEMA,
+  buildPersonaPromptText,
+  normalizePersonaProfileResult,
+} from './src/personaRuntime.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const OPENAI_MODEL = 'gpt-4.1-mini'
 const APPEARANCE_LLM_SERVER_URL = String(process.env.LLM_SERVER_URL || 'http://terarium-llm-server:18200').replace(/\/+$/, '')
 const APPEARANCE_LLM_SERVER_API_KEY = String(process.env.LLM_SERVER_API_KEY || process.env.LLM_API_KEY || '').trim()
-const APPEARANCE_LLM_MODEL = String(process.env.TUTORIAL_APPEARANCE_MODEL || 'qwen3-vl:2b').trim()
-const APPEARANCE_TEXT_MODEL = String(process.env.TUTORIAL_APPEARANCE_TEXT_MODEL || 'gemma4:e4b').trim()
+const APPEARANCE_LLM_MODEL = String(process.env.TUTORIAL_APPEARANCE_MODEL || 'gemma4:e4b').trim()
 const PERSONA_TOTAL_TURNS = 6
 const PERSONA_SESSION_TTL_MS = 30 * 60 * 1000
 const PERSONA_MAX_ANSWER_CHARS = 320
@@ -27,9 +34,40 @@ const PERSONA_RESULT_USER_INSTRUCTION_LINES = promptTemplates.persona.result_use
 const ROUTINE_SYSTEM_PROMPT = promptTemplates.routine.system_prompt_lines.join('\n').trim()
 const ROUTINE_GENERATION_GUARD_PROMPT = promptTemplates.routine.generation_guard_prompt
 const ROUTINE_USER_INSTRUCTION_LINES = promptTemplates.routine.user_instructions
-const APPEARANCE_ANALYSIS_SYSTEM_PROMPT = promptTemplates.appearance_analysis.system_prompt
-const APPEARANCE_ANALYSIS_USER_PROMPT = promptTemplates.appearance_analysis.user_prompt
 const { Pool } = pg
+
+const PERSONA_INTERVIEW_MODULES = [
+  {
+    set: 'attraction',
+    questionType: 'initiative_rhythm',
+    focus: 'Focus axis: first-attraction signal, initiative rhythm, and early interest expression.',
+  },
+  {
+    set: 'contact',
+    questionType: 'contact_style',
+    focus: 'Focus axis: contact rhythm, reply latency expectation, and texting tone.',
+  },
+  {
+    set: 'taste',
+    questionType: 'lifestyle_taste',
+    focus: 'Focus axis: daily lifestyle anchors, solo recharge, hobbies, likes, dislikes, and date texture.',
+  },
+  {
+    set: 'boundaries',
+    questionType: 'boundary_heat',
+    focus: 'Focus axis: boundary setting, jealousy trigger, respect expectation, and physical-distance comfort.',
+  },
+  {
+    set: 'conflict',
+    questionType: 'repair_pattern',
+    focus: 'Focus axis: conflict style, defensive habit, apology standard, and repair threshold.',
+  },
+  {
+    set: 'commitment',
+    questionType: 'future_shape',
+    focus: 'Focus axis: relationship goal clarity, intimacy pace, certainty threshold, and partner role expectation.',
+  },
+]
 
 class DbAppError extends Error {
   constructor(statusCode, message) {
@@ -49,6 +87,18 @@ const dbPool = new Pool({
   idleTimeoutMillis: Number(process.env.POSTGRES_IDLE_TIMEOUT_MS || 30000),
   connectionTimeoutMillis: Number(process.env.POSTGRES_CONNECT_TIMEOUT_MS || 5000),
 })
+
+const ensureTutorialSchema = async () => {
+  await dbPool.query(`
+    ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS is_ready BOOLEAN NOT NULL DEFAULT false;
+    UPDATE agent_profiles
+    SET is_ready = true
+    WHERE COALESCE(agent_name, '') <> ''
+      AND agent_name <> agent_id
+      AND COALESCE(persona_json, '{}'::jsonb) <> '{}'::jsonb
+      AND COALESCE(routine_json, '{}'::jsonb) <> '{}'::jsonb;
+  `)
+}
 
 const isDbUnavailableError = (errorOrMessage) => {
   const message = String(
@@ -91,6 +141,25 @@ const HAIR_COLOR_ENUM = [
 ]
 
 const EYE_COLOR_ENUM = ['black', 'dark_brown', 'brown', 'hazel', 'green', 'blue', 'gray', 'amber', 'unknown']
+const CLOTHING_COLOR_ENUM = [
+  'black',
+  'dark_brown',
+  'brown',
+  'light_brown',
+  'beige',
+  'gray',
+  'white',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'blue',
+  'navy',
+  'purple',
+  'pink',
+  'multicolor',
+  'unknown',
+]
 
 const APPEARANCE_SCHEMA = {
   type: 'object',
@@ -121,7 +190,7 @@ const APPEARANCE_SCHEMA = {
     hair_part_direction: {
       type: 'string',
       enum: ['none', 'center', 'left', 'right', 'unknown'],
-      description: 'Hair part direction. Korean taxonomy: ?놁쓬/以묒븰/醫뚯륫/?곗륫',
+      description: 'Hair part direction.',
     },
     bangs_type: {
       type: 'string',
@@ -159,12 +228,27 @@ const APPEARANCE_SCHEMA = {
     top_type: {
       type: 'string',
       enum: ['short_sleeve_tshirt', 'long_sleeve_tshirt', 'shirt', 'hoodie', 'casual_zip_jacket', 'unknown'],
-      description: 'Top clothing type. Korean taxonomy: 諛섑뙏 ?곗뀛痢?湲댄뙏 ?곗뀛痢??붿툩/?꾨뱶??罹먯＜???먯폆(?뉗? 吏묒뾽)',
+      description: 'Top clothing type.',
+    },
+    top_color: {
+      type: 'string',
+      enum: CLOTHING_COLOR_ENUM,
+      description: 'Main visible top clothing color. If unclear, infer the most plausible likely color instead of leaving it empty.',
     },
     bottom_type: {
       type: 'string',
       enum: ['wide_long_pants', 'shorts', 'long_skirt', 'short_skirt', 'unknown'],
       description: 'Bottom clothing type.',
+    },
+    bottom_color: {
+      type: 'string',
+      enum: CLOTHING_COLOR_ENUM,
+      description: 'Main visible bottom clothing color. If unclear, infer the most plausible likely color instead of leaving it empty.',
+    },
+    shoe_type: {
+      type: 'string',
+      enum: ['sneakers', 'unknown'],
+      description: 'Visible shoe type.',
     },
     accessories: {
       type: 'object',
@@ -173,7 +257,7 @@ const APPEARANCE_SCHEMA = {
         glasses_type: {
           type: 'string',
           enum: ['none', 'round', 'square', 'unknown'],
-          description: 'Glasses type. Korean taxonomy: ?덇꼍 ?놁쓬/?덇꼍(?κ렐)/?덇꼍(?ш컖)',
+          description: 'Glasses type.',
         },
         has_necklace: {
           type: 'boolean',
@@ -187,32 +271,6 @@ const APPEARANCE_SCHEMA = {
       required: ['glasses_type', 'has_necklace', 'has_earrings'],
       description: 'Accessory attributes.',
     },
-    context_hypothesis: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        attire_formality: {
-          type: 'string',
-          enum: ['casual', 'smart_casual', 'formal', 'uniform_like', 'activewear', 'unknown'],
-        },
-        likely_activity_context: {
-          type: 'string',
-          enum: ['campus_or_study', 'office_or_admin', 'customer_facing_service', 'creative_or_media', 'outdoor_or_field', 'home_or_personal', 'unknown'],
-        },
-        possible_role_tags: {
-          type: 'array',
-          minItems: 0,
-          maxItems: 3,
-          items: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 24,
-          },
-        },
-      },
-      required: ['attire_formality', 'likely_activity_context', 'possible_role_tags'],
-      description: 'Low-confidence context hypothesis from visible attire and setting cues. Do not treat as facts.',
-    },
   },
   required: [
     'hair_style',
@@ -223,9 +281,11 @@ const APPEARANCE_SCHEMA = {
     'eye_color',
     'mouth_type',
     'top_type',
+    'top_color',
     'bottom_type',
+    'bottom_color',
+    'shoe_type',
     'accessories',
-    'context_hypothesis',
   ],
 }
 
@@ -261,130 +321,6 @@ const PERSONA_QUESTION_SCHEMA = {
     },
   },
   required: ['turn', 'set', 'question_type', 'question', 'options'],
-}
-
-const PERSONA_RESULT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    age: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 20,
-      description: 'Trusted age-range context reflected as natural Korean phrase.',
-    },
-    profile_label: {
-      type: 'string',
-      minLength: 2,
-      maxLength: 32,
-      description: 'Memorable Korean card label for this persona.',
-    },
-    prioritized_values: {
-      type: 'array',
-      minItems: 3,
-      maxItems: 3,
-      items: { type: 'string', minLength: 8, maxLength: 120 },
-      description: 'Three concrete Korean value statements that this person uses to judge relationship fit.',
-    },
-    outlook_bias: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'First-read bias this person tends to apply when interpreting another person.',
-    },
-    character_tag: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 32,
-      description: 'Compact Korean archetype label that captures romantic behavior signature.',
-    },
-    romance_drive: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'What fundamentally motivates this person in romance.',
-    },
-    approach_style: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'How this person initiates or approaches someone they like.',
-    },
-    contact_style: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'Preferred messaging frequency, pace, and emotional cadence.',
-    },
-    boundary_rule: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'Core boundary rule this person expects to be respected.',
-    },
-    jealousy_trigger: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'Signals that destabilize trust or trigger jealousy.',
-    },
-    conflict_style: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'How this person tends to communicate during conflict.',
-    },
-    repair_style: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'How this person repairs trust after conflict.',
-    },
-    commitment_goal: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'Desired relationship trajectory and commitment preference.',
-    },
-    hard_limits: {
-      type: 'array',
-      minItems: 2,
-      maxItems: 5,
-      items: { type: 'string', minLength: 1, maxLength: 32 },
-      description:
-        'Non-negotiables that, once crossed, are treated as irreversible deal-breakers (e.g., repeated lying, betrayal).',
-    },
-    decision_bias: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 140,
-      description: 'What evidence this person prioritizes when making relationship decisions.',
-    },
-    one_line_core: {
-      type: 'string',
-      minLength: 1,
-      maxLength: 100,
-      description: 'One-line Korean core summary that can steer agent behavior immediately.',
-    },
-  },
-  required: [
-    'age',
-    'profile_label',
-    'prioritized_values',
-    'outlook_bias',
-    'character_tag',
-    'romance_drive',
-    'approach_style',
-    'contact_style',
-    'boundary_rule',
-    'jealousy_trigger',
-    'conflict_style',
-    'repair_style',
-    'commitment_goal',
-    'hard_limits',
-    'decision_bias',
-    'one_line_core',
-  ],
 }
 
 const ROUTINE_SCHEMA = {
@@ -432,6 +368,8 @@ const normalizeUntrustedText = (text, maxChars = PERSONA_MAX_ANSWER_CHARS) => {
 
   const normalized = text
     .normalize('NFKC')
+    // User input can contain pasted control characters; strip them before sending text to models or SQL.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -510,40 +448,6 @@ const extractStructuredJson = (payload) => {
   }
 }
 
-const extractStructuredJsonFromText = (text) => {
-  const normalized = String(text || '').trim()
-  if (!normalized) {
-    throw new Error('No structured JSON was returned by the model.')
-  }
-
-  try {
-    return JSON.parse(normalized)
-  } catch {
-    const fenceMatch = normalized.match(/```(?:json)?\s*([\s\S]*?)```/i)
-    const fenced = fenceMatch?.[1]?.trim()
-    if (fenced) {
-      try {
-        return JSON.parse(fenced)
-      } catch {
-        // fall through
-      }
-    }
-
-    const firstBraceIndex = normalized.indexOf('{')
-    const lastBraceIndex = normalized.lastIndexOf('}')
-    if (firstBraceIndex !== -1 && lastBraceIndex !== -1 && firstBraceIndex < lastBraceIndex) {
-      const candidate = normalized.slice(firstBraceIndex, lastBraceIndex + 1)
-      try {
-        return JSON.parse(candidate)
-      } catch {
-        // fall through
-      }
-    }
-
-    throw new Error('Model returned non-JSON output unexpectedly.')
-  }
-}
-
 const normalizeEnumValue = (value, allowedValues, fallback = 'unknown') => {
   if (typeof value !== 'string') return fallback
   const normalized = value.trim()
@@ -552,13 +456,27 @@ const normalizeEnumValue = (value, allowedValues, fallback = 'unknown') => {
 
 const normalizeBooleanValue = (value) => Boolean(value)
 
-const normalizeStringArray = (value, maxItems = 3) => {
-  if (!Array.isArray(value)) return []
-  return value
-    .filter((item) => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, maxItems)
+const inferImaginedClothingColor = (fieldName, raw = {}) => {
+  const typeValue = fieldName === 'top_color' ? raw?.top_type : raw?.bottom_type
+
+  if (fieldName === 'top_color') {
+    if (typeValue === 'shirt') return 'white'
+    if (typeValue === 'hoodie') return 'gray'
+    if (typeValue === 'casual_zip_jacket') return 'black'
+    return 'white'
+  }
+
+  if (typeValue === 'short_skirt' || typeValue === 'long_skirt') return 'black'
+  if (typeValue === 'shorts') return 'blue'
+  return 'black'
+}
+
+const normalizeClothingColorValue = (value, fieldName, raw = {}) => {
+  const normalized = normalizeEnumValue(value, CLOTHING_COLOR_ENUM)
+  if (normalized !== 'unknown') {
+    return normalized
+  }
+  return inferImaginedClothingColor(fieldName, raw)
 }
 
 const normalizeAppearanceResult = (raw = {}) => ({
@@ -570,22 +488,14 @@ const normalizeAppearanceResult = (raw = {}) => ({
   eye_color: normalizeEnumValue(raw.eye_color, EYE_COLOR_ENUM),
   mouth_type: normalizeEnumValue(raw.mouth_type, APPEARANCE_SCHEMA.properties.mouth_type.enum),
   top_type: normalizeEnumValue(raw.top_type, APPEARANCE_SCHEMA.properties.top_type.enum),
+  top_color: normalizeClothingColorValue(raw.top_color, 'top_color', raw),
   bottom_type: normalizeEnumValue(raw.bottom_type, APPEARANCE_SCHEMA.properties.bottom_type.enum),
+  bottom_color: normalizeClothingColorValue(raw.bottom_color, 'bottom_color', raw),
+  shoe_type: normalizeEnumValue(raw.shoe_type, APPEARANCE_SCHEMA.properties.shoe_type.enum),
   accessories: {
     glasses_type: normalizeEnumValue(raw?.accessories?.glasses_type, APPEARANCE_SCHEMA.properties.accessories.properties.glasses_type.enum),
     has_necklace: normalizeBooleanValue(raw?.accessories?.has_necklace),
     has_earrings: normalizeBooleanValue(raw?.accessories?.has_earrings),
-  },
-  context_hypothesis: {
-    attire_formality: normalizeEnumValue(
-      raw?.context_hypothesis?.attire_formality,
-      APPEARANCE_SCHEMA.properties.context_hypothesis.properties.attire_formality.enum,
-    ),
-    likely_activity_context: normalizeEnumValue(
-      raw?.context_hypothesis?.likely_activity_context,
-      APPEARANCE_SCHEMA.properties.context_hypothesis.properties.likely_activity_context.enum,
-    ),
-    possible_role_tags: normalizeStringArray(raw?.context_hypothesis?.possible_role_tags, 3),
   },
 })
 
@@ -667,31 +577,55 @@ const inferAppearanceFromDescription = (description) => {
   else if (has(/\blong-sleeve\b|\blong sleeve\b/)) top_type = 'long_sleeve_tshirt'
   else if (has(/\bt-shirt\b|\btshirt\b|\btee\b|\bsleeveless top\b|\btop\b/)) top_type = 'short_sleeve_tshirt'
 
+  let top_color = 'unknown'
+  if (has(/\bblack (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'black'
+  else if (has(/\bdark brown (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'dark_brown'
+  else if (has(/\bbrown (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'brown'
+  else if (has(/\blight brown (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'light_brown'
+  else if (has(/\bbeige (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'beige'
+  else if (has(/\bgray (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b|\bgrey (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'gray'
+  else if (has(/\bwhite (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'white'
+  else if (has(/\bred (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'red'
+  else if (has(/\borange (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'orange'
+  else if (has(/\byellow (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'yellow'
+  else if (has(/\bgreen (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'green'
+  else if (has(/\bblue (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'blue'
+  else if (has(/\bnavy (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'navy'
+  else if (has(/\bpurple (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'purple'
+  else if (has(/\bpink (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'pink'
+  else if (has(/\bmulticolor(ed)? (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'multicolor'
+
   let bottom_type = 'unknown'
   if (has(/\bshorts\b/)) bottom_type = 'shorts'
   else if (has(/\blong skirt\b|\bmaxi skirt\b/)) bottom_type = 'long_skirt'
   else if (has(/\bshort skirt\b|\bmini skirt\b/)) bottom_type = 'short_skirt'
   else if (has(/\bpants\b|\btrousers\b|\bjeans\b/)) bottom_type = 'wide_long_pants'
 
+  let bottom_color = 'unknown'
+  if (has(/\bblack (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'black'
+  else if (has(/\bdark brown (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'dark_brown'
+  else if (has(/\bbrown (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'brown'
+  else if (has(/\blight brown (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'light_brown'
+  else if (has(/\bbeige (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'beige'
+  else if (has(/\bgray (pants|trousers|jeans|shorts|skirt)\b|\bgrey (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'gray'
+  else if (has(/\bwhite (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'white'
+  else if (has(/\bred (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'red'
+  else if (has(/\borange (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'orange'
+  else if (has(/\byellow (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'yellow'
+  else if (has(/\bgreen (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'green'
+  else if (has(/\bblue (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'blue'
+  else if (has(/\bnavy (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'navy'
+  else if (has(/\bpurple (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'purple'
+  else if (has(/\bpink (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'pink'
+  else if (has(/\bmulticolor(ed)? (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'multicolor'
+
+  let shoe_type = 'unknown'
+  if (has(/\bsneakers\b|\btrainers\b|\btennis shoes\b|\brunning shoes\b/)) shoe_type = 'sneakers'
+
   const negGlasses = has(/\bno glasses\b|without glasses|no eyewear/)
   const glasses_type = negGlasses ? 'none' : has(/\bround glasses\b/) ? 'round' : has(/\bsquare glasses\b/) ? 'square' : 'unknown'
   const has_necklace = has(/\bnecklace\b/) && !has(/\bno necklace\b|without necklace/)
   const has_earrings = has(/\bearrings\b/) && !has(/\bno earrings\b|without earrings/)
-
-  let attire_formality = 'unknown'
-  if (has(/\bcasual\b|t-shirt|sleeveless top|hoodie/)) attire_formality = 'casual'
-  else if (has(/\bsmart casual\b/)) attire_formality = 'smart_casual'
-  else if (has(/\bformal\b|\bsuit\b/)) attire_formality = 'formal'
-  else if (has(/\buniform\b/)) attire_formality = 'uniform_like'
-  else if (has(/\bactivewear\b|\bathletic\b|\bsportswear\b/)) attire_formality = 'activewear'
-
-  let likely_activity_context = 'unknown'
-  if (has(/\bcampus\b|\bstudy\b|\bstudent\b/)) likely_activity_context = 'campus_or_study'
-  else if (has(/\boffice\b|\badmin\b/)) likely_activity_context = 'office_or_admin'
-  else if (has(/\bcustomer\b|\bservice\b|\bstore\b|\bcafe\b/)) likely_activity_context = 'customer_facing_service'
-  else if (has(/\bcreative\b|\bmedia\b|\bstudio\b/)) likely_activity_context = 'creative_or_media'
-  else if (has(/\boutdoor\b|\bfield\b|\bpark\b/)) likely_activity_context = 'outdoor_or_field'
-  else if (has(/\bhome\b|\bpersonal\b|\bportrait\b|\bneutral background\b/)) likely_activity_context = 'home_or_personal'
 
   return normalizeAppearanceResult({
     hair_style,
@@ -702,46 +636,168 @@ const inferAppearanceFromDescription = (description) => {
     eye_color,
     mouth_type,
     top_type,
+    top_color,
     bottom_type,
+    bottom_color,
+    shoe_type,
     accessories: {
       glasses_type,
       has_necklace,
       has_earrings,
     },
-    context_hypothesis: {
-      attire_formality,
-      likely_activity_context,
-      possible_role_tags: [],
-    },
   })
 }
 
-const buildAppearanceExtractionPrompt = () => {
-  const lines = [
-    'Return exactly one JSON object with these keys only.',
-    `hair_style: ${APPEARANCE_SCHEMA.properties.hair_style.enum.join(', ')}`,
-    `hair_part_direction: ${APPEARANCE_SCHEMA.properties.hair_part_direction.enum.join(', ')}`,
-    `bangs_type: ${APPEARANCE_SCHEMA.properties.bangs_type.enum.join(', ')}`,
-    `hair_color: ${HAIR_COLOR_ENUM.join(', ')}`,
-    `eye_type: ${APPEARANCE_SCHEMA.properties.eye_type.enum.join(', ')}`,
-    `eye_color: ${EYE_COLOR_ENUM.join(', ')}`,
-    `mouth_type: ${APPEARANCE_SCHEMA.properties.mouth_type.enum.join(', ')}`,
-    `top_type: ${APPEARANCE_SCHEMA.properties.top_type.enum.join(', ')}`,
-    `bottom_type: ${APPEARANCE_SCHEMA.properties.bottom_type.enum.join(', ')}`,
-    `accessories.glasses_type: ${APPEARANCE_SCHEMA.properties.accessories.properties.glasses_type.enum.join(', ')}`,
-    `context_hypothesis.attire_formality: ${APPEARANCE_SCHEMA.properties.context_hypothesis.properties.attire_formality.enum.join(', ')}`,
-    `context_hypothesis.likely_activity_context: ${APPEARANCE_SCHEMA.properties.context_hypothesis.properties.likely_activity_context.enum.join(', ')}`,
-    'accessories.has_necklace: true or false',
-    'accessories.has_earrings: true or false',
-    'context_hypothesis.possible_role_tags: array of 0 to 3 short strings',
-    'Map each field to the closest allowed enum when the description gives enough evidence.',
-    'Use unknown only when the description does not provide enough evidence.',
-    'Do not infer age or protected traits.',
-    'Do not add markdown, comments, or code fences.',
-    'Use this exact shape:',
-    '{"hair_style":"unknown","hair_part_direction":"unknown","bangs_type":"unknown","hair_color":"unknown","eye_type":"unknown","eye_color":"unknown","mouth_type":"unknown","top_type":"unknown","bottom_type":"unknown","accessories":{"glasses_type":"unknown","has_necklace":false,"has_earrings":false},"context_hypothesis":{"attire_formality":"unknown","likely_activity_context":"unknown","possible_role_tags":[]}}',
-  ]
-  return lines.join('\n')
+const countUnknownAppearanceFields = (appearance = {}) => {
+  let unknowns = 0
+  if (appearance.hair_style === 'unknown') unknowns += 1
+  if (appearance.hair_part_direction === 'unknown') unknowns += 1
+  if (appearance.bangs_type === 'unknown') unknowns += 1
+  if (appearance.hair_color === 'unknown') unknowns += 1
+  if (appearance.eye_type === 'unknown') unknowns += 1
+  if (appearance.eye_color === 'unknown') unknowns += 1
+  if (appearance.mouth_type === 'unknown') unknowns += 1
+  if (appearance.top_type === 'unknown') unknowns += 1
+  if (appearance.top_color === 'unknown') unknowns += 1
+  if (appearance.bottom_type === 'unknown') unknowns += 1
+  if (appearance.bottom_color === 'unknown') unknowns += 1
+  if (appearance.shoe_type === 'unknown') unknowns += 1
+  if (appearance?.accessories?.glasses_type === 'unknown') unknowns += 1
+  return unknowns
+}
+
+const parseEnumChoice = (text, allowedValues, fallback = 'unknown') => {
+  const normalized = String(text || '').trim().toLowerCase()
+  if (!normalized) return fallback
+  for (const value of allowedValues) {
+    if (normalized === String(value).toLowerCase()) return value
+  }
+  for (const value of allowedValues) {
+    if (normalized.includes(String(value).toLowerCase())) return value
+  }
+  return fallback
+}
+
+const parseBooleanChoice = (text, fallback = false) => {
+  const normalized = String(text || '').trim().toLowerCase()
+  if (normalized === 'true' || normalized.includes('true')) return true
+  if (normalized === 'false' || normalized.includes('false')) return false
+  return fallback
+}
+
+const requestAppearanceSingleChoiceViaLlmServer = async ({ imageDataUrl, fieldName, allowedValues, instruction }) => {
+  const response = await fetch(`${APPEARANCE_LLM_SERVER_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${APPEARANCE_LLM_SERVER_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: APPEARANCE_LLM_MODEL,
+      temperature: 0.1,
+      num_predict: 32,
+      messages: [
+        {
+          role: 'system',
+          content: `${instruction}\nField: ${fieldName}\nAllowed values: ${allowedValues.join(', ')}\nReturn exactly one allowed value only. No JSON. No explanation.`,
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Choose one value for ${fieldName} from the allowed list.`,
+            },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        },
+      ],
+    }),
+  })
+
+  const payload = await response.json()
+  if (!response.ok) {
+    const message = payload?.error?.message || 'Appearance single-choice request failed.'
+    throw new Error(message)
+  }
+
+  return String(payload?.choices?.[0]?.message?.content || '').trim()
+}
+
+const refineAppearanceUnknownsViaLlmServer = async ({ imageDataUrl, appearance }) => {
+  const refined = JSON.parse(JSON.stringify(appearance))
+
+  const chooseEnum = async (fieldName, allowedValues, instruction) => {
+    const raw = await requestAppearanceSingleChoiceViaLlmServer({ imageDataUrl, fieldName, allowedValues, instruction })
+    return parseEnumChoice(raw, allowedValues, 'unknown')
+  }
+
+  if (refined.hair_style === 'unknown') {
+    refined.hair_style = await chooseEnum('hair_style', APPEARANCE_SCHEMA.properties.hair_style.enum, 'Choose the closest visible hair style from the list.')
+  }
+  if (refined.hair_part_direction === 'unknown') {
+    refined.hair_part_direction = await chooseEnum('hair_part_direction', APPEARANCE_SCHEMA.properties.hair_part_direction.enum, 'Choose the visible hair part direction from the list.')
+  }
+  if (refined.hair_color === 'unknown') {
+    refined.hair_color = await chooseEnum('hair_color', HAIR_COLOR_ENUM, 'Choose the closest visible hair color from the list.')
+  }
+  if (refined.eye_type === 'unknown') {
+    refined.eye_type = await chooseEnum('eye_type', APPEARANCE_SCHEMA.properties.eye_type.enum, 'Choose the closest visible eye shape or impression from the list.')
+  }
+  if (refined.eye_color === 'unknown') {
+    refined.eye_color = await chooseEnum('eye_color', EYE_COLOR_ENUM, 'Choose the closest visible iris or eye color from the list.')
+  }
+  if (refined.mouth_type === 'unknown') {
+    refined.mouth_type = await chooseEnum('mouth_type', APPEARANCE_SCHEMA.properties.mouth_type.enum, 'Choose the closest visible mouth expression from the list.')
+  }
+  if (refined.top_type === 'unknown') {
+    refined.top_type = await chooseEnum('top_type', APPEARANCE_SCHEMA.properties.top_type.enum, 'Choose the closest visible top clothing type from the list.')
+  }
+  if (refined.top_color === 'unknown') {
+    refined.top_color = await chooseEnum(
+      'top_color',
+      CLOTHING_COLOR_ENUM,
+      'Choose the main top clothing color from the list. Never leave this as unknown. If unclear, infer the most plausible likely color.',
+    )
+  }
+  if (refined.bottom_type === 'unknown') {
+    refined.bottom_type = await chooseEnum('bottom_type', APPEARANCE_SCHEMA.properties.bottom_type.enum, 'Choose the closest visible bottom clothing type from the list. If not visible, use unknown.')
+  }
+  if (refined.bottom_color === 'unknown') {
+    refined.bottom_color = await chooseEnum(
+      'bottom_color',
+      CLOTHING_COLOR_ENUM,
+      'Choose the main bottom clothing color from the list. Never leave this as unknown. If unclear, infer the most plausible likely color.',
+    )
+  }
+  if (refined.shoe_type === 'unknown') {
+    refined.shoe_type = await chooseEnum('shoe_type', APPEARANCE_SCHEMA.properties.shoe_type.enum, 'Choose the visible shoe type from the list. If shoes are not visible, use unknown.')
+  }
+  if (refined.accessories.glasses_type === 'unknown') {
+    refined.accessories.glasses_type = await chooseEnum(
+      'glasses_type',
+      APPEARANCE_SCHEMA.properties.accessories.properties.glasses_type.enum,
+      'Choose the visible glasses type from the list. If no glasses are visible, choose none.',
+    )
+  }
+
+  const necklaceRaw = await requestAppearanceSingleChoiceViaLlmServer({
+    imageDataUrl,
+    fieldName: 'has_necklace',
+    allowedValues: ['true', 'false'],
+    instruction: 'Decide whether a necklace is visibly present.',
+  })
+  refined.accessories.has_necklace = parseBooleanChoice(necklaceRaw, refined.accessories.has_necklace)
+
+  const earringsRaw = await requestAppearanceSingleChoiceViaLlmServer({
+    imageDataUrl,
+    fieldName: 'has_earrings',
+    allowedValues: ['true', 'false'],
+    instruction: 'Decide whether earrings are visibly present.',
+  })
+  refined.accessories.has_earrings = parseBooleanChoice(earringsRaw, refined.accessories.has_earrings)
+
+  return normalizeAppearanceResult(refined)
 }
 
 const requestAppearanceDescriptionViaLlmServer = async ({ imageDataUrl }) => {
@@ -786,52 +842,6 @@ const requestAppearanceDescriptionViaLlmServer = async ({ imageDataUrl }) => {
   }
 
   return String(payload?.choices?.[0]?.message?.content || '').trim()
-}
-
-const requestAppearanceStructuringViaLlmServer = async ({ description }) => {
-  const extractionPrompt = buildAppearanceExtractionPrompt()
-  const repairInstruction = 'Previous output was invalid. Return only the JSON object in the required shape.'
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const extraRepair = attempt === 1 ? '' : `\n${repairInstruction}`
-    const response = await fetch(`${APPEARANCE_LLM_SERVER_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${APPEARANCE_LLM_SERVER_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: APPEARANCE_TEXT_MODEL,
-        temperature: 0.1,
-        num_predict: 400,
-        messages: [
-          {
-            role: 'system',
-            content: `Convert a visible-person description into the required appearance JSON.\n${extractionPrompt}${extraRepair}`,
-          },
-          {
-            role: 'user',
-            content: `Visible description:\n${description}`,
-          },
-        ],
-      }),
-    })
-
-    const payload = await response.json()
-    if (!response.ok) {
-      const message = payload?.error?.message || 'Appearance structuring request failed.'
-      throw new Error(message)
-    }
-
-    const text = payload?.choices?.[0]?.message?.content || ''
-    try {
-      return normalizeAppearanceResult(extractStructuredJsonFromText(text))
-    } catch (error) {
-      if (attempt >= 2) throw error
-    }
-  }
-
-  throw new Error('Appearance structuring request failed.')
 }
 
 const isMaxTokensIncomplete = (payload) =>
@@ -958,36 +968,13 @@ const requestStructuredJson = async ({ apiKey, schemaName, schema, input, maxOut
   return doRequest(1)
 }
 
-const getTurnMeta = (turn) => ({
-  set: `turn_${turn}`,
-  questionType: 'main',
-})
-
-const TURN_FOCUS_DIRECTIVES = {
-  1: 'Focus axis: first-attraction signal and initiative rhythm.',
-  2: 'Focus axis: contact frequency and emotional response latency.',
-  3: 'Focus axis: jealousy trigger and trust calibration.',
-  4: 'Focus axis: conflict conversation style under emotional load.',
-  5: 'Focus axis: boundary setting and respect expectation.',
-  6: 'Focus axis: commitment preference and relationship goal clarity.',
-}
-
-const normalizeAgeValue = (value) => {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) {
-    return 24
+const getTurnMeta = (turn) => {
+  const module = PERSONA_INTERVIEW_MODULES[Math.max(0, turn - 1)] || PERSONA_INTERVIEW_MODULES[0]
+  return {
+    set: module.set,
+    questionType: module.questionType,
+    focus: module.focus,
   }
-  return Math.min(60, Math.max(18, Math.round(numeric)))
-}
-
-const ageLabelFromValue = (value) => {
-  if (value <= 18) {
-    return '18 or below'
-  }
-  if (value >= 60) {
-    return '60 or above'
-  }
-  return `${value}`
 }
 
 const cleanupExpiredPersonaSessions = () => {
@@ -1007,7 +994,7 @@ const serializePersonaHistory = (answers) =>
     turn: entry.turn,
     questionType: entry.questionType,
     question: entry.question,
-    suggestedOptions: entry.options,
+    suggestedOptions: Array.isArray(entry.options) ? entry.options : [],
     answer: buildModelSafeText(entry.answer),
     answerMode: entry.answerMode,
     answerRiskLevel: entry.answerRiskLevel ?? 'low',
@@ -1062,6 +1049,16 @@ const APPEARANCE_VALUE_LABELS = {
     purple: 'purple-toned hair',
     multicolor: 'multi-color hair',
   },
+  eye_color: {
+    black: 'black eyes',
+    dark_brown: 'dark-brown eyes',
+    brown: 'brown eyes',
+    hazel: 'hazel eyes',
+    green: 'green eyes',
+    blue: 'blue eyes',
+    gray: 'gray eyes',
+    amber: 'amber eyes',
+  },
   eye_type: {
     upturned_cat_eyes: 'upturned eyes',
     round_dog_eyes: 'round eyes',
@@ -1086,31 +1083,55 @@ const APPEARANCE_VALUE_LABELS = {
     hoodie: 'hoodie',
     casual_zip_jacket: 'casual zip jacket',
   },
+  top_color: {
+    black: 'black top',
+    dark_brown: 'dark-brown top',
+    brown: 'brown top',
+    light_brown: 'light-brown top',
+    beige: 'beige top',
+    gray: 'gray top',
+    white: 'white top',
+    red: 'red top',
+    orange: 'orange top',
+    yellow: 'yellow top',
+    green: 'green top',
+    blue: 'blue top',
+    navy: 'navy top',
+    purple: 'purple top',
+    pink: 'pink top',
+    multicolor: 'multi-color top',
+  },
   bottom_type: {
     wide_long_pants: 'wide long pants',
     shorts: 'shorts',
     long_skirt: 'long skirt',
     short_skirt: 'short skirt',
   },
+  bottom_color: {
+    black: 'black bottom',
+    dark_brown: 'dark-brown bottom',
+    brown: 'brown bottom',
+    light_brown: 'light-brown bottom',
+    beige: 'beige bottom',
+    gray: 'gray bottom',
+    white: 'white bottom',
+    red: 'red bottom',
+    orange: 'orange bottom',
+    yellow: 'yellow bottom',
+    green: 'green bottom',
+    blue: 'blue bottom',
+    navy: 'navy bottom',
+    purple: 'purple bottom',
+    pink: 'pink bottom',
+    multicolor: 'multi-color bottom',
+  },
+  shoe_type: {
+    sneakers: 'sneakers',
+  },
   glasses_type: {
     none: 'no glasses',
     round: 'round glasses',
     square: 'square glasses',
-  },
-  attire_formality: {
-    casual: 'casual outfit',
-    smart_casual: 'smart-casual outfit',
-    formal: 'formal outfit',
-    uniform_like: 'uniform-like outfit',
-    activewear: 'activewear-like outfit',
-  },
-  likely_activity_context: {
-    campus_or_study: 'campus/study context',
-    office_or_admin: 'office/admin context',
-    customer_facing_service: 'customer-facing context',
-    creative_or_media: 'creative/media context',
-    outdoor_or_field: 'outdoor/field context',
-    home_or_personal: 'home/personal context',
   },
 }
 
@@ -1163,34 +1184,26 @@ const buildAppearanceHintText = (appearance) => {
   const topType = labelAppearanceValue('top_type', appearance.top_type)
   if (topType) hints.push(topType)
 
+  const topColor = labelAppearanceValue('top_color', appearance.top_color)
+  if (topColor) hints.push(topColor)
+
   const bottomType = labelAppearanceValue('bottom_type', appearance.bottom_type)
   if (bottomType) hints.push(bottomType)
 
+  const bottomColor = labelAppearanceValue('bottom_color', appearance.bottom_color)
+  if (bottomColor) hints.push(bottomColor)
+
+  const shoeType = labelAppearanceValue('shoe_type', appearance.shoe_type)
+  if (shoeType) hints.push(shoeType)
+
   const glassesType = labelAppearanceValue('glasses_type', appearance?.accessories?.glasses_type)
   if (glassesType) hints.push(glassesType)
-
-  const attireFormality = labelAppearanceValue('attire_formality', appearance?.context_hypothesis?.attire_formality)
-  if (attireFormality) hints.push(attireFormality)
-
-  const activityContext = labelAppearanceValue('likely_activity_context', appearance?.context_hypothesis?.likely_activity_context)
-  if (activityContext) hints.push(activityContext)
 
   if (appearance?.accessories?.has_earrings === true) {
     hints.push('earrings visible')
   }
   if (appearance?.accessories?.has_necklace === true) {
     hints.push('necklace visible')
-  }
-
-  if (Array.isArray(appearance?.context_hypothesis?.possible_role_tags)) {
-    const roleTags = appearance.context_hypothesis.possible_role_tags
-      .map((item) => (typeof item === 'string' ? item.trim() : ''))
-      .filter(Boolean)
-      .slice(0, 3)
-
-    if (roleTags.length > 0) {
-      hints.push(`possible role tags: ${roleTags.join(', ')}`)
-    }
   }
 
   if (hints.length === 0) {
@@ -1200,19 +1213,10 @@ const buildAppearanceHintText = (appearance) => {
   return `Low-confidence camera hint: ${hints.slice(0, 8).join(', ')}`
 }
 
-const normalizeListStrings = (items, { min = 0, max = 8, fallback = [] } = {}) => {
-  const normalized = Array.isArray(items)
-    ? items
-        .map((item) => (typeof item === 'string' ? item.trim() : ''))
-        .filter(Boolean)
-    : []
-
-  const unique = [...new Set(normalized)]
-  if (unique.length >= min) {
-    return unique.slice(0, max)
-  }
-
-  return [...fallback].slice(0, max)
+const looksLikeBrokenNickname = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return false
+  return text.includes('�') || /\?{2,}/.test(text)
 }
 
 const normalizeNickname = (value) => {
@@ -1220,6 +1224,9 @@ const normalizeNickname = (value) => {
   if (!nickname) return ''
   if (nickname.length < 2 || nickname.length > 12) {
     throw new DbAppError(400, 'nickname must be 2-12 chars')
+  }
+  if (looksLikeBrokenNickname(nickname)) {
+    throw new DbAppError(400, 'nickname appears to be corrupted')
   }
   for (const ch of nickname) {
     if (ch.charCodeAt(0) < 32) {
@@ -1231,14 +1238,7 @@ const normalizeNickname = (value) => {
 
 const normalizeAppearancePayload = (value) => {
   if (!value || typeof value !== 'object') return {}
-  const normalized = { ...value }
-  const contextHypothesis = normalized.context_hypothesis
-  if (contextHypothesis && typeof contextHypothesis === 'object') {
-    const cleaned = { ...contextHypothesis }
-    delete cleaned.estimated_age_band
-    normalized.context_hypothesis = cleaned
-  }
-  return normalized
+  return { ...value }
 }
 
 const normalizeRoutinePayload = (value, validNodeRefs = new Set()) => {
@@ -1246,16 +1246,23 @@ const normalizeRoutinePayload = (value, validNodeRefs = new Set()) => {
   const blocks = Array.isArray(value.blocks) ? value.blocks : []
   const normalizedBlocks = []
 
+  const normalizedNodeRefMap = new Map(
+    [...validNodeRefs].map((ref) => [String(ref).trim().toLowerCase(), String(ref).trim()]),
+  )
+
   for (const block of blocks) {
     if (!block || typeof block !== 'object' || Array.isArray(block)) continue
     const startHour = Number(block.start_hour)
     const endHour = Number(block.end_hour)
-    const nodeRef = typeof block.node_ref === 'string' ? block.node_ref.trim() : ''
+    let nodeRef = typeof block.node_ref === 'string' ? block.node_ref.trim() : ''
     const activity = typeof block.activity === 'string' ? block.activity.trim() : ''
     const rationale = typeof block.rationale === 'string' ? block.rationale.trim() : ''
     if (!Number.isInteger(startHour) || !Number.isInteger(endHour)) continue
     if (startHour < 0 || endHour > 24 || startHour >= endHour) continue
     if (!nodeRef || !activity || !rationale) continue
+    if (validNodeRefs.size > 0 && !validNodeRefs.has(nodeRef)) {
+      nodeRef = normalizedNodeRefMap.get(nodeRef.toLowerCase()) || ''
+    }
     if (validNodeRefs.size > 0 && !validNodeRefs.has(nodeRef)) continue
     normalizedBlocks.push({
       start_hour: startHour,
@@ -1444,12 +1451,12 @@ const startTutorialAgent = async ({ agentId, appearance }) => {
             WHEN agent_profiles.appearance_json = '{}'::jsonb THEN EXCLUDED.appearance_json
             ELSE agent_profiles.appearance_json
           END,
+          is_ready = false,
           updated_at = NOW(),
           last_active_at = NOW()
       `,
       [normalizedAgentId, JSON.stringify(normalizeAppearancePayload(appearance))],
     )
-    await ensureAgentSpawnState(client, normalizedAgentId)
 
     const row = await getAgentById(client, normalizedAgentId)
     await client.query('COMMIT')
@@ -1462,7 +1469,7 @@ const startTutorialAgent = async ({ agentId, appearance }) => {
   }
 }
 
-const completeTutorialAgent = async ({ agentId, appearance, personaResult, routine }) => {
+const completeTutorialAgent = async ({ agentId, appearance, personaResult, routine, nickname }) => {
   const normalizedAgentId = String(agentId || '').trim()
   if (!normalizedAgentId) {
     throw new DbAppError(400, 'agentId is required')
@@ -1470,6 +1477,7 @@ const completeTutorialAgent = async ({ agentId, appearance, personaResult, routi
 
   const normalizedAppearance = normalizeAppearancePayload(appearance)
   const profile = personaResult && typeof personaResult === 'object' ? personaResult : {}
+  const normalizedNickname = typeof nickname === 'string' && nickname.trim() ? normalizeNickname(nickname) : ''
   const validNodeRefs = new Set((await getSceneGraphNodesForRoutine()).map((node) => node.nodeRef))
   const normalizedRoutine = normalizeRoutinePayload(routine, validNodeRefs)
   const client = await dbPool.connect()
@@ -1485,6 +1493,8 @@ const completeTutorialAgent = async ({ agentId, appearance, personaResult, routi
           appearance_json = $2::jsonb,
           persona_json = $3::jsonb,
           routine_json = $4::jsonb,
+          agent_name = CASE WHEN $5 <> '' THEN $5 ELSE agent_profiles.agent_name END,
+          is_ready = true,
           updated_at = NOW(),
           last_active_at = NOW()
       `,
@@ -1493,6 +1503,7 @@ const completeTutorialAgent = async ({ agentId, appearance, personaResult, routi
         JSON.stringify(normalizedAppearance),
         JSON.stringify(profile),
         JSON.stringify(normalizedRoutine),
+        normalizedNickname,
       ],
     )
     await ensureAgentSpawnState(client, normalizedAgentId)
@@ -1530,17 +1541,17 @@ const claimNickname = async ({ agentId, nickname }) => {
         VALUES ($1, NOW(), NOW())
         ON CONFLICT (agent_id)
         DO UPDATE SET
+          is_ready = false,
           updated_at = NOW(),
           last_active_at = NOW()
       `,
       [normalizedAgentId],
     )
-    await ensureAgentSpawnState(client, normalizedAgentId)
 
     const updated = await client.query(
       `
         UPDATE agent_profiles
-        SET agent_name = $1, updated_at = NOW(), last_active_at = NOW()
+        SET agent_name = $1, is_ready = false, updated_at = NOW(), last_active_at = NOW()
         WHERE agent_id = $2
           AND NOT EXISTS (
             SELECT 1 FROM agent_profiles existing
@@ -1570,57 +1581,6 @@ const claimNickname = async ({ agentId, nickname }) => {
   }
 }
 
-const normalizeAgentProfileResult = ({ rawResult, ageValue, ageLabel }) => {
-  const clean = (value, fallback = '') =>
-    typeof value === 'string' && value.trim() ? value.trim() : fallback
-  const cleanList = (value, fallback = [], min = 1, max = 8) => normalizeListStrings(value, { min, max, fallback })
-  const resolvedAgeValue = normalizeAgeValue(ageValue)
-  const resolvedAgeLabel = clean(ageLabel, ageLabelFromValue(resolvedAgeValue))
-  const characterTag = clean(rawResult?.character_tag ?? rawResult?.characterTag, '신중한 관찰자')
-  const romanceDrive = clean(rawResult?.romance_drive ?? rawResult?.romanceDrive, '관계를 빠르게 결론내리기보다 상호 반응과 일관성을 보며 천천히 신뢰를 쌓으려 합니다.')
-  const approachStyle = clean(rawResult?.approach_style ?? rawResult?.approachStyle, '관심이 생겨도 바로 밀어붙이기보다 상대 반응을 살핀 뒤 자연스럽게 거리를 좁힙니다.')
-  const contactStyle = clean(rawResult?.contact_style ?? rawResult?.contactStyle, '연락 빈도는 꾸준히 유지하되 상대 일정과 답장 속도를 보며 리듬을 조절합니다.')
-  const boundaryRule = clean(rawResult?.boundary_rule ?? rawResult?.boundaryRule, '약속과 개인 시간을 모두 존중받길 원하며, 애매한 상황은 그냥 넘기지 않고 기준을 확인합니다.')
-  const conflictStyle = clean(rawResult?.conflict_style ?? rawResult?.conflictStyle, '감정이 올라와도 바로 단절하기보다 말투를 가다듬고 핵심 쟁점을 정리해 대화하려 합니다.')
-  const repairStyle = clean(rawResult?.repair_style ?? rawResult?.repairStyle, '갈등 후에는 시간을 조금 둔 뒤 구체적으로 무엇이 문제였는지 짚으며 신뢰 회복 여부를 판단합니다.')
-  const commitmentGoal = clean(rawResult?.commitment_goal ?? rawResult?.commitmentGoal, '가벼운 호기심보다 장기적으로 믿고 의지할 수 있는 관계로 발전할 가능성을 봅니다.')
-  const decisionBias = clean(rawResult?.decision_bias ?? rawResult?.decisionBias, '말보다 반복되는 행동, 약속 이행, 반응의 일관성을 더 강하게 판단 근거로 삼습니다.')
-  const oneLineCore = clean(rawResult?.one_line_core ?? rawResult?.oneLineCore, '천천히 관찰하면서도 기준이 맞는 상대에게는 꾸준히 신뢰를 쌓아 가는 타입입니다.')
-  const prioritizedValues = cleanList(
-    rawResult?.prioritized_values ?? rawResult?.prioritizedValues,
-    [
-      '말보다 행동의 일관성을 더 오래 관찰하며 관계의 신뢰도를 판단합니다.',
-      '상대의 개인 시간을 존중하되 중요한 약속과 태도 변화는 분명하게 확인하고 싶어합니다.',
-      '감정 표현의 강도보다 상황을 조율하려는 태도와 책임감 있는 반응을 더 높게 평가합니다.',
-    ],
-    3,
-    3,
-  )
-  return {
-    age: resolvedAgeLabel,
-    profileLabel: clean(rawResult?.profile_label ?? rawResult?.profileLabel, `${characterTag}형`),
-    prioritizedValues,
-    outlookBias: clean(rawResult?.outlook_bias ?? rawResult?.outlookBias, '호감이 있어도 바로 확신하기보다 상대가 얼마나 꾸준하고 성실한지 먼저 보려는 편입니다.'),
-    characterTag,
-    romanceDrive,
-    approachStyle,
-    contactStyle,
-    boundaryRule,
-    jealousyTrigger: clean(rawResult?.jealousy_trigger ?? rawResult?.jealousyTrigger, '말을 아끼면서도 다른 사람에게는 유독 적극적인 태도나, 설명 없이 반복되는 거리두기에 민감해집니다.'),
-    conflictStyle,
-    repairStyle,
-    commitmentGoal,
-    decisionBias,
-    oneLineCore,
-    hardLimits: cleanList(
-      rawResult?.hard_limits ?? rawResult?.hardLimits,
-      ['거짓말 반복', '약속을 가볍게 넘기는 태도', '무시하거나 통제하려는 행동'],
-      3,
-      5,
-    ),
-  }
-}
-
 const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
   const turnMeta = getTurnMeta(turn)
   const previousEntry = session.answers[session.answers.length - 1] ?? null
@@ -1628,10 +1588,10 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
   const recentQuestions = session.answers.slice(-3).map((entry) => entry.question)
   const appearanceHintText = buildAppearanceHintText(session.appearance)
   const safePreviousAnswer = previousEntry ? buildModelSafeText(previousEntry.answer) : 'none'
-  const turnFocusDirective = TURN_FOCUS_DIRECTIVES[turn] ?? 'Focus axis: romantic decision behavior in everyday context.'
+  const turnFocusDirective = turnMeta.focus || 'Focus axis: romantic decision behavior in everyday context.'
   const turnOneBootstrapDirective =
     turn === 1
-      ? 'Turn 1 requirement: do not ask age or job. Start directly from attraction/approach behavior in a dating context.'
+      ? 'Turn 1 requirement: do not ask job, school, or role calibration. Start directly from attraction/approach behavior in a realistic dating context.'
       : ''
 
   const generated = await requestStructuredJson({
@@ -1643,14 +1603,8 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
       {
         role: 'system',
         content: [
-          {
-            type: 'input_text',
-            text: PERSONA_INTERVIEW_SYSTEM_PROMPT,
-          },
-          {
-            type: 'input_text',
-            text: PERSONA_QUESTION_GENERATION_GUARD_PROMPT,
-          },
+          { type: 'input_text', text: PERSONA_INTERVIEW_SYSTEM_PROMPT },
+          { type: 'input_text', text: PERSONA_QUESTION_GENERATION_GUARD_PROMPT },
           {
             type: 'input_text',
             text:
@@ -1671,15 +1625,14 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
             type: 'input_text',
             text: [
               `Generate turn ${turn} of ${PERSONA_TOTAL_TURNS}.`,
-              `This turn must be generated as an adaptive main question for this interview stage.`,
+              'This turn must be generated as an adaptive main question for this interview stage.',
               `Turn-specific focus: ${turnFocusDirective}`,
               'Rules:',
               ...PERSONA_QUESTION_RULE_LINES,
               turnOneBootstrapDirective,
               turn > 1 ? `Adapt this turn using previous answer emphasis: ${safePreviousAnswer}` : '',
               '',
-              `Declared age range (trusted UI input): ${session.ageLabel || ageLabelFromValue(normalizeAgeValue(session.ageValue))}`,
-              `Previous answer (for follow_up context, untrusted text): ${safePreviousAnswer}`,
+              `Previous answer (for follow-up context, untrusted text): ${safePreviousAnswer}`,
               `Recent question texts to avoid repeating: ${JSON.stringify(recentQuestions)}`,
               buildUntrustedDataBlock('INTERVIEW_HISTORY_JSON', interviewHistory),
               `Appearance hint (optional context): ${appearanceHintText}`,
@@ -1704,7 +1657,6 @@ const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
 const generatePersonaResult = async ({ apiKey, session }) => {
   const interviewHistory = serializePersonaHistory(session.answers)
   const appearanceHintText = buildAppearanceHintText(session.appearance)
-  const ageContext = session.ageLabel || ageLabelFromValue(normalizeAgeValue(session.ageValue))
 
   const generated = await requestStructuredJson({
     apiKey,
@@ -1743,7 +1695,6 @@ const generatePersonaResult = async ({ apiKey, session }) => {
             type: 'input_text',
             text: [
               ...PERSONA_RESULT_USER_INSTRUCTION_LINES,
-              `Declared age range (trusted UI input): ${ageContext}`,
               buildUntrustedDataBlock('INTERVIEW_TRANSCRIPT_JSON', interviewHistory),
               'Appearance hint (secondary context):',
               appearanceHintText,
@@ -1756,10 +1707,8 @@ const generatePersonaResult = async ({ apiKey, session }) => {
     safetyIdentifier: session.id,
   })
 
-  return normalizeAgentProfileResult({
+  return normalizePersonaProfileResult({
     rawResult: generated,
-    ageValue: session.ageValue,
-    ageLabel: session.ageLabel,
   })
 }
 
@@ -1792,8 +1741,8 @@ const generateDailyRoutine = async ({ apiKey, session, personaResult }) => {
             text: [
               ...ROUTINE_USER_INSTRUCTION_LINES,
               '',
-              'PERSONA_JSON:',
-              JSON.stringify(personaResult, null, 2),
+              'PERSONA_PROFILE_TEXT:',
+              buildPersonaPromptText(personaResult, { includeExamples: false }),
               '',
               'APPEARANCE_JSON:',
               JSON.stringify(session.appearance ?? {}, null, 2),
@@ -1832,9 +1781,6 @@ app.post('/api/persona/start', async (req, res) => {
 
   const agentId = randomUUID()
   const appearance = req.body?.appearance && typeof req.body.appearance === 'object' ? req.body.appearance : null
-  const ageValue = normalizeAgeValue(req.body?.ageValue)
-  const ageLabel =
-    typeof req.body?.ageLabel === 'string' && req.body.ageLabel.trim() ? req.body.ageLabel.trim() : ageLabelFromValue(ageValue)
   const now = Date.now()
 
   const session = {
@@ -1842,8 +1788,6 @@ app.post('/api/persona/start', async (req, res) => {
     createdAt: now,
     updatedAt: now,
     appearance,
-    ageValue,
-    ageLabel,
     nickname: '',
     answers: [],
     currentTurn: 1,
@@ -1855,14 +1799,6 @@ app.post('/api/persona/start', async (req, res) => {
     const firstQuestion = await generatePersonaQuestion({ apiKey, session, turn: 1 })
     session.currentQuestion = firstQuestion
     personaSessions.set(agentId, session)
-    try {
-      await startTutorialAgent({
-        agentId,
-        appearance,
-      })
-    } catch (dbError) {
-      console.error('[persona/start] failed to persist tutorial agent start:', dbError)
-    }
 
     res.json({
       agentId,
@@ -1878,10 +1814,10 @@ app.post('/api/persona/answer', async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY
   const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : ''
   const answerRaw = typeof req.body?.answer === 'string' ? req.body.answer : ''
-  const answer = normalizeUntrustedText(answerRaw, PERSONA_MAX_ANSWER_CHARS)
   const answerModeRaw = typeof req.body?.answerMode === 'string' ? req.body.answerMode.trim() : 'suggested'
   const answerMode = answerModeRaw === 'custom' ? 'custom' : 'suggested'
-  const answerRisk = analyzeInjectionRisk(answer)
+  const normalizedAnswer = normalizeUntrustedText(answerRaw, PERSONA_MAX_ANSWER_CHARS)
+  const answerRisk = analyzeInjectionRisk(normalizedAnswer)
   if (!apiKey) {
     res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' })
     return
@@ -1890,14 +1826,8 @@ app.post('/api/persona/answer', async (req, res) => {
     res.status(400).json({ error: 'agentId is required.' })
     return
   }
-  if (!answer) {
+  if (!normalizedAnswer) {
     res.status(400).json({ error: 'answer is required.' })
-    return
-  }
-  if (answerMode === 'custom' && answerRisk.riskLevel === 'high') {
-    res.status(400).json({
-      error: '???????????????????? ??? ??????????? ??? ?????????????. ??? ????????????????????',
-    })
     return
   }
   cleanupExpiredPersonaSessions()
@@ -1918,13 +1848,20 @@ app.post('/api/persona/answer', async (req, res) => {
     res.status(409).json({ error: 'Session state is invalid. Current question not found.' })
     return
   }
+  if (answerMode === 'custom' && answerRisk.riskLevel === 'high') {
+    res.status(400).json({
+      error: '직접 입력 문장에 시스템 지시처럼 보이는 내용이 많습니다. 자연스러운 설명으로 다시 적어주세요.',
+    })
+    return
+  }
+
   session.answers.push({
     turn: currentQuestion.turn,
     set: currentQuestion.set,
     questionType: currentQuestion.question_type,
     question: currentQuestion.question,
     options: currentQuestion.options,
-    answer,
+    answer: normalizedAnswer,
     answerMode,
     answerRiskLevel: answerRisk.riskLevel,
     answerRiskSignals: answerRisk.signalCount,
@@ -1944,6 +1881,7 @@ app.post('/api/persona/answer', async (req, res) => {
           appearance: session.appearance,
           personaResult: result,
           routine,
+          nickname: session.nickname,
         })
       } catch (dbError) {
         console.error('[persona/answer] failed to persist tutorial agent complete:', dbError)
@@ -2032,9 +1970,6 @@ app.get('/api/nickname/check', async (req, res) => {
 app.post('/api/nickname/claim', async (req, res) => {
   const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : ''
   const nickname = typeof req.body?.nickname === 'string' ? req.body.nickname.trim() : ''
-  const ageValue = normalizeAgeValue(req.body?.ageValue)
-  const ageLabel =
-    typeof req.body?.ageLabel === 'string' && req.body.ageLabel.trim() ? req.body.ageLabel.trim() : ageLabelFromValue(ageValue)
   if (!agentId) {
     res.status(400).json({ error: 'agentId is required.' })
     return
@@ -2053,8 +1988,6 @@ app.post('/api/nickname/claim', async (req, res) => {
     const payload = await tryClaimNickname()
     if (session) {
       session.nickname = payload?.user?.nickname || nickname
-      session.ageValue = ageValue
-      session.ageLabel = ageLabel
       session.updatedAt = Date.now()
     }
     res.json({
@@ -2071,8 +2004,6 @@ app.post('/api/nickname/claim', async (req, res) => {
         })
         const retryPayload = await tryClaimNickname()
         session.nickname = retryPayload?.user?.nickname || nickname
-        session.ageValue = ageValue
-        session.ageLabel = ageLabel
         session.updatedAt = Date.now()
         res.json({
           ...retryPayload,
@@ -2085,8 +2016,6 @@ app.post('/api/nickname/claim', async (req, res) => {
     }
     if (isDbUnavailableError(error) && session) {
       session.nickname = nickname
-      session.ageValue = ageValue
-      session.ageLabel = ageLabel
       session.updatedAt = Date.now()
       res.json({
         ok: true,
@@ -2115,10 +2044,14 @@ app.post('/api/analyze-appearance', async (req, res) => {
 
   try {
     const description = await requestAppearanceDescriptionViaLlmServer({ imageDataUrl })
-    const result =
+    let result =
       description === 'NO_PERSON' || !description
         ? normalizeAppearanceResult({})
         : inferAppearanceFromDescription(description)
+
+    if (description !== 'NO_PERSON' && countUnknownAppearanceFields(result) >= 5) {
+      result = await refineAppearanceUnknownsViaLlmServer({ imageDataUrl, appearance: result })
+    }
     res.json({ result })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown server error.'
@@ -2140,8 +2073,6 @@ app.post('/api/analyze-appearance', async (req, res) => {
 })
 
 if (process.env.NODE_ENV === 'production') {
-  const __filename = fileURLToPath(import.meta.url)
-  const __dirname = path.dirname(__filename)
   const distPath = path.join(__dirname, 'dist')
 
   app.use(express.static(distPath))
@@ -2150,17 +2081,34 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-const server = app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`)
-})
-
-server.on('error', (error) => {
-  if (error && typeof error === 'object' && 'code' in error && error.code === 'EADDRINUSE') {
-    console.error(`[server] Port ${port} is already in use. Stop existing process or run with PORT=<other-port>.`)
+const prepareTutorialServer = async () => {
+  const skipSchema = String(process.env.SKIP_TUTORIAL_SCHEMA || '').trim().toLowerCase() === 'true'
+  if (skipSchema) {
+    console.warn('[server] Skipping tutorial schema preparation because SKIP_TUTORIAL_SCHEMA=true.')
     return
   }
 
-  console.error('[server] Failed to start server:', error)
-})
+  await ensureTutorialSchema()
+}
+
+prepareTutorialServer()
+  .then(() => {
+    const server = app.listen(port, () => {
+      console.log(`Server listening on http://localhost:${port}`)
+    })
+
+    server.on('error', (error) => {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'EADDRINUSE') {
+        console.error(`[server] Port ${port} is already in use. Stop existing process or run with PORT=<other-port>.`)
+        return
+      }
+
+      console.error('[server] Failed to start server:', error)
+    })
+  })
+  .catch((error) => {
+    console.error('[server] Failed to prepare tutorial schema:', error)
+    process.exit(1)
+  })
 
 
