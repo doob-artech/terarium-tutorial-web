@@ -1236,9 +1236,40 @@ const normalizeNickname = (value) => {
   return nickname
 }
 
+const DEFAULT_APPEARANCE_PAYLOAD = {
+  hair_style: 'short_cut',
+  hair_part_direction: 'center',
+  bangs_type: 'none',
+  hair_color: 'black',
+  eye_type: 'round_dog_eyes',
+  eye_color: 'dark_brown',
+  mouth_type: 'closed_smile',
+  top_type: 'hoodie',
+  top_color: 'gray',
+  bottom_type: 'wide_long_pants',
+  bottom_color: 'black',
+  shoe_type: 'sneakers',
+  accessories: {
+    glasses_type: 'none',
+    has_necklace: false,
+    has_earrings: false,
+  },
+}
+
 const normalizeAppearancePayload = (value) => {
-  if (!value || typeof value !== 'object') return {}
-  return { ...value }
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const accessories = source.accessories && typeof source.accessories === 'object' && !Array.isArray(source.accessories)
+    ? source.accessories
+    : {}
+
+  return normalizeAppearanceResult({
+    ...DEFAULT_APPEARANCE_PAYLOAD,
+    ...source,
+    accessories: {
+      ...DEFAULT_APPEARANCE_PAYLOAD.accessories,
+      ...accessories,
+    },
+  })
 }
 
 const normalizeRoutinePayload = (value, validNodeRefs = new Set()) => {
