@@ -3,10 +3,15 @@ import mascotSvg from './assets/image-10.svg'
 import cameraButtonSvg from './assets/camera-button.svg'
 import emojiVSvg from './assets/emoji-v.svg'
 import speechBubbleSvg from './assets/speech-bubble.svg'
+import { TUTORIAL_DATA } from './data'
+import { CHARACTER_PRESETS } from './tutorialAssets'
+import doobCloseUpVideo from './assets/DoobCloseUp.mp4'
+import viewAllVideo from './assets/viewAll.mp4'
+import characterBackground from './assets/character.jpg'
 import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
-const PERSONA_TOTAL_TURNS = 6
+const PERSONA_TOTAL_TURNS = 8
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -25,8 +30,159 @@ const MOCK_APPEARANCE_RESULT = {
   },
 }
 
+const SPECTRUM_OPTION_ORDER = {
+  first_meeting_style: ['minimal', 'waits', 'reads_mood', 'caretaking', 'light_joke', 'initiates'],
+  conversation_role: ['reflective', 'listener', 'reactor', 'questioner', 'mood_keeper', 'storyteller'],
+  disagreement_style: ['move_on', 'step_back', 'soften', 'listen_first', 'mediate', 'direct'],
+  care_style: ['wait_until_ready', 'quiet_presence', 'cheer_up', 'ask_directly', 'practical_help', 'problem_solve'],
+  trust_basis: ['comfort', 'frequency', 'shared_interest', 'humor', 'reliability', 'honesty'],
+  boundary_style: ['hides_need', 'reduce_contact', 'quietly_leave', 'polite_response', 'self_recharge', 'direct_boundary'],
+  group_role: ['quiet_observer', 'deep_pair', 'organizer', 'includer', 'entertainer', 'leader'],
+  repair_style: ['give_space', 'wait_then_repair', 'practical_repair', 'humor_repair', 'talk_it_through', 'initiates_repair'],
+  silence_style: ['comfortable_silence', 'shifts_attention', 'soft_reaction', 'checks_comfort', 'asks_question', 'fills_silence'],
+  closeness_pace: ['slow_closeness', 'responds_to_approach', 'gradual_frequency', 'shared_activity', 'deep_talk', 'fast_if_matched'],
+  humor_style: ['subtle_smile', 'dry_gentle_humor', 'laughs_along', 'quirky', 'brightens_mood', 'starts_play'],
+  collaboration_style: ['quiet_worker', 'checks_others', 'divides_roles', 'organizes_flow', 'problem_solver', 'idea_giver'],
+  social_amplification: ['faithful', 'calmer', 'warmer', 'braver', 'more_playful', 'more_direct'],
+}
+
+const getOptionValue = (option) => (typeof option === 'object' ? option.value : option)
+const getOptionLabel = (option) => (typeof option === 'object' ? option.label : option)
+
+const orderSpectrumOptions = (question, options) => {
+  const values = SPECTRUM_OPTION_ORDER[question?.key || question?.question_type] || []
+  if (!values.length) return options
+  const optionByValue = new Map(options.map((option) => [getOptionValue(option), option]))
+  const ordered = values.map((value) => optionByValue.get(value)).filter(Boolean)
+  const leftovers = options.filter((option) => !values.includes(getOptionValue(option)))
+  return [...ordered, ...leftovers]
+}
+
+const TUTORIAL_SKY_BACKGROUND = 'linear-gradient(180deg, #9FD1FC 0%, #FFF 100%)'
+const TUTORIAL_ANSWER_BACKGROUNDS = {
+  3: { label: 'YES', background: 'linear-gradient(0deg, #FFF 0%, #5D9CEC 73.08%)' },
+  4: { label: 'NO', background: 'linear-gradient(0deg, #FFF 0%, #FF8C5A 73.08%)' },
+}
+const TUTORIAL_SKY_STEPS = new Set([9, 10, 11, 12, 13])
+const TUTORIAL_BACKGROUND_VIDEOS = {
+  1: { src: doobCloseUpVideo, loop: false },
+  2: { src: doobCloseUpVideo, loop: false },
+  5: { src: viewAllVideo, loop: false },
+}
+const TUTORIAL_STEP_CHARACTERS = {
+  3: 'responseGuide',
+  4: 'responseGuide',
+  9: 'avatar',
+  10: 'avatarSmall',
+  11: 'avatarResult',
+}
+
+function TutorialPrelude({ onBeginCapture }) {
+  const [currentId, setCurrentId] = useState(0)
+  const [userName, setUserName] = useState('')
+  const step = TUTORIAL_DATA.find((item) => item.id === currentId) || TUTORIAL_DATA[0]
+  const backgroundVideo = TUTORIAL_BACKGROUND_VIDEOS[currentId]
+  const answerBackground = TUTORIAL_ANSWER_BACKGROUNDS[currentId]
+  const currentBackground =
+    step.background ||
+    answerBackground?.background ||
+    (TUTORIAL_SKY_STEPS.has(currentId) ? TUTORIAL_SKY_BACKGROUND : null)
+  const characterKey = step.character || TUTORIAL_STEP_CHARACTERS[currentId] || (currentId >= 5 && currentId !== 12 ? 'bubbleGuide' : null)
+  const character = characterKey ? CHARACTER_PRESETS[characterKey] : null
+  const text = Array.isArray(step.textList) ? step.textList.join('\n\n') : (step.textList || step.text || '')
+  const formattedText = String(text).replace(/{{name}}/g, userName || '이름 없음')
+
+  const goNext = (nextId) => {
+    if (nextId === 'START_QUESTION' || step.type === 'CAMERA') {
+      onBeginCapture()
+      return
+    }
+    if (nextId === 'FINISH_ALL') {
+      setCurrentId(0)
+      setUserName('')
+      return
+    }
+    setCurrentId(nextId)
+  }
+
+  if (step.type === 'INTRO') {
+    return (
+      <div id="tutorial-container" className="tutorial-prelude">
+        <div className="tutorial-layer-bg">
+          <video className="tutorial-bg-video" autoPlay muted loop playsInline>
+            <source src={doobCloseUpVideo} type="video/mp4" />
+          </video>
+          <div className="tutorial-intro-overlay" />
+        </div>
+        <main className="tutorial-ui-root tutorial-intro-content">
+          <h1 className="tutorial-intro-title">TERARIUM</h1>
+          <p className="tutorial-intro-subtitle">{formattedText}</p>
+          <button className="tutorial-start-btn" type="button" onClick={() => goNext(step.nextId)}>
+            {step.buttonText || '시작'}
+          </button>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div id="tutorial-container" className="tutorial-prelude">
+      <div
+        className="tutorial-layer-bg"
+        style={currentBackground ? { background: currentBackground } : { backgroundImage: `url(${characterBackground})` }}
+      >
+        {backgroundVideo && (
+          <video key={backgroundVideo.src} className="tutorial-bg-video" autoPlay muted loop={backgroundVideo.loop} playsInline>
+            <source src={backgroundVideo.src} type="video/mp4" />
+          </video>
+        )}
+        {answerBackground?.label && <span className="tutorial-answer-bg-text">{answerBackground.label}</span>}
+      </div>
+      {character && (
+        <img className={`tutorial-character ${character.layerClass || ''}`} src={character.src} alt={character.alt || ''} style={character.style} />
+      )}
+      <main className="tutorial-ui-root">
+        <section className={`tutorial-card step-${currentId}`}>
+          <p className="tutorial-card-text">{formattedText}</p>
+          {step.type === 'SELECT' && (
+            <div className="tutorial-select-grid">
+              {step.options.map((option) => (
+                <button key={option.label} className="tutorial-select-btn" type="button" onClick={() => goNext(option.nextId)}>
+                  <strong>{option.label}</strong>
+                  <span>{option.subText}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {step.type === 'INPUT' && (
+            <div className="tutorial-name-row">
+              <label>{step.questionText}</label>
+              <input value={userName} placeholder={step.placeholder} onChange={(event) => setUserName(event.target.value)} />
+            </div>
+          )}
+          {step.type === 'AUTO_STACK' && (
+            <div className="tutorial-stack-list">
+              {step.stackList.map((item, index) => <span key={`${item.text}-${index}`}>{item.text}</span>)}
+            </div>
+          )}
+          {step.type !== 'SELECT' && (
+            <button
+              className="tutorial-next-btn"
+              type="button"
+              onClick={() => goNext(step.nextId)}
+              disabled={step.type === 'INPUT' && userName.trim().length < 2}
+            >
+              {step.type === 'CAMERA' ? '촬영하러 가기' : step.buttonText || '다음'}
+            </button>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}
+
 function App() {
-  const [stage, setStage] = useState('idle')
+  const [stage, setStage] = useState('tutorial')
   const [countdown, setCountdown] = useState(null)
   const [flashOn, setFlashOn] = useState(false)
   const [showShutterText, setShowShutterText] = useState(false)
@@ -317,7 +473,7 @@ function App() {
   }, [personaAgentId, analysisResult, syncAppearanceToAgent])
 
   const handleStart = () => {
-    if (stage !== 'idle') {
+    if (!['idle', 'tutorial'].includes(stage)) {
       return
     }
 
@@ -432,6 +588,9 @@ function App() {
           ])
         }
         setPersonaResult(payload.result ?? null)
+        if (payload.enterUrl) {
+          setEnterUrl(payload.enterUrl)
+        }
         setPersonaQuestion(null)
         setIsQuestionTransitionLoading(false)
         return
@@ -508,6 +667,16 @@ function App() {
     setPersonaInput('')
   }
 
+  const openCustomInput = () => {
+    if (personaLoading || isQuestionTransitionLoading) {
+      return
+    }
+    setSelectedOption(null)
+    setSelectedAnswerMode('custom')
+    setIsPersonaCustomInputOpen(true)
+    setPersonaError('')
+  }
+
   const handlePrevClick = () => {
     if (personaResult) {
       return
@@ -545,6 +714,14 @@ function App() {
   const isViewingHistory = historyViewIndex !== null
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
+  const spectrumOptions = orderSpectrumOptions(displayQuestion, displayOptions)
+  const fallbackSpectrumIndex = Math.max(0, Math.floor((spectrumOptions.length - 1) / 2))
+  const selectedSpectrumIndex = Math.max(
+    0,
+    spectrumOptions.findIndex((option) => getOptionValue(option) === selectedOption),
+  )
+  const activeSpectrumIndex = selectedOption ? selectedSpectrumIndex : fallbackSpectrumIndex
+  const activeSpectrumOption = selectedOption ? spectrumOptions[activeSpectrumIndex] : null
   const canSubmitSelection = Boolean(selectedOption)
   const canSubmitNickname = /^[A-Za-z0-9가-힣 ]{2,12}$/.test(nicknameInput.trim())
   const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
@@ -589,6 +766,10 @@ function App() {
       setNicknameStatus('error')
       setNicknameError(error instanceof Error ? error.message : '?됰꽕????μ뿉 ?ㅽ뙣?덉뒿?덈떎.')
     }
+  }
+
+  if (stage === 'tutorial') {
+    return <TutorialPrelude onBeginCapture={handleStart} />
   }
 
   return (
@@ -748,30 +929,84 @@ function App() {
                 <section className="persona-options" aria-label="선택지">
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
 
-                  {!isPersonaCustomInputOpen &&
-                    displayOptions.map((option, index) => (
-                      <button
-                        key={`persona-option-${displayQuestion.turn}-${index}`}
-                        type="button"
-                        className={`persona-option ${selectedOption === option ? 'is-selected' : selectedOption ? 'is-dimmed' : ''}`}
-                        style={{ animationDelay: `${0.1 + index * 0.07}s` }}
-                        onClick={() => handlePersonaOptionClick(option)}
+                  {!isPersonaCustomInputOpen && spectrumOptions.length > 0 && (
+                    <article className={`persona-spectrum ${selectedOption ? 'has-selection' : ''}`}>
+                      <p className="persona-spectrum-current">
+                        {activeSpectrumOption ? getOptionLabel(activeSpectrumOption) : '슬라이더를 움직여 선택해 주세요'}
+                      </p>
+                      <input
+                        className="persona-spectrum-slider"
+                        type="range"
+                        min="0"
+                        max={Math.max(0, spectrumOptions.length - 1)}
+                        step="1"
+                        value={activeSpectrumIndex}
+                        onChange={(event) => {
+                          const nextOption = spectrumOptions[Number(event.target.value)]
+                          if (nextOption) {
+                            handlePersonaOptionClick(getOptionValue(nextOption))
+                          }
+                        }}
                         disabled={personaLoading}
-                      >
-                        <span className="persona-option-text">{option}</span>
-                      </button>
-                    ))}
+                        aria-label="답변 스펙트럼"
+                      />
+                      <div className="persona-spectrum-ticks" aria-hidden="true">
+                        {spectrumOptions.map((option, index) => (
+                          <span
+                            key={`persona-spectrum-tick-${displayQuestion.turn}-${getOptionValue(option)}`}
+                            className={activeSpectrumIndex === index && selectedOption ? 'is-active' : ''}
+                          />
+                        ))}
+                      </div>
+                      <div className="persona-spectrum-labels">
+                        {spectrumOptions.map((option, index) => (
+                          <button
+                            key={`persona-spectrum-label-${displayQuestion.turn}-${getOptionValue(option)}`}
+                            type="button"
+                            className={`persona-spectrum-label ${activeSpectrumIndex === index && selectedOption ? 'is-active' : ''}`}
+                            onClick={() => handlePersonaOptionClick(getOptionValue(option))}
+                            disabled={personaLoading}
+                          >
+                            {getOptionLabel(option)}
+                          </button>
+                        ))}
+                      </div>
+                    </article>
+                  )}
 
                   {isPersonaCustomInputOpen ? (
-                    <div className="persona-custom-editor" style={{ animationDelay: '0.1s' }}>
+                    <div className="persona-custom-editor">
                       <div className="persona-custom-editor-inner">
                         <textarea
                           className="persona-custom-editor-textarea"
                           value={personaInput}
-                          onChange={(e) => setPersonaInput(e.target.value)}
-                          placeholder="직접 입력하세요. (3글자 이상)"
+                          placeholder="선택지에 딱 맞지 않으면, 당신의 방식으로 짧게 적어주세요."
+                          maxLength={180}
+                          onChange={(event) => {
+                            setPersonaInput(event.target.value)
+                            setPersonaError('')
+                          }}
                           disabled={personaLoading}
+                          autoFocus
                         />
+                        <div className="persona-custom-editor-actions">
+                          <button
+                            className="persona-custom-action-btn btn-cancel"
+                            type="button"
+                            onClick={resetCurrentSelection}
+                            disabled={personaLoading}
+                          >
+                            취소
+                          </button>
+                          <button
+                            className="persona-custom-action-btn btn-confirm"
+                            type="button"
+                            onClick={handleNextClick}
+                            disabled={!canSubmitCustomInput || personaLoading}
+                          >
+                            입력 완료
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -779,14 +1014,10 @@ function App() {
                       className={`persona-custom-trigger ${selectedOption ? 'is-dimmed' : ''}`}
                       type="button"
                       style={{ animationDelay: '0.38s' }}
-                      onClick={() => {
-                        setIsPersonaCustomInputOpen(true)
-                        setSelectedOption(null)
-                        setSelectedAnswerMode('suggested')
-                      }}
+                      onClick={openCustomInput}
                       disabled={personaLoading}
                     >
-                      직접 입력하기
+                      직접 입력
                     </button>
                   )}
                 </section>

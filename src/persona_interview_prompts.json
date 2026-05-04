@@ -105,7 +105,7 @@
     ],
     "generation_guard_prompt": "Return only strict JSON that matches the schema. Do not output markdown or commentary.",
     "user_instructions": [
-      "Create one weekday routine in hourly time blocks.",
+      "Create one full-day routine as broad time blocks, not a generic hourly checklist.",
       "Use 9-14 blocks spanning from late night or dawn through the end of the day.",
       "The routine must include at least one late-night or dawn block between 0:00 and 6:00.",
       "The blocks must cover the full day continuously from 0 to 24 with no hour gaps.",
@@ -116,7 +116,10 @@
       "Forbidden node_ref examples: unnamed connector, park bench, current_node, home_node, library, My_Apartment.",
       "activity must be a concrete Korean phrase describing what the agent is doing there.",
       "rationale must be one Korean sentence explaining why this persona chooses that place at that time.",
-      "At least one block should reflect food, one should reflect work/study/rest, and one should reflect a socially revealing choice.",
+      "Before choosing nodes, infer what this exact persona would seek or avoid in this environment: solitude, attention, food, alcohol, views, playful spaces, public safety, private corners, social risk, or routine comfort.",
+      "At least one block should reflect food, one should reflect rest or self-maintenance, and one should reveal the persona socially.",
+      "Do not distribute people evenly just for variety. Variety should come from persona differences mapped onto the available scene graph.",
+      "Do not overuse beaches or scenic nodes unless the persona actually suggests that pull.",
       "Do not use blank-name connector nodes as destinations unless it is clearly a pass-through movement block.",
       "If a pass-through connector is necessary, mark activity as a short transit behavior.",
       "Keep the final plan practical enough that a simulation can execute it."

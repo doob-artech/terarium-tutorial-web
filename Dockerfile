@@ -21,7 +21,8 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY server.js ./server.js
 COPY src/persona_interview_prompts.json ./src/persona_interview_prompts.json
-COPY src/personaRuntime.js ./src/personaRuntime.js
+COPY src/socialPersonaRuntime.js ./src/socialPersonaRuntime.js
+COPY scripts ./scripts
 
 EXPOSE 8787
 
