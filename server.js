@@ -98,6 +98,13 @@ const dbPool = new Pool({
 const ensureTutorialSchema = async () => {
   await dbPool.query(`
     ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS is_ready BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS persona_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS routine_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS appearance_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+    UPDATE agent_profiles
+    SET persona_json = social_persona_json
+    WHERE persona_json = '{}'::jsonb
+      AND COALESCE(social_persona_json, '{}'::jsonb) <> '{}'::jsonb;
     UPDATE agent_profiles
     SET is_ready = true
     WHERE COALESCE(agent_name, '') <> ''

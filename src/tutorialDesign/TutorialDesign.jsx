@@ -481,17 +481,23 @@ const TutorialDesign = ({
                           type="text"
                           placeholder={step.placeholder}
                           value={userName}
-                          onChange={(e) => setUserName(e.target.value)}
+                          onChange={(e) => {
+                            setUserName(e.target.value);
+                            setNameError('');
+                          }}
+                          disabled={isNameSubmitting}
                           autoFocus
                         />
+                        {nameError && <p className="name-error">{nameError}</p>}
                       </div>
 
                       <div className="action-row show">
                         <button
                           className="primary-next-btn"
                           onClick={() => handleNext(step.nextId)}
+                          disabled={isNameSubmitting}
                         >
-                          {step.buttonText}
+                          {isNameSubmitting ? '확인 중...' : step.buttonText}
                         </button>
                       </div>
                     </section>
