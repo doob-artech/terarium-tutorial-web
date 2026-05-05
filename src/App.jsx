@@ -61,6 +61,10 @@ function App() {
   const startInterviewInFlightRef = useRef(false)
   const startInterviewRequestIdRef = useRef(0)
   const syncedAppearanceAgentRef = useRef('')
+  const capturePipelineRef = useRef(null)
+  const personaAgentIdRef = useRef('')
+  const nicknameValueRef = useRef('')
+  const nicknameInputRef = useRef('')
 
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
@@ -81,6 +85,10 @@ function App() {
   const resetPersonaSession = () => {
     startInterviewRequestIdRef.current += 1
     startInterviewInFlightRef.current = false
+    capturePipelineRef.current = null
+    personaAgentIdRef.current = ''
+    nicknameValueRef.current = ''
+    nicknameInputRef.current = ''
     syncedAppearanceAgentRef.current = ''
     setPersonaAgentId('')
     setPersonaQuestion(null)
@@ -274,6 +282,18 @@ function App() {
   }, [analysisResult])
 
   useEffect(() => {
+    personaAgentIdRef.current = personaAgentId
+  }, [personaAgentId])
+
+  useEffect(() => {
+    nicknameValueRef.current = nicknameValue
+  }, [nicknameValue])
+
+  useEffect(() => {
+    nicknameInputRef.current = nicknameInput
+  }, [nicknameInput])
+
+  useEffect(() => {
     return () => {
       clearTimers()
       stopCamera()
@@ -399,37 +419,54 @@ function App() {
       setFlashOn(true)
       setShowShutterText(true)
       setIsCaptureProcessing(true)
-      setStage('avatarLoading')
+      setStage('avatarIntro')
 
-      void (async () => {
-        let appearanceResult = null
-        if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
-          setAnalysisStatus('success')
-          setAnalysisResult(MOCK_APPEARANCE_RESULT)
-          appearanceResult = MOCK_APPEARANCE_RESULT
-        } else {
-          if (!imageDataUrl) {
-            setAnalysisStatus('error')
+      const capturePipeline = (async () => {
+        try {
+          let appearanceResult = null
+          if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
+            setAnalysisStatus('success')
+            setAnalysisResult(MOCK_APPEARANCE_RESULT)
+            appearanceResult = MOCK_APPEARANCE_RESULT
           } else {
-            appearanceResult = await analyzePhotoWithOpenAI(imageDataUrl)
+            if (!imageDataUrl) {
+              setAnalysisStatus('error')
+            } else {
+              appearanceResult = await analyzePhotoWithOpenAI(imageDataUrl)
+            }
           }
-        }
 
-        const avatarAppearance = appearanceResult ?? MOCK_APPEARANCE_RESULT
-        if (!appearanceResult) {
-          setAnalysisResult(avatarAppearance)
-        }
+          const avatarAppearance = appearanceResult ?? MOCK_APPEARANCE_RESULT
+          if (!appearanceResult) {
+            setAnalysisResult(avatarAppearance)
+          }
 
-        const personaPayload = await startPersonaInterview(avatarAppearance)
-        if (personaPayload?.agentId) {
-          await buildAvatarModel({
-            agentId: personaPayload.agentId,
-            appearance: avatarAppearance,
-          })
+          const personaPayload = await startPersonaInterview(avatarAppearance)
+          if (personaPayload?.agentId) {
+            await buildAvatarModel({
+              agentId: personaPayload.agentId,
+              appearance: avatarAppearance,
+            })
+            const latestNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
+            if (latestNickname) {
+              await fetch('/api/avatar/rename', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  agentId: personaPayload.agentId,
+                  nickname: latestNickname,
+                }),
+              }).catch(() => null)
+            }
+          }
+          return personaPayload
+        } finally {
+          setIsCaptureProcessing(false)
         }
-        setIsCaptureProcessing(false)
-        setStage('avatarIntro')
       })()
+      capturePipelineRef.current = capturePipeline
     }, 3000)
 
     const flashOffTimer = window.setTimeout(() => setFlashOn(false), 3300)
@@ -638,9 +675,19 @@ function App() {
       return false
     }
 
-    const activeAgentId = personaAgentId || (TEST_MODE_RELAXED_NICKNAME ? `test-${Date.now()}` : '')
+    let activeAgentId = personaAgentId || personaAgentIdRef.current
+    if (!activeAgentId && capturePipelineRef.current) {
+      setNicknameStatus('checking')
+      setNicknameError('')
+      const pipelinePayload = await capturePipelineRef.current.catch(() => null)
+      activeAgentId = pipelinePayload?.agentId || personaAgentIdRef.current
+    }
+    if (!activeAgentId && TEST_MODE_RELAXED_NICKNAME) {
+      activeAgentId = `test-${Date.now()}`
+    }
     if (!activeAgentId) {
       setNicknameError('질문을 준비하고 있습니다. 잠시만 기다려 주세요.')
+      setNicknameStatus('idle')
       return false
     }
     if (!personaAgentId) {
