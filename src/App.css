@@ -1211,49 +1211,49 @@ transform: scale(1.01) translateY(-2px) !important;
 
 @font-face {
   font-family: 'DoctorGlitch';
-  src: url('./fonts/DOCTOR GLITCH.OTF') format('opentype');
+  src: url('./tutorialDesign/fonts/DOCTOR GLITCH.OTF') format('opentype');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'ChangwonDangamAsac';
-  src: url('./fonts/CHANGWONDANGAMASAC-BOLD.TTF') format('truetype');
+  src: url('./tutorialDesign/fonts/CHANGWONDANGAMASAC-BOLD.TTF') format('truetype');
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'NanumSquareNeo';
-  src: url('./fonts/NANUMSQUARENEO-ALT.TTF') format('truetype');
+  src: url('./tutorialDesign/fonts/NANUMSQUARENEO-ALT.TTF') format('truetype');
   font-weight: 300;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'NanumSquareNeo';
-  src: url('./fonts/NANUMSQUARENEO-BRG.TTF') format('truetype');
+  src: url('./tutorialDesign/fonts/NANUMSQUARENEO-BRG.TTF') format('truetype');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'NanumSquareNeo';
-  src: url('./fonts/NANUMSQUARENEO-CBD.TTF') format('truetype');
+  src: url('./tutorialDesign/fonts/NANUMSQUARENEO-CBD.TTF') format('truetype');
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'NanumSquareNeo';
-  src: url('./fonts/NANUMSQUARENEO-DEB.TTF') format('truetype');
+  src: url('./tutorialDesign/fonts/NANUMSQUARENEO-DEB.TTF') format('truetype');
   font-weight: 800;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'NanumSquareNeo';
-  src: url('./fonts/NANUMSQUARENEO-EHV.TTF') format('truetype');
+  src: url('./tutorialDesign/fonts/NANUMSQUARENEO-EHV.TTF') format('truetype');
   font-weight: 900;
   font-style: normal;
 }
