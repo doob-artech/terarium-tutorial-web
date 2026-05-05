@@ -267,6 +267,41 @@
   pointer-events: none;
 }
 
+.avatar-loading-screen {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: #fff;
+  font-family: 'ChangwonDangamAsac', 'NanumSquareNeo', sans-serif !important;
+  font-size: clamp(28px, 4vw, 64px);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: lowercase;
+}
+
+.hidden-capture-video {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tutorial-camera-background-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  background: #000;
+}
+
 .analysis-panel {
   position: absolute;
   left: clamp(14px, 1vw, 22px);
@@ -978,19 +1013,19 @@ transform: scale(1.01) translateY(-2px) !important;
 .capture-processing-text {
   margin: 0;
   color: #ffffff;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'ChangwonDangamAsac', 'NanumSquareNeo', sans-serif !important;
   font-size: clamp(16px, 1.3vw, 24px);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 
 .countdown-text {
   margin: 0;
   color: #FFFFFF;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'ChangwonDangamAsac', 'NanumSquareNeo', sans-serif !important;
   font-size: clamp(170px, 16vw, 320px);
-  font-weight: 900;
-  line-height: 0.9;
+  font-weight: 700;
+  line-height: 1;
   text-align: center;
   text-shadow: 0 6px 26px rgba(0, 0, 0, 0.24);
 }

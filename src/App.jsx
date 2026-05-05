@@ -1,11 +1,9 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
-import mascotSvg from './assets/image-10.svg'
-import cameraButtonSvg from './assets/camera-button.svg'
-import emojiVSvg from './assets/emoji-v.svg'
-import speechBubbleSvg from './assets/speech-bubble.svg'
+import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
+const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
 const PERSONA_TOTAL_TURNS = 6
 
 const MOCK_APPEARANCE_RESULT = {
@@ -30,10 +28,9 @@ function App() {
   const [countdown, setCountdown] = useState(null)
   const [flashOn, setFlashOn] = useState(false)
   const [showShutterText, setShowShutterText] = useState(false)
-  const [cameraError, setCameraError] = useState('')
-  const [analysisStatus, setAnalysisStatus] = useState('idle')
+  const [, setCameraError] = useState('')
+  const [, setAnalysisStatus] = useState('idle')
   const [analysisResult, setAnalysisResult] = useState(null)
-  const [bubbleVisible, setBubbleVisible] = useState(true)
   const [personaAgentId, setPersonaAgentId] = useState('')
   const [personaQuestion, setPersonaQuestion] = useState(null)
   const [personaLoading, setPersonaLoading] = useState(false)
@@ -45,12 +42,17 @@ function App() {
   const [nicknameStatus, setNicknameStatus] = useState('idle')
   const [nicknameValue, setNicknameValue] = useState('')
   const [enterUrl, setEnterUrl] = useState('')
+  const [avatarModelUrl, setAvatarModelUrl] = useState('')
+  const [avatarManifestUrl, setAvatarManifestUrl] = useState('')
+  const [, setAvatarBuildError] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
   const [selectedAnswerMode, setSelectedAnswerMode] = useState('suggested')
   const [answeredHistory, setAnsweredHistory] = useState([])
   const [historyViewIndex, setHistoryViewIndex] = useState(null)
   const [captureLocked, setCaptureLocked] = useState(false)
+  const [autoCaptureRequested, setAutoCaptureRequested] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [isQuestionTransitionLoading, setIsQuestionTransitionLoading] = useState(false)
   const [isCaptureProcessing, setIsCaptureProcessing] = useState(false)
   const timeoutIdsRef = useRef([])
@@ -59,15 +61,6 @@ function App() {
   const startInterviewInFlightRef = useRef(false)
   const startInterviewRequestIdRef = useRef(0)
   const syncedAppearanceAgentRef = useRef('')
-
-  const bubbleText =
-    isCaptureProcessing
-      ? '분석과 질문을 준비하고 있습니다...'
-      : analysisStatus === 'analyzing'
-        ? '분석 중입니다...'
-        : analysisStatus === 'success'
-          ? '분석 완료!'
-          : '준비되면 가운데 카메라 버튼을 눌러주세요.'
 
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
@@ -100,6 +93,9 @@ function App() {
     setNicknameStatus('idle')
     setNicknameValue('')
     setEnterUrl('')
+    setAvatarModelUrl('')
+    setAvatarManifestUrl('')
+    setAvatarBuildError('')
     setAnsweredHistory([])
     setHistoryViewIndex(null)
     setSelectedAnswerMode('suggested')
@@ -189,6 +185,33 @@ function App() {
     [],
   )
 
+  const buildAvatarModel = async ({ agentId, appearance }) => {
+    if (!agentId || !appearance) {
+      return null
+    }
+
+    setAvatarBuildError('')
+    try {
+      const response = await fetch('/api/avatar/build', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ agentId, appearance }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'Avatar build request failed.')
+      }
+      setAvatarModelUrl(payload.modelUrl ?? '')
+      setAvatarManifestUrl(payload.manifestUrl ?? '')
+      return payload
+    } catch (error) {
+      setAvatarBuildError(error instanceof Error ? error.message : 'Unknown error while building avatar.')
+      return null
+    }
+  }
+
   const startPersonaInterview = useCallback(async (appearanceOverride = null) => {
     if (startInterviewInFlightRef.current) {
       return false
@@ -236,12 +259,12 @@ function App() {
       setSelectedAnswerMode('suggested')
       setAnsweredHistory([])
       setHistoryViewIndex(null)
-      return true
+      return payload
     } catch (error) {
       if (requestId === startInterviewRequestIdRef.current) {
         setPersonaError(error instanceof Error ? error.message : 'Unknown error while starting persona interview.')
       }
-      return false
+      return null
     } finally {
       if (requestId === startInterviewRequestIdRef.current) {
         setPersonaLoading(false)
@@ -258,17 +281,15 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (stage !== 'webcam') {
+    if (!['webcam', 'cameraDesignCapture'].includes(stage)) {
       return
     }
-
-    setBubbleVisible(true)
 
     let canceled = false
 
     const startCamera = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('??釉뚮씪?곗??먯꽌???뱀틺??吏?먰븯吏 ?딆뒿?덈떎.')
+        setCameraError('')
         return
       }
 
@@ -286,10 +307,14 @@ function App() {
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
+          videoRef.current.onloadedmetadata = () => {
+            setCameraReady(true)
+          }
         }
+        setCameraReady(true)
         setCameraError('')
       } catch {
-        setCameraError('?뱀틺 沅뚰븳???덉슜?댁＜?몄슂.')
+        setCameraError('')
       }
     }
 
@@ -297,6 +322,7 @@ function App() {
 
     return () => {
       canceled = true
+      setCameraReady(false)
       stopCamera()
     }
   }, [stage])
@@ -316,7 +342,7 @@ function App() {
     void syncAppearanceToAgent(personaAgentId, analysisResult)
   }, [personaAgentId, analysisResult, syncAppearanceToAgent])
 
-  const handleStart = () => {
+  const handleStart = (shouldAutoCapture = false) => {
     if (stage !== 'idle') {
       return
     }
@@ -324,27 +350,42 @@ function App() {
     clearTimers()
     resetPersonaSession()
     setCaptureLocked(false)
+    setAutoCaptureRequested(Boolean(shouldAutoCapture))
+    setCameraReady(false)
     setIsQuestionTransitionLoading(false)
     setIsCaptureProcessing(false)
     setAnalysisStatus('idle')
     setAnalysisResult(null)
-    setStage('expanding')
-
-    const expandTimer = window.setTimeout(() => {
-      setStage('webcam')
-    }, 800)
-
-    timeoutIdsRef.current.push(expandTimer)
+    setStage(shouldAutoCapture ? 'cameraDesignCapture' : 'webcam')
   }
 
-  const handleCapture = () => {
-    if (stage !== 'webcam' || countdown !== null || flashOn || captureLocked || isCaptureProcessing) {
+  const handleEnterCameraDesignStep = () => {
+    if (stage !== 'idle') {
       return
     }
 
+    clearTimers()
+    resetPersonaSession()
+    setAutoCaptureRequested(false)
+    setCaptureLocked(false)
+    setCountdown(null)
+    setFlashOn(false)
+    setShowShutterText(false)
+    setCameraReady(false)
+    setIsCaptureProcessing(false)
+    setAnalysisStatus('idle')
+    setAnalysisResult(null)
+    setStage('cameraDesignCapture')
+  }
+
+  const handleCapture = () => {
+    if (!['webcam', 'cameraDesignCapture'].includes(stage) || countdown !== null || flashOn || captureLocked || isCaptureProcessing) {
+      return
+    }
+
+    setAutoCaptureRequested(false)
     setCaptureLocked(true)
     clearTimers()
-    setBubbleVisible(false)
     setShowShutterText(false)
     setCountdown(3)
 
@@ -358,23 +399,36 @@ function App() {
       setFlashOn(true)
       setShowShutterText(true)
       setIsCaptureProcessing(true)
-      setStage('nickname')
+      setStage('avatarLoading')
 
       void (async () => {
-        void startPersonaInterview()
-
+        let appearanceResult = null
         if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
           setAnalysisStatus('success')
           setAnalysisResult(MOCK_APPEARANCE_RESULT)
+          appearanceResult = MOCK_APPEARANCE_RESULT
         } else {
           if (!imageDataUrl) {
             setAnalysisStatus('error')
           } else {
-            await analyzePhotoWithOpenAI(imageDataUrl)
+            appearanceResult = await analyzePhotoWithOpenAI(imageDataUrl)
           }
         }
 
+        const avatarAppearance = appearanceResult ?? MOCK_APPEARANCE_RESULT
+        if (!appearanceResult) {
+          setAnalysisResult(avatarAppearance)
+        }
+
+        const personaPayload = await startPersonaInterview(avatarAppearance)
+        if (personaPayload?.agentId) {
+          await buildAvatarModel({
+            agentId: personaPayload.agentId,
+            appearance: avatarAppearance,
+          })
+        }
         setIsCaptureProcessing(false)
+        setStage('avatarIntro')
       })()
     }, 3000)
 
@@ -383,6 +437,19 @@ function App() {
 
     timeoutIdsRef.current.push(countTwoTimer, countOneTimer, flashTimer, flashOffTimer, shutterOffTimer)
   }
+
+  useEffect(() => {
+    if (!['webcam', 'cameraDesignCapture'].includes(stage) || !autoCaptureRequested || !cameraReady || captureLocked || isCaptureProcessing || countdown !== null) {
+      return
+    }
+
+    const captureTimer = window.setTimeout(() => {
+      handleCapture()
+    }, 450)
+    return () => window.clearTimeout(captureTimer)
+    // handleCapture reads the latest camera frame when this short-lived timer fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, autoCaptureRequested, cameraReady, captureLocked, isCaptureProcessing, countdown])
 
   const submitPersonaAnswer = async (answerText, answerMode = 'suggested') => {
     if (!personaQuestion || !personaAgentId || personaResult || personaLoading) {
@@ -434,6 +501,7 @@ function App() {
         setPersonaResult(payload.result ?? null)
         setPersonaQuestion(null)
         setIsQuestionTransitionLoading(false)
+        setStage('finalDesign')
         return
       }
 
@@ -546,22 +614,52 @@ function App() {
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
   const canSubmitSelection = Boolean(selectedOption)
-  const canSubmitNickname = /^[A-Za-z0-9가-힣 ]{2,12}$/.test(nicknameInput.trim())
+  const canSubmitNickname = TEST_MODE_RELAXED_NICKNAME
+    ? nicknameInput.trim().length > 0
+    : /^[A-Za-z0-9가-힣 ]{2,12}$/.test(nicknameInput.trim())
   const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
   const isNicknameStage = stage === 'nickname'
+  const personaKeywords = [
+    personaResult?.personality?.first_impression_style,
+    personaResult?.personality?.trust_building_style,
+    personaResult?.personality?.decision_bias,
+    personaResult?.personality?.stress_response,
+  ]
+    .map((value) => String(value || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/)[0])
+    .filter(Boolean)
+    .slice(0, 4)
 
-  const handleNicknameClaim = async () => {
-    if (!canSubmitNickname || nicknameStatus === 'checking' || nicknameStatus === 'success') {
-      return
+  const handleNicknameClaim = async (nicknameOverride = null, nextStage = 'persona') => {
+    const targetNickname = typeof nicknameOverride === 'string' ? nicknameOverride.trim() : nicknameInput.trim()
+    const isValidNickname = TEST_MODE_RELAXED_NICKNAME
+      ? targetNickname.length > 0
+      : /^[A-Za-z0-9가-힣 ]{2,12}$/.test(targetNickname)
+    if (!isValidNickname || nicknameStatus === 'checking') {
+      return false
     }
 
+    const activeAgentId = personaAgentId || (TEST_MODE_RELAXED_NICKNAME ? `test-${Date.now()}` : '')
+    if (!activeAgentId) {
+      setNicknameError('질문을 준비하고 있습니다. 잠시만 기다려 주세요.')
+      return false
+    }
     if (!personaAgentId) {
-      setNicknameError('吏덈Ц??以鍮꾪븯怨??덉뒿?덈떎. ?좎떆留?湲곕떎??二쇱꽭??')
-      return
+      setPersonaAgentId(activeAgentId)
     }
 
     setNicknameStatus('checking')
     setNicknameError('')
+
+    const acceptNickname = (payload = {}) => {
+      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/#agentId=${encodeURIComponent(activeAgentId)}`)
+      setNicknameValue(targetNickname)
+      setNicknameInput(targetNickname)
+      setNicknameStatus('success')
+      if (nextStage) {
+        setStage(nextStage)
+      }
+      return true
+    }
 
     try {
       const response = await fetch('/api/nickname/claim', {
@@ -570,25 +668,108 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          agentId: personaAgentId,
-          nickname: nicknameInput.trim(),
+          agentId: activeAgentId,
+          nickname: targetNickname,
         }),
       })
 
       const payload = await response.json()
 
       if (!response.ok) {
-        throw new Error(payload?.error ?? '?됰꽕????μ뿉 ?ㅽ뙣?덉뒿?덈떎.')
+        throw new Error(payload?.error ?? '닉네임 저장에 실패했습니다.')
       }
 
-      setEnterUrl(payload.enterUrl ?? '')
-      setNicknameValue(nicknameInput.trim())
-      setNicknameStatus('success')
-      setStage('persona')
+      const avatarResponse = await fetch('/api/avatar/rename', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agentId: activeAgentId,
+          nickname: targetNickname,
+        }),
+      })
+      const avatarPayload = await avatarResponse.json().catch(() => null)
+      if (avatarResponse.ok && avatarPayload) {
+        setAvatarModelUrl(avatarPayload.modelUrl ?? avatarModelUrl)
+        setAvatarManifestUrl(avatarPayload.manifestUrl ?? avatarManifestUrl)
+      }
+      return acceptNickname(payload)
     } catch (error) {
+      if (TEST_MODE_RELAXED_NICKNAME) {
+        return acceptNickname()
+      }
       setNicknameStatus('error')
-      setNicknameError(error instanceof Error ? error.message : '?됰꽕????μ뿉 ?ㅽ뙣?덉뒿?덈떎.')
+      setNicknameError(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
+      return false
     }
+  }
+
+  if (stage === 'idle') {
+    return (
+      <TutorialDesign
+        onCameraStepEnter={handleEnterCameraDesignStep}
+        onBeginCamera={handleEnterCameraDesignStep}
+      />
+    )
+  }
+
+  if (stage === 'cameraDesignCapture') {
+    return (
+      <>
+        <TutorialDesign
+          initialId={8}
+          onBeginCamera={handleCapture}
+          backgroundSlot={
+            <video
+              ref={videoRef}
+              className="tutorial-camera-background-video"
+              autoPlay
+              playsInline
+              muted
+            />
+          }
+        />
+        {countdown !== null && (
+          <section className="countdown-overlay" aria-live="polite">
+            <p className="countdown-text">{countdown}</p>
+          </section>
+        )}
+      </>
+    )
+  }
+
+  if (stage === 'avatarLoading') {
+    return (
+      <main className="avatar-loading-screen" aria-live="polite">
+        <p>loading</p>
+      </main>
+    )
+  }
+
+  if (stage === 'avatarIntro') {
+    return (
+      <TutorialDesign
+        initialId={9}
+        avatarUrl={avatarModelUrl}
+        externalName={nicknameValue}
+        onNameSubmit={(name) => handleNicknameClaim(name, null)}
+        onStartQuestions={() => setStage('persona')}
+      />
+    )
+  }
+
+  if (stage === 'finalDesign') {
+    return (
+      <TutorialDesign
+        initialId={14}
+        avatarUrl={avatarModelUrl}
+        externalName={nicknameValue || nicknameInput.trim()}
+        keywords={personaKeywords}
+        enterUrl={enterUrl}
+        onFinish={() => setStage('idle')}
+      />
+    )
   }
 
   return (
@@ -597,49 +778,9 @@ function App() {
       role="application"
       aria-label="테라리움 튜토리얼 시작 화면"
     >
-      <img className="mascot" src={mascotSvg} alt="테라리움 캐릭터" />
-
-      <main className="start-panel">
-        <div className="panel-content">
-          <h1 className="brand-title">TERARIUM</h1>
-
-          <button className="start-button" type="button" aria-label="튜토리얼 시작" onClick={handleStart}>
-            시작
-          </button>
-
-          <p className="description">튜토리얼을 시작하려면 시작 버튼을 눌러주세요.</p>
-        </div>
-      </main>
-
       {stage === 'webcam' && (
         <section className="webcam-stage" aria-label="웹캠 화면">
-          {!cameraError ? (
-            <video ref={videoRef} className="webcam-view" autoPlay playsInline muted />
-          ) : (
-            <div className="webcam-fallback">{cameraError}</div>
-          )}
-
-          <div className="webcam-ui">
-            {bubbleVisible && (
-              <div className="speech-bubble-wrap" aria-live="polite">
-                <img className="speech-bubble-bg" src={speechBubbleSvg} alt="" aria-hidden="true" />
-                <p className="speech-bubble-text">{bubbleText}</p>
-              </div>
-            )}
-            <img className="emoji-badge" src={emojiVSvg} alt="" aria-hidden="true" />
-
-            <div className="capture-panel">
-              <button
-                className={`capture-button ${captureLocked ? 'is-locked' : ''}`}
-                type="button"
-                onClick={handleCapture}
-                aria-label="촬영 시작"
-                disabled={captureLocked || isCaptureProcessing}
-              >
-                <img src={cameraButtonSvg} alt="" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+          <video ref={videoRef} className="webcam-view" autoPlay playsInline muted />
         </section>
       )}
 
@@ -662,7 +803,6 @@ function App() {
                 : personaQuestionText || (personaLoading ? '질문을 준비하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
             </p>
             {!isNicknameStage && isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
-            <img className="persona-header-emoji" src={emojiVSvg} alt="" aria-hidden="true" />
           </header>
 
           <section className="persona-board" aria-live="polite">

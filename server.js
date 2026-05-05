@@ -1,11 +1,13 @@
 ﻿import 'dotenv/config'
 import express from 'express'
 import pg from 'pg'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import promptTemplates from './src/persona_interview_prompts.json' with { type: 'json' }
 import {
+  PERSONA_VERSION,
   PERSONA_RESULT_SCHEMA,
   buildPersonaPromptText,
   normalizePersonaProfileResult,
@@ -23,6 +25,11 @@ const PERSONA_SESSION_TTL_MS = 30 * 60 * 1000
 const PERSONA_MAX_ANSWER_CHARS = 320
 const PERSONA_MAX_MODEL_DATA_CHARS = 180
 const OPENAI_MAX_RATE_LIMIT_RETRIES = 3
+const IS_TUTORIAL_TEST_MODE =
+  process.env.NODE_ENV !== 'production' ||
+  String(process.env.SKIP_TUTORIAL_SCHEMA || '').trim().toLowerCase() === 'true' ||
+  String(process.env.ALLOW_DUPLICATE_NICKNAME || '').trim().toLowerCase() === 'true'
+const isPlaceholderOpenAiKey = (apiKey) => !apiKey || String(apiKey).trim() === 'change-me'
 
 const PERSONA_INTERVIEW_SYSTEM_PROMPT = promptTemplates.persona.system_prompt_lines.join('\n').trim()
 const PERSONA_QUESTION_GENERATION_GUARD_PROMPT = promptTemplates.persona.question_generation_guard_prompt
@@ -1272,6 +1279,224 @@ const normalizeAppearancePayload = (value) => {
   })
 }
 
+const AVATAR_MODEL_ROOT = path.join(__dirname, 'model')
+const AVATAR_OUTPUT_ROOT = path.join(__dirname, 'output')
+
+const sanitizeFileStem = (value, fallback = 'avatar') => {
+  const normalized = String(value || '')
+    .trim()
+    // eslint-disable-next-line no-control-regex
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/\.+/g, '.')
+    .slice(0, 80)
+  return normalized || fallback
+}
+
+const fileExists = async (filePath) => {
+  try {
+    const stat = await fs.stat(filePath)
+    return stat.isFile()
+  } catch {
+    return false
+  }
+}
+
+const toAssetNameVariants = (candidate) => {
+  const normalized = String(candidate || '').trim()
+  if (!normalized) {
+    return []
+  }
+
+  const lower = normalized.toLowerCase()
+  const upperFirst = lower ? `${lower.charAt(0).toUpperCase()}${lower.slice(1)}` : lower
+  return Array.from(new Set([normalized, lower, upperFirst]))
+}
+
+const findFirstAsset = async (categories, candidates, extensions = ['.glb']) => {
+  const categoryList = Array.isArray(categories) ? categories : [categories]
+  const cleanCategories = categoryList.map((category) => String(category || '').replace(/^\/+|\/+$/g, ''))
+
+  for (const category of cleanCategories) {
+    const dir = category ? path.join(AVATAR_MODEL_ROOT, category) : AVATAR_MODEL_ROOT
+    for (const candidate of candidates.filter(Boolean)) {
+      for (const assetName of toAssetNameVariants(candidate)) {
+        for (const extension of extensions) {
+          const fileName = `${assetName}${extension}`
+          const filePath = path.join(dir, fileName)
+          if (await fileExists(filePath)) {
+            return {
+              category,
+              key: candidate,
+              fileName,
+              path: filePath,
+              publicPath: category ? `/model/${category}/${fileName}` : `/model/${fileName}`,
+            }
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+
+const inferColorHex = (value, fallback) => {
+  const map = {
+    black: '#151515',
+    dark_brown: '#3a2419',
+    brown: '#6b442d',
+    light_brown: '#a66f43',
+    beige: '#d2b48c',
+    gray: '#777777',
+    white: '#f2f2ee',
+    red: '#c23b3b',
+    orange: '#e57b2d',
+    yellow: '#e4c247',
+    green: '#4c9a58',
+    blue: '#3d74c5',
+    navy: '#1d2e5f',
+    purple: '#7a4aa0',
+    pink: '#d879a7',
+    blonde: '#d8bd65',
+    multicolor: '#8a7bd1',
+  }
+  return map[value] || fallback
+}
+
+const createEmptyGlbBuffer = () => {
+  const json = JSON.stringify({
+    asset: { version: '2.0', generator: 'terarium-tutorial placeholder' },
+    scene: 0,
+    scenes: [{ nodes: [] }],
+    nodes: [],
+  })
+  const jsonPadding = (4 - (Buffer.byteLength(json) % 4)) % 4
+  const jsonBuffer = Buffer.from(json + ' '.repeat(jsonPadding))
+  const totalLength = 12 + 8 + jsonBuffer.length
+  const header = Buffer.alloc(12)
+  header.writeUInt32LE(0x46546c67, 0)
+  header.writeUInt32LE(2, 4)
+  header.writeUInt32LE(totalLength, 8)
+  const chunkHeader = Buffer.alloc(8)
+  chunkHeader.writeUInt32LE(jsonBuffer.length, 0)
+  chunkHeader.writeUInt32LE(0x4e4f534a, 4)
+  return Buffer.concat([header, chunkHeader, jsonBuffer])
+}
+
+const buildAvatarAssetPlan = async (appearance) => {
+  const normalized = normalizeAppearancePayload(appearance)
+  const bottomsKey = ['long_skirt', 'short_skirt'].includes(normalized.bottom_type) ? normalized.bottom_type : 'wide_long_pants'
+  const accessories = []
+  if (normalized.accessories.glasses_type && normalized.accessories.glasses_type !== 'none') {
+    accessories.push(`glasses_${normalized.accessories.glasses_type}`)
+  }
+  if (normalized.accessories.has_necklace) accessories.push('necklace')
+  if (normalized.accessories.has_earrings) accessories.push('earrings')
+
+  const selected = {
+    basic: await findFirstAsset(['basic', ''], ['basic', 'base', 'body']),
+    eye: await findFirstAsset(['eyes', 'eye'], [normalized.eye_type, 'default'], ['.png', '.webp', '.jpg', '.jpeg']),
+    lip: await findFirstAsset(['mouth', 'lip'], [normalized.mouth_type, 'default'], ['.png', '.webp', '.jpg', '.jpeg']),
+    hair: await findFirstAsset(['hair'], [normalized.hair_style, 'short_cut', 'default']),
+    bangs: normalized.bangs_type === 'none' ? null : await findFirstAsset(['bangs', 'bang'], [normalized.bangs_type, 'default']),
+    top: await findFirstAsset(['top', 'tops'], [normalized.top_type, 'hoodie', 'default']),
+    bottoms: await findFirstAsset(['bottoms', 'Bottoms', 'bottom'], [bottomsKey, normalized.bottom_type, 'wide_long_pants', 'default']),
+    accessories: (
+      await Promise.all(accessories.map((key) => findFirstAsset(['accessories', 'accessory'], [key])))
+    ).filter(Boolean),
+  }
+
+  return {
+    appearance: normalized,
+    selected,
+    colors: {
+      skin: '#f1c7a8',
+      hair: inferColorHex(normalized.hair_color, '#151515'),
+      top: inferColorHex(normalized.top_color, '#777777'),
+      bottoms: inferColorHex(normalized.bottom_color, '#151515'),
+    },
+    shaderTextures: {
+      eye: selected.eye?.publicPath || null,
+      lip: selected.lip?.publicPath || null,
+    },
+    note:
+      'This manifest records the GLB parts and texture/color inputs. Install a GLB merge step, such as a Blender script or glTF-Transform pipeline, to bake these parts into one skinned model.',
+  }
+}
+
+const buildAvatarOutput = async ({ agentId, appearance }) => {
+  const normalizedAgentId = sanitizeFileStem(agentId || randomUUID(), 'avatar')
+  await fs.mkdir(AVATAR_OUTPUT_ROOT, { recursive: true })
+  const plan = await buildAvatarAssetPlan(appearance)
+  const outputFileName = `${normalizedAgentId}.glb`
+  const outputPath = path.join(AVATAR_OUTPUT_ROOT, outputFileName)
+  const manifestFileName = `${normalizedAgentId}.avatar.json`
+  const manifestPath = path.join(AVATAR_OUTPUT_ROOT, manifestFileName)
+
+  if (plan.selected.basic?.path) {
+    await fs.copyFile(plan.selected.basic.path, outputPath)
+  } else {
+    await fs.writeFile(outputPath, createEmptyGlbBuffer())
+  }
+
+  await fs.writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        agentId: normalizedAgentId,
+        output: `/output/${outputFileName}`,
+        ...plan,
+      },
+      null,
+      2,
+    ),
+  )
+
+  return {
+    ok: true,
+    agentId: normalizedAgentId,
+    modelUrl: `/output/${outputFileName}`,
+    manifestUrl: `/output/${manifestFileName}`,
+    plan,
+  }
+}
+
+const renameAvatarOutput = async ({ agentId, nickname }) => {
+  const fromStem = sanitizeFileStem(agentId, 'avatar')
+  const toStem = sanitizeFileStem(nickname, fromStem)
+  await fs.mkdir(AVATAR_OUTPUT_ROOT, { recursive: true })
+
+  const fromGlb = path.join(AVATAR_OUTPUT_ROOT, `${fromStem}.glb`)
+  const toGlb = path.join(AVATAR_OUTPUT_ROOT, `${toStem}.glb`)
+  const fromManifest = path.join(AVATAR_OUTPUT_ROOT, `${fromStem}.avatar.json`)
+  const toManifest = path.join(AVATAR_OUTPUT_ROOT, `${toStem}.avatar.json`)
+
+  if (await fileExists(fromGlb)) {
+    await fs.copyFile(fromGlb, toGlb)
+  }
+  if (await fileExists(fromManifest)) {
+    const raw = JSON.parse(await fs.readFile(fromManifest, 'utf8'))
+    await fs.writeFile(
+      toManifest,
+      JSON.stringify(
+        {
+          ...raw,
+          nickname,
+          output: `/output/${toStem}.glb`,
+        },
+        null,
+        2,
+      ),
+    )
+  }
+
+  return {
+    ok: true,
+    modelUrl: `/output/${toStem}.glb`,
+    manifestUrl: `/output/${toStem}.avatar.json`,
+  }
+}
+
 const normalizeRoutinePayload = (value, validNodeRefs = new Set()) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const blocks = Array.isArray(value.blocks) ? value.blocks : []
@@ -1438,6 +1663,144 @@ const serializeAgentUser = (row) => ({
   appearance: row.appearance_json && typeof row.appearance_json === 'object' ? row.appearance_json : {},
   personaResult: row.persona_json && typeof row.persona_json === 'object' ? row.persona_json : {},
   routine: row.routine_json && typeof row.routine_json === 'object' ? row.routine_json : {},
+})
+
+const MOCK_PERSONA_QUESTIONS = [
+  {
+    question: '바쁜 카페에서 마음에 드는 사람이 보일 때 어떻게 먼저 다가가시나요?',
+    options: [
+      '미리 이야기할 거리와 말투를 준비해서 접근해요',
+      '상대 반응에 맞춰 자연스럽게 대화를 시작해요',
+      '일단 눈 인사만 주고 상황 봐요',
+      '주변 분위기를 파악하며 가볍게 인사로 시작해요',
+    ],
+  },
+  {
+    question: '처음 만난 사람이 답장이 늦을 때 어떤 생각이 먼저 드나요?',
+    options: [
+      '바쁜 일이 있겠지 생각하고 기다려요',
+      '관심이 줄었나 싶어 조금 신경 쓰여요',
+      '내가 먼저 다른 이야기를 꺼내요',
+      '답장 속도보다 다음 만남의 분위기를 봐요',
+    ],
+  },
+  {
+    question: '관계에서 상대가 갑자기 거리를 둘 때 어떻게 반응하나요?',
+    options: [
+      '바로 이유를 물어보고 확인해요',
+      '잠깐 시간을 주고 다시 말을 걸어요',
+      '상대가 편해질 때까지 거리를 둬요',
+      '분위기를 풀 수 있는 가벼운 말을 건네요',
+    ],
+  },
+  {
+    question: '좋아하는 사람에게 마음을 표현할 때 가장 편한 방식은 무엇인가요?',
+    options: [
+      '직접적으로 분명하게 말해요',
+      '작은 배려와 행동으로 보여줘요',
+      '장난과 농담 속에 살짝 드러내요',
+      '상대가 확신을 줄 때까지 천천히 표현해요',
+    ],
+  },
+  {
+    question: '갈등이 생겼을 때 가장 먼저 중요하게 보는 것은 무엇인가요?',
+    options: [
+      '서로의 감정을 진정시키는 것',
+      '무엇이 문제였는지 정확히 정리하는 것',
+      '앞으로 어떻게 바꿀지 약속하는 것',
+      '관계가 너무 무거워지지 않게 분위기를 푸는 것',
+    ],
+  },
+  {
+    question: '오래 이어지는 관계에서 가장 중요하다고 느끼는 것은 무엇인가요?',
+    options: [
+      '서로의 생활 리듬을 존중하는 것',
+      '말보다 꾸준한 행동으로 믿음을 주는 것',
+      '새로운 경험을 함께 만들며 설렘을 유지하는 것',
+      '불편한 감정도 솔직하게 나눌 수 있는 것',
+    ],
+  },
+]
+
+const buildMockPersonaQuestion = (turn) => {
+  const index = Math.max(0, Math.min(MOCK_PERSONA_QUESTIONS.length - 1, turn - 1))
+  const template = MOCK_PERSONA_QUESTIONS[index]
+  const turnMeta = getTurnMeta(turn)
+  return {
+    turn,
+    set: turnMeta.set || `mock_set_${turn}`,
+    question_type: turnMeta.questionType || 'mock_question',
+    question: template.question,
+    options: template.options,
+  }
+}
+
+const buildMockPersonaResult = (session) => ({
+  version: PERSONA_VERSION,
+  core_identity: {
+    self_image: '차분하게 상황을 살피면서도 마음이 움직이면 직접 행동하는 성향입니다.',
+    public_mask: '처음에는 신중하지만 익숙해지면 따뜻하고 장난스러운 모습을 보여줍니다.',
+    emotional_need: '상대가 꾸준한 관심과 안정적인 반응을 보여줄 때 편안함을 느낍니다.',
+    romantic_goal: '가볍게 흔들리는 관계보다 서로의 리듬을 존중하는 관계를 선호합니다.',
+  },
+  personality: {
+    first_impression_style: '신중함',
+    trust_building_style: '꾸준함',
+    decision_bias: '관찰형',
+    insecurity_trigger: '거리감',
+    pride_point: '배려심',
+    stress_response: '정리형',
+    boredom_pattern: '새로움',
+  },
+  preferences: {
+    likes: ['차분한 대화', '꾸준한 연락', '작은 배려'],
+    dislikes: ['갑작스러운 거리두기', '불분명한 태도', '감정 회피'],
+    hobbies: ['산책', '카페에서 생각 정리하기'],
+    ideal_type: ['말보다 행동이 안정적인 사람', '분위기를 세심하게 보는 사람', '서로의 시간을 존중하는 사람'],
+    dealbreakers: ['반복되는 거짓말', '무시하는 말투', '일방적인 관계'],
+  },
+  social_style: {
+    speech_style: '처음에는 조심스럽게 말하지만 친해지면 편하고 부드럽게 표현합니다.',
+    texting_style: '답장 속도보다 맥락과 진심을 중요하게 여깁니다.',
+    flirting_style: '과한 표현보다 기억해주는 행동으로 호감을 드러냅니다.',
+    humor_style: '상대가 부담스럽지 않은 가벼운 농담을 선호합니다.',
+    conflict_style: '감정이 올라오면 잠깐 정리한 뒤 이야기하려고 합니다.',
+    repair_style: '구체적인 사과와 바뀐 행동을 중요하게 봅니다.',
+    boundary_style: '불편함을 오래 참기보다 적절한 선에서 말하려고 합니다.',
+  },
+  relationship_policy: {
+    first_meeting: '처음에는 상대의 말투와 주변을 배려하는 방식을 천천히 관찰합니다.',
+    when_interested: '관심이 생기면 작게 챙겨주고 대화의 접점을 늘립니다.',
+    when_uninterested: '거리를 두되 무례하지 않게 반응을 줄입니다.',
+    jealousy_trigger: '상대의 관심이 갑자기 다른 곳으로 향한다고 느낄 때 흔들립니다.',
+    intimacy_pace: '빠른 확신보다 자연스럽게 쌓이는 친밀감을 선호합니다.',
+    commitment_attitude: '관계가 시작되면 책임감 있게 유지하려는 편입니다.',
+  },
+  behavior_signals: {
+    under_stress: '혼자 정리할 시간을 가진 뒤 다시 대화하려고 합니다.',
+    when_hurt: '바로 따지기보다 거리를 두고 상대의 반응을 봅니다.',
+    when_jealous: '티를 크게 내지 않지만 말투가 조금 건조해질 수 있습니다.',
+    when_lonely: '익숙한 사람에게 조용히 신호를 보내는 편입니다.',
+    everyday_habit: '작은 루틴과 편안한 공간을 중요하게 여깁니다.',
+  },
+  style_examples: {
+    casual_texts: ['오늘 좀 정신없었지?', '천천히 답해도 괜찮아.', '그 이야기 기억나서 물어봤어.'],
+    flirting_texts: ['그때 말한 거 아직 기억하고 있었어.', '너랑 이야기하면 시간이 빨리 가.', '다음엔 같이 가보자.'],
+    conflict_texts: ['조금 정리하고 다시 이야기하고 싶어.', '그 말은 나한테 좀 크게 느껴졌어.', '다음엔 이렇게 해주면 좋겠어.'],
+  },
+  mock: true,
+  answer_count: session.answers.length,
+})
+
+const buildMockRoutine = () => ({
+  blocks: [
+    { start_hour: 0, end_hour: 7, node_ref: 'mock_home', activity: '휴식', rationale: '테스트 루틴입니다.' },
+    { start_hour: 7, end_hour: 10, node_ref: 'mock_cafe', activity: '가벼운 대화', rationale: '사회적 성향을 반영합니다.' },
+    { start_hour: 10, end_hour: 14, node_ref: 'mock_square', activity: '관찰과 이동', rationale: '탐색 행동을 표현합니다.' },
+    { start_hour: 14, end_hour: 18, node_ref: 'mock_library', activity: '조용한 정리', rationale: '차분한 루틴을 반영합니다.' },
+    { start_hour: 18, end_hour: 22, node_ref: 'mock_park', activity: '만남', rationale: '관계 지향 행동을 표현합니다.' },
+    { start_hour: 22, end_hour: 24, node_ref: 'mock_home', activity: '하루 정리', rationale: '안정적인 마무리입니다.' },
+  ],
 })
 
 const getAgentById = async (client, agentId) => {
@@ -1795,6 +2158,8 @@ const app = express()
 const port = Number(process.env.PORT || 8787)
 
 app.use(express.json({ limit: '15mb' }))
+app.use('/output', express.static(AVATAR_OUTPUT_ROOT))
+app.use('/model', express.static(AVATAR_MODEL_ROOT))
 
 app.get('/api/persona-system-prompt', (req, res) => {
   res.json({ systemPrompt: PERSONA_INTERVIEW_SYSTEM_PROMPT })
@@ -1802,11 +2167,6 @@ app.get('/api/persona-system-prompt', (req, res) => {
 
 app.post('/api/persona/start', async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY
-
-  if (!apiKey) {
-    res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' })
-    return
-  }
 
   cleanupExpiredPersonaSessions()
 
@@ -1827,7 +2187,10 @@ app.post('/api/persona/start', async (req, res) => {
   }
 
   try {
-    const firstQuestion = await generatePersonaQuestion({ apiKey, session, turn: 1 })
+    const firstQuestion =
+      IS_TUTORIAL_TEST_MODE && isPlaceholderOpenAiKey(apiKey)
+        ? buildMockPersonaQuestion(1)
+        : await generatePersonaQuestion({ apiKey, session, turn: 1 })
     session.currentQuestion = firstQuestion
     personaSessions.set(agentId, session)
 
@@ -1849,10 +2212,6 @@ app.post('/api/persona/answer', async (req, res) => {
   const answerMode = answerModeRaw === 'custom' ? 'custom' : 'suggested'
   const normalizedAnswer = normalizeUntrustedText(answerRaw, PERSONA_MAX_ANSWER_CHARS)
   const answerRisk = analyzeInjectionRisk(normalizedAnswer)
-  if (!apiKey) {
-    res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' })
-    return
-  }
   if (!agentId) {
     res.status(400).json({ error: 'agentId is required.' })
     return
@@ -1900,8 +2259,9 @@ app.post('/api/persona/answer', async (req, res) => {
   session.updatedAt = Date.now()
   try {
     if (currentQuestion.turn >= PERSONA_TOTAL_TURNS) {
-      const result = await generatePersonaResult({ apiKey, session })
-      const routine = await generateDailyRoutine({ apiKey, session, personaResult: result })
+      const useMockPersona = IS_TUTORIAL_TEST_MODE && isPlaceholderOpenAiKey(apiKey)
+      const result = useMockPersona ? buildMockPersonaResult(session) : await generatePersonaResult({ apiKey, session })
+      const routine = useMockPersona ? buildMockRoutine() : await generateDailyRoutine({ apiKey, session, personaResult: result })
       session.result = result
       session.routine = routine
       session.currentQuestion = null
@@ -1925,7 +2285,10 @@ app.post('/api/persona/answer', async (req, res) => {
       return
     }
     const nextTurn = currentQuestion.turn + 1
-    const nextQuestion = await generatePersonaQuestion({ apiKey, session, turn: nextTurn })
+    const nextQuestion =
+      IS_TUTORIAL_TEST_MODE && isPlaceholderOpenAiKey(apiKey)
+        ? buildMockPersonaQuestion(nextTurn)
+        : await generatePersonaQuestion({ apiKey, session, turn: nextTurn })
     session.currentTurn = nextTurn
     session.currentQuestion = nextQuestion
     session.updatedAt = Date.now()
@@ -2010,6 +2373,30 @@ app.post('/api/nickname/claim', async (req, res) => {
     return
   }
   const session = personaSessions.get(agentId)
+  if (IS_TUTORIAL_TEST_MODE) {
+    let normalizedNickname
+    try {
+      normalizedNickname = normalizeNickname(nickname)
+    } catch {
+      normalizedNickname = String(nickname || '').replace(/\s+/g, ' ').trim().slice(0, 12) || 'test'
+    }
+    if (session) {
+      session.nickname = normalizedNickname
+      session.updatedAt = Date.now()
+    }
+    res.json({
+      ok: true,
+      user: {
+        agentId,
+        nickname: normalizedNickname,
+      },
+      enterUrl: buildTerariumEnterUrl(agentId),
+      testMode: true,
+      warning: 'Nickname uniqueness was skipped because SKIP_TUTORIAL_SCHEMA=true.',
+    })
+    return
+  }
+
   const tryClaimNickname = async () =>
     claimNickname({
       agentId,
@@ -2100,6 +2487,44 @@ app.post('/api/analyze-appearance', async (req, res) => {
     }
 
     res.status(500).json({ error: message })
+  }
+})
+
+app.post('/api/avatar/build', async (req, res) => {
+  const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : ''
+  const appearance = req.body?.appearance && typeof req.body.appearance === 'object' ? req.body.appearance : null
+  if (!agentId) {
+    res.status(400).json({ error: 'agentId is required.' })
+    return
+  }
+  if (!appearance) {
+    res.status(400).json({ error: 'appearance is required.' })
+    return
+  }
+
+  try {
+    res.json(await buildAvatarOutput({ agentId, appearance }))
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to build avatar output.' })
+  }
+})
+
+app.post('/api/avatar/rename', async (req, res) => {
+  const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : ''
+  const nickname = typeof req.body?.nickname === 'string' ? req.body.nickname.trim() : ''
+  if (!agentId) {
+    res.status(400).json({ error: 'agentId is required.' })
+    return
+  }
+  if (!nickname) {
+    res.status(400).json({ error: 'nickname is required.' })
+    return
+  }
+
+  try {
+    res.json(await renameAvatarOutput({ agentId, nickname }))
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to rename avatar output.' })
   }
 })
 
