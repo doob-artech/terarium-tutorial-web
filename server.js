@@ -20,7 +20,7 @@ const OPENAI_MODEL = 'gpt-4.1-mini'
 const APPEARANCE_LLM_SERVER_URL = String(process.env.LLM_SERVER_URL || 'http://terarium-llm-server:18200').replace(/\/+$/, '')
 const APPEARANCE_LLM_SERVER_API_KEY = String(process.env.LLM_SERVER_API_KEY || process.env.LLM_API_KEY || '').trim()
 const APPEARANCE_LLM_MODEL = String(process.env.TUTORIAL_APPEARANCE_MODEL || 'gemma4:e4b').trim()
-const PERSONA_TOTAL_TURNS = 6
+const PERSONA_TOTAL_TURNS = 8
 const PERSONA_SESSION_TTL_MS = 30 * 60 * 1000
 const PERSONA_MAX_ANSWER_CHARS = 320
 const PERSONA_MAX_MODEL_DATA_CHARS = 180
@@ -44,36 +44,14 @@ const ROUTINE_USER_INSTRUCTION_LINES = promptTemplates.routine.user_instructions
 const { Pool } = pg
 
 const PERSONA_INTERVIEW_MODULES = [
-  {
-    set: 'attraction',
-    questionType: 'initiative_rhythm',
-    focus: 'Focus axis: first-attraction signal, initiative rhythm, and early interest expression.',
-  },
-  {
-    set: 'contact',
-    questionType: 'contact_style',
-    focus: 'Focus axis: contact rhythm, reply latency expectation, and texting tone.',
-  },
-  {
-    set: 'taste',
-    questionType: 'lifestyle_taste',
-    focus: 'Focus axis: daily lifestyle anchors, solo recharge, hobbies, likes, dislikes, and date texture.',
-  },
-  {
-    set: 'boundaries',
-    questionType: 'boundary_heat',
-    focus: 'Focus axis: boundary setting, jealousy trigger, respect expectation, and physical-distance comfort.',
-  },
-  {
-    set: 'conflict',
-    questionType: 'repair_pattern',
-    focus: 'Focus axis: conflict style, defensive habit, apology standard, and repair threshold.',
-  },
-  {
-    set: 'commitment',
-    questionType: 'future_shape',
-    focus: 'Focus axis: relationship goal clarity, intimacy pace, certainty threshold, and partner role expectation.',
-  },
+  { set: 'social', questionType: 'first_meeting_style', focus: 'Fixed axis: first meeting approach style.' },
+  { set: 'social', questionType: 'conversation_role', focus: 'Fixed axis: conversation role.' },
+  { set: 'social', questionType: 'trust_basis', focus: 'Fixed axis: trust building basis.' },
+  { set: 'social', questionType: 'disagreement_style', focus: 'Fixed axis: disagreement response.' },
+  { set: 'social', questionType: 'care_style', focus: 'Fixed axis: care style.' },
+  { set: 'social', questionType: 'boundary_style', focus: 'Fixed axis: personal boundary style.' },
+  { set: 'social', questionType: 'group_role', focus: 'Fixed axis: group role.' },
+  { set: 'social', questionType: 'social_amplification', focus: 'Fixed axis: desired agent amplification.' },
 ]
 
 class DbAppError extends Error {
@@ -326,8 +304,8 @@ const PERSONA_QUESTION_SCHEMA = {
     },
     options: {
       type: 'array',
-      minItems: 4,
-      maxItems: 4,
+      minItems: 6,
+      maxItems: 6,
       items: {
         type: 'string',
         minLength: 1,
@@ -1672,71 +1650,113 @@ const serializeAgentUser = (row) => ({
   routine: row.routine_json && typeof row.routine_json === 'object' ? row.routine_json : {},
 })
 
-const MOCK_PERSONA_QUESTIONS = [
+const FIXED_PERSONA_QUESTIONS = [
   {
-    question: '바쁜 카페에서 마음에 드는 사람이 보일 때 어떻게 먼저 다가가시나요?',
+    questionType: 'first_meeting_style',
+    question: '처음 만난 사람과 함께 있으면 나는 보통?',
     options: [
-      '미리 이야기할 거리와 말투를 준비해서 접근해요',
-      '상대 반응에 맞춰 자연스럽게 대화를 시작해요',
-      '일단 눈 인사만 주고 상황 봐요',
-      '주변 분위기를 파악하며 가볍게 인사로 시작해요',
+      '먼저 말을 걸어본다',
+      '상대가 말할 때까지 기다린다',
+      '주변 분위기를 먼저 살핀다',
+      '가벼운 농담이나 인사로 시작한다',
+      '필요한 말만 짧게 한다',
+      '같이 있는 사람을 자연스럽게 챙긴다',
     ],
   },
   {
-    question: '처음 만난 사람이 답장이 늦을 때 어떤 생각이 먼저 드나요?',
+    questionType: 'conversation_role',
+    question: '대화가 이어질 때 나는 어떤 쪽에 가까운가요?',
     options: [
-      '바쁜 일이 있겠지 생각하고 기다려요',
-      '관심이 줄었나 싶어 조금 신경 쓰여요',
-      '내가 먼저 다른 이야기를 꺼내요',
-      '답장 속도보다 다음 만남의 분위기를 봐요',
+      '이야기를 많이 꺼낸다',
+      '상대의 이야기를 잘 들어준다',
+      '질문을 하며 이어간다',
+      '공감이나 리액션을 자주 한다',
+      '생각한 뒤 천천히 말한다',
+      '분위기가 어색하지 않게 도와준다',
     ],
   },
   {
-    question: '관계에서 상대가 갑자기 거리를 둘 때 어떻게 반응하나요?',
+    questionType: 'trust_basis',
+    question: '친해지는 데 중요한 것은?',
     options: [
-      '바로 이유를 물어보고 확인해요',
-      '잠깐 시간을 주고 다시 말을 걸어요',
-      '상대가 편해질 때까지 거리를 둬요',
-      '분위기를 풀 수 있는 가벼운 말을 건네요',
+      '자주 보는 것',
+      '솔직하게 말하는 것',
+      '서로 웃을 수 있는 것',
+      '조용히 편한 것',
+      '약속을 잘 지키는 것',
+      '취향이나 관심사가 통하는 것',
     ],
   },
   {
-    question: '좋아하는 사람에게 마음을 표현할 때 가장 편한 방식은 무엇인가요?',
+    questionType: 'disagreement_style',
+    question: '의견이 다를 때 나는 보통?',
     options: [
-      '직접적으로 분명하게 말해요',
-      '작은 배려와 행동으로 보여줘요',
-      '장난과 농담 속에 살짝 드러내요',
-      '상대가 확신을 줄 때까지 천천히 표현해요',
+      '내 생각을 분명히 말한다',
+      '상대의 말을 먼저 들어본다',
+      '중간 지점을 찾으려 한다',
+      '잠깐 거리를 두고 생각한다',
+      '분위기가 상하지 않게 돌려 말한다',
+      '가볍게 넘기고 다음 이야기로 간다',
     ],
   },
   {
-    question: '갈등이 생겼을 때 가장 먼저 중요하게 보는 것은 무엇인가요?',
+    questionType: 'care_style',
+    question: '누군가 힘들어 보이면 나는?',
     options: [
-      '서로의 감정을 진정시키는 것',
-      '무엇이 문제였는지 정확히 정리하는 것',
-      '앞으로 어떻게 바꿀지 약속하는 것',
-      '관계가 너무 무거워지지 않게 분위기를 푸는 것',
+      '바로 괜찮은지 물어본다',
+      '조용히 곁에 있어준다',
+      '해결 방법을 같이 찾아본다',
+      '기분이 풀리게 말을 건넨다',
+      '상대가 말할 때까지 기다린다',
+      '작은 도움을 행동으로 해준다',
     ],
   },
   {
-    question: '오래 이어지는 관계에서 가장 중요하다고 느끼는 것은 무엇인가요?',
+    questionType: 'boundary_style',
+    question: '내가 혼자 있고 싶을 때는?',
     options: [
-      '서로의 생활 리듬을 존중하는 것',
-      '말보다 꾸준한 행동으로 믿음을 주는 것',
-      '새로운 경험을 함께 만들며 설렘을 유지하는 것',
-      '불편한 감정도 솔직하게 나눌 수 있는 것',
+      '솔직히 혼자 있고 싶다고 말한다',
+      '조용히 자리를 피한다',
+      '연락이나 대화를 조금 줄인다',
+      '그래도 예의 있게 반응한다',
+      '좋아하는 일을 하며 회복한다',
+      '혼자 있고 싶어도 티를 잘 내지 않는다',
+    ],
+  },
+  {
+    questionType: 'group_role',
+    question: '여러 사람이 함께 있을 때 나는?',
+    options: [
+      '대화를 이끈다',
+      '조용히 듣는다',
+      '빠진 사람이 없게 챙긴다',
+      '재밌는 분위기를 만든다',
+      '필요한 정보를 정리한다',
+      '마음에 맞는 한두 사람과 깊게 말한다',
+    ],
+  },
+  {
+    questionType: 'social_amplification',
+    question: '이 에이전트가 당신을 닮되, 하나 더 가져도 된다면?',
+    options: [
+      '조금 더 솔직하게',
+      '조금 더 다정하게',
+      '조금 더 용감하게',
+      '조금 더 차분하게',
+      '조금 더 유쾌하게',
+      '지금의 나와 최대한 비슷하게',
     ],
   },
 ]
 
 const buildMockPersonaQuestion = (turn) => {
-  const index = Math.max(0, Math.min(MOCK_PERSONA_QUESTIONS.length - 1, turn - 1))
-  const template = MOCK_PERSONA_QUESTIONS[index]
+  const index = Math.max(0, Math.min(FIXED_PERSONA_QUESTIONS.length - 1, turn - 1))
+  const template = FIXED_PERSONA_QUESTIONS[index]
   const turnMeta = getTurnMeta(turn)
   return {
     turn,
-    set: turnMeta.set || `mock_set_${turn}`,
-    question_type: turnMeta.questionType || 'mock_question',
+    set: turnMeta.set || 'social',
+    question_type: template.questionType || turnMeta.questionType || 'social_question',
     question: template.question,
     options: template.options,
   }
@@ -1983,6 +2003,8 @@ const claimNickname = async ({ agentId, nickname }) => {
 }
 
 const generatePersonaQuestion = async ({ apiKey, session, turn }) => {
+  return buildMockPersonaQuestion(turn)
+
   const turnMeta = getTurnMeta(turn)
   const previousEntry = session.answers[session.answers.length - 1] ?? null
   const interviewHistory = serializePersonaHistory(session.answers)

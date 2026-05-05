@@ -4,7 +4,7 @@ import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
-const PERSONA_TOTAL_TURNS = 6
+const PERSONA_TOTAL_TURNS = 8
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -913,7 +913,7 @@ function App() {
                 </article>
               ) : isQuestionTransitionLoading ? (
                 <section className="persona-options" aria-label="다음 질문 생성 중">
-                  {Array.from({ length: 4 }).map((_, index) => (
+                  {Array.from({ length: 6 }).map((_, index) => (
                     <div
                       key={`persona-option-skeleton-${index}`}
                       className="persona-option-skeleton"
