@@ -334,11 +334,7 @@ const TutorialDesign = ({
               <h1 className="intro-title" data-text="TERARIUM">TERARIUM</h1>
 
               <p className="intro-subtitle">
-                {renderTypewriter(step.text, {
-                  speed: 40,
-                  repeat: true,
-                  repeatDelay: 2600,
-                })}
+                {formatText(step.text)}
               </p>
 
               <button
