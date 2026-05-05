@@ -2288,28 +2288,32 @@ app.post('/api/persona/answer', async (req, res) => {
   session.updatedAt = Date.now()
   try {
     if (currentQuestion.turn >= PERSONA_TOTAL_TURNS) {
-      const useMockPersona = IS_TUTORIAL_TEST_MODE && isPlaceholderOpenAiKey(apiKey)
-      const result = useMockPersona ? buildMockPersonaResult(session) : await generatePersonaResult({ apiKey, session })
-      const routine = useMockPersona ? buildMockRoutine() : await generateDailyRoutine({ apiKey, session, personaResult: result })
-      session.result = result
-      session.routine = routine
       session.currentQuestion = null
       session.updatedAt = Date.now()
-      try {
-        await completeTutorialAgent({
-          agentId,
-          appearance: session.appearance,
-          personaResult: result,
-          routine,
-          nickname: session.nickname,
-        })
-      } catch (dbError) {
-        console.error('[persona/answer] failed to persist tutorial agent complete:', dbError)
-      }
+
+      void (async () => {
+        try {
+          const useMockPersona = IS_TUTORIAL_TEST_MODE && isPlaceholderOpenAiKey(apiKey)
+          const result = useMockPersona ? buildMockPersonaResult(session) : await generatePersonaResult({ apiKey, session })
+          const routine = useMockPersona ? buildMockRoutine() : await generateDailyRoutine({ apiKey, session, personaResult: result })
+          session.result = result
+          session.routine = routine
+          session.updatedAt = Date.now()
+          await completeTutorialAgent({
+            agentId,
+            appearance: session.appearance,
+            personaResult: result,
+            routine,
+            nickname: session.nickname,
+          })
+        } catch (backgroundError) {
+          console.error('[persona/answer] background finalization failed:', backgroundError)
+        }
+      })()
+
       res.json({
         done: true,
-        result,
-        routine,
+        pending: true,
       })
       return
     }

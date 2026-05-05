@@ -181,6 +181,9 @@ const TutorialDesign = ({
     : null;
   const shouldRenderAvatarModel =
     avatarUrl && ['avatar', 'avatarSmall', 'avatarResult'].includes(characterKey);
+  const qrCodeSrc = enterUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(enterUrl)}`
+    : qrImage;
 
   useEffect(() => {
     setIsTextDone(false);
@@ -560,10 +563,10 @@ const TutorialDesign = ({
 
                   {enterUrl ? (
                     <a href={enterUrl} target="_blank" rel="noreferrer">
-                      <img src={qrImage} alt="QR code" className="qr-image" />
+                      <img src={qrCodeSrc} alt="QR code" className="qr-image" />
                     </a>
                   ) : (
-                    <img src={qrImage} alt="QR code" className="qr-image" />
+                    <img src={qrCodeSrc} alt="QR code" className="qr-image" />
                   )}
 
                   <div className="action-row show">

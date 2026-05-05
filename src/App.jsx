@@ -808,8 +808,8 @@ function App() {
 
   if (stage === 'finalDesign') {
     return (
-      <TutorialDesign
-        initialId={14}
+        <TutorialDesign
+        initialId={15}
         avatarUrl={avatarModelUrl}
         externalName={nicknameValue || nicknameInput.trim()}
         keywords={personaKeywords}
@@ -879,7 +879,7 @@ function App() {
                       onClick={() => void handleNicknameClaim()}
                       disabled={!canSubmitNickname || nicknameStatus === 'checking'}
                     >
-                      {nicknameStatus === 'checking' ? '이름 확인 중...' : personaLoading ? '질문 준비 중...' : '다음으로'}
+                      {nicknameStatus === 'checking' ? '이름 확인 중...' : personaLoading ? '분석 중...' : '다음으로'}
                     </button>
                   </div>
                 </article>
@@ -903,7 +903,7 @@ function App() {
               ) : !displayQuestion ? (
                 <article className="persona-status-card">
                   <p className="persona-status-text">
-                    {personaLoading ? '다음 질문을 준비하고 있습니다...' : personaError || '질문을 다시 불러와 주세요.'}
+                    {personaLoading ? '분석 중...' : personaError || '질문을 다시 불러와 주세요.'}
                   </p>
                   {!personaLoading && (
                     <button className="persona-retry-button" type="button" onClick={() => void startPersonaInterview()}>
@@ -912,7 +912,7 @@ function App() {
                   )}
                 </article>
               ) : isQuestionTransitionLoading ? (
-                <section className="persona-options" aria-label="다음 질문 생성 중">
+                <section className="persona-options" aria-label="분석 중">
                   {Array.from({ length: 6 }).map((_, index) => (
                     <div
                       key={`persona-option-skeleton-${index}`}
@@ -1002,7 +1002,7 @@ function App() {
                   onClick={handleNextClick}
                   disabled={personaLoading || isQuestionTransitionLoading || (!canSubmitSelection && !canSubmitCustomInput && !isViewingHistory)}
                 >
-                  {isQuestionTransitionLoading ? '다음 질문 생성 중...' : '다음으로'}
+                  {isQuestionTransitionLoading ? '분석 중...' : '다음으로'}
                 </button>
               )}
             </nav>
@@ -1025,7 +1025,7 @@ function App() {
         <section className="capture-processing-overlay" aria-live="polite">
           <div className="capture-processing-pill">
             <span className="capture-processing-dot" />
-            <p className="capture-processing-text">분석과 질문 생성 중...</p>
+            <p className="capture-processing-text">분석 중...</p>
           </div>
         </section>
       )}
