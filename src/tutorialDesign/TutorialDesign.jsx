@@ -47,6 +47,7 @@ const Typewriter = ({
   repeatDelay = 1200,
   highlightText = '',
   highlightClassName = '',
+  forceComplete = false,
   onComplete,
 }) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -58,6 +59,12 @@ const Typewriter = ({
 
   useEffect(() => {
     if (!text) {
+      onCompleteRef.current?.();
+      return;
+    }
+
+    if (forceComplete) {
+      setDisplayedText(text);
       onCompleteRef.current?.();
       return;
     }
@@ -92,7 +99,7 @@ const Typewriter = ({
     timer = setTimeout(nextTick, speed);
 
     return () => clearTimeout(timer);
-  }, [text, speed, pauseTime, repeat, repeatDelay]);
+  }, [text, speed, pauseTime, repeat, repeatDelay, forceComplete]);
 
   if (!highlightText) {
     return <>{displayedText}</>;
@@ -139,6 +146,7 @@ const TutorialDesign = ({
   const [isWhiteLayerTransition, setIsWhiteLayerTransition] = useState(false);
   const [nameError, setNameError] = useState('');
   const [isNameSubmitting, setIsNameSubmitting] = useState(false);
+  const [forceCompleteText, setForceCompleteText] = useState(false);
 
   const step =
     TUTORIAL_DATA.find((item) => item.id === currentId) || TUTORIAL_DATA[0];
@@ -178,6 +186,7 @@ const TutorialDesign = ({
     setIsTextDone(false);
     setIsNameIntroDone(false);
     setNameError('');
+    setForceCompleteText(false);
   }, [currentId]);
 
   useEffect(() => {
@@ -205,7 +214,7 @@ const TutorialDesign = ({
     if (currentId === 10) {
       const trimmedName = userName.trim();
       if (!trimmedName) {
-        setNameError('이름을 입력해 주세요.');
+        setNameError('??已????낆젾??雅뚯눘苑??');
         return;
       }
 
@@ -215,7 +224,7 @@ const TutorialDesign = ({
       setIsNameSubmitting(false);
 
       if (ok === false) {
-        setNameError('이미 사용 중인 이름이에요. 다른 이름을 입력해 주세요.');
+        setNameError('??? ????餓λ쵐????已??곷퓠?? ??삘뀲 ??已????낆젾??雅뚯눘苑??');
         return;
       }
     }
@@ -244,8 +253,18 @@ const TutorialDesign = ({
     setCurrentId(nextId);
   };
 
+  const handleProgressiveNext = (nextId) => {
+    if (!isTextDone) {
+      setForceCompleteText(true);
+      setIsTextDone(true);
+      return;
+    }
+
+    void handleNext(nextId);
+  };
+
   const formatText = (text) =>
-    text?.replace(/{{name}}/g, userName || externalName || '이름 없음');
+    text?.replace(/{{name}}/g, userName || externalName || '??已???곸벉');
 
   const nameHighlightProps = userName
     ? {
@@ -262,15 +281,14 @@ const TutorialDesign = ({
       key={key}
       text={formatText(text)}
       speed={speed}
+      forceComplete={forceCompleteText}
       {...nameHighlightProps}
       {...typewriterProps}
     />
   );
 
   const handleTextComplete = () => {
-    setTimeout(() => {
-      setIsTextDone(true);
-    }, 1000);
+    setIsTextDone(true);
   };
 
   const handleNameIntroComplete = () => {
@@ -334,12 +352,16 @@ const TutorialDesign = ({
               <h1 className="intro-title" data-text="TERARIUM">TERARIUM</h1>
 
               <p className="intro-subtitle">
-                {formatText(step.text)}
+                {renderTypewriter(step.text, {
+                  speed: 34,
+                  pauseTime: 360,
+                  onComplete: handleTextComplete,
+                })}
               </p>
 
               <button
                 className="start-btn"
-                onClick={() => handleNext(step.nextId)}
+                onClick={() => handleProgressiveNext(step.nextId)}
               >
                 {step.buttonText}
               </button>
@@ -446,7 +468,7 @@ const TutorialDesign = ({
                       <div className="stack-action-row">
                         <button
                           className="primary-next-btn"
-                          onClick={() => handleNext(step.nextId)}
+                          onClick={() => handleProgressiveNext(step.nextId)}
                           disabled={isNameSubmitting}
                         >
                           {isNameSubmitting ? '확인 중...' : step.buttonText}
@@ -490,7 +512,7 @@ const TutorialDesign = ({
                       <div className="action-row show">
                         <button
                           className="primary-next-btn"
-                          onClick={() => handleNext(step.nextId)}
+                          onClick={() => handleProgressiveNext(step.nextId)}
                           disabled={isNameSubmitting}
                         >
                           {isNameSubmitting ? '확인 중...' : step.buttonText}
@@ -517,16 +539,14 @@ const TutorialDesign = ({
                         })}
                       </p>
 
-                      {isTextDone && (
-                        <div className="action-row show">
-                          <button
-                            className="primary-next-btn"
-                            onClick={() => handleNext(step.nextId)}
-                          >
-                            {step.buttonText}
-                          </button>
-                        </div>
-                      )}
+                      <div className="action-row show">
+                        <button
+                          className="primary-next-btn"
+                          onClick={() => handleProgressiveNext(step.nextId)}
+                        >
+                          {step.buttonText}
+                        </button>
+                      </div>
                     </section>
                   )}
                 </div>
@@ -546,16 +566,14 @@ const TutorialDesign = ({
                     <img src={qrImage} alt="QR code" className="qr-image" />
                   )}
 
-                  {isTextDone && (
-                    <div className="action-row show">
-                      <button
-                        className="primary-next-btn"
-                        onClick={() => handleNext(step.nextId)}
-                      >
-                        {step.buttonText}
-                      </button>
-                    </div>
-                  )}
+                  <div className="action-row show">
+                    <button
+                      className="primary-next-btn"
+                      onClick={() => handleProgressiveNext(step.nextId)}
+                    >
+                      {step.buttonText}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -591,12 +609,12 @@ const TutorialDesign = ({
                     </div>
 
                     {step.type === 'SELECT' && (
-                      <div className={`selection-row ${isTextDone ? 'show' : 'hide'}`}>
+                      <div className="selection-row show">
                         {step.options.map((opt, i) => (
                           <button
                             key={i}
                             className={`opt-btn ${opt.label}`}
-                            onClick={() => handleNext(opt.nextId)}
+                            onClick={() => handleProgressiveNext(opt.nextId)}
                           >
                             <span className="lbl-top">{opt.label}</span>
                             <span className="lbl-sub">{opt.subText}</span>
@@ -621,10 +639,10 @@ const TutorialDesign = ({
                   </div>
 
                   {step.type !== 'SELECT' && (
-                    <div className={`action-row ${isTextDone ? 'show' : 'hide'}`}>
+                    <div className="action-row show">
                       <button
                         className="primary-next-btn"
-                        onClick={() => handleNext(step.nextId)}
+                        onClick={() => handleProgressiveNext(step.nextId)}
                       >
                         {step.buttonText}
                       </button>
