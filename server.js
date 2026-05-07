@@ -1002,8 +1002,12 @@ const serializePersonaHistory = (answers) =>
     answerRiskSignals: Number.isInteger(entry.answerRiskSignals) ? entry.answerRiskSignals : 0,
   }))
 
-const buildTerariumEnterUrl = (agentId) =>
-  `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(agentId)}`
+const buildTerariumEnterUrl = (agentId, nickname = '') => {
+  const params = new URLSearchParams({ agentId: String(agentId || '') })
+  const normalizedNickname = String(nickname || '').trim()
+  if (normalizedNickname) params.set('nickname', normalizedNickname)
+  return `https://terarium.team-doob.com/profile?${params.toString()}`
+}
 
 const APPEARANCE_VALUE_LABELS = {
   hair_style: {
@@ -2432,7 +2436,7 @@ app.post('/api/nickname/claim', async (req, res) => {
         agentId,
         nickname: normalizedNickname,
       },
-      enterUrl: buildTerariumEnterUrl(agentId),
+      enterUrl: buildTerariumEnterUrl(agentId, normalizedNickname),
       testMode: true,
       warning: 'Nickname uniqueness was skipped because SKIP_TUTORIAL_SCHEMA=true.',
     })
@@ -2452,7 +2456,7 @@ app.post('/api/nickname/claim', async (req, res) => {
     }
     res.json({
       ...payload,
-      enterUrl: buildTerariumEnterUrl(agentId),
+      enterUrl: buildTerariumEnterUrl(agentId, payload?.user?.nickname || nickname),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to claim nickname.'
@@ -2467,7 +2471,7 @@ app.post('/api/nickname/claim', async (req, res) => {
         session.updatedAt = Date.now()
         res.json({
           ...retryPayload,
-          enterUrl: buildTerariumEnterUrl(agentId),
+          enterUrl: buildTerariumEnterUrl(agentId, retryPayload?.user?.nickname || nickname),
         })
         return
       } catch (retryError) {
@@ -2483,7 +2487,7 @@ app.post('/api/nickname/claim', async (req, res) => {
           agentId,
           nickname,
         },
-        enterUrl: buildTerariumEnterUrl(agentId),
+        enterUrl: buildTerariumEnterUrl(agentId, nickname),
         dbFallback: true,
         warning: 'DB temporarily unavailable; nickname was stored in-memory only.',
       })

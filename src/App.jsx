@@ -584,6 +584,17 @@ function App() {
     }
   }
 
+  const handlePersonaOptionDoubleClick = (option) => {
+    if (historyViewIndex !== null || personaLoading || isQuestionTransitionLoading || personaResult) {
+      return
+    }
+    setIsPersonaCustomInputOpen(false)
+    setSelectedAnswerMode('suggested')
+    setSelectedOption(option)
+    setIsQuestionTransitionLoading(true)
+    void submitPersonaAnswer(option, 'suggested')
+  }
+
   const handleNextClick = () => {
     if (historyViewIndex !== null) {
       if (historyViewIndex < answeredHistory.length - 1) {
@@ -698,7 +709,9 @@ function App() {
     setNicknameError('')
 
     const acceptNickname = (payload = {}) => {
-      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(activeAgentId)}`)
+      const fallbackParams = new URLSearchParams({ agentId: activeAgentId })
+      fallbackParams.set('nickname', targetNickname)
+      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?${fallbackParams.toString()}`)
       setNicknameValue(targetNickname)
       setNicknameInput(targetNickname)
       setNicknameStatus('success')
@@ -943,6 +956,7 @@ function App() {
                         className={`persona-option ${selectedOption === option ? 'is-selected' : selectedOption ? 'is-dimmed' : ''}`}
                         style={{ animationDelay: `${0.1 + index * 0.07}s` }}
                         onClick={() => handlePersonaOptionClick(option)}
+                        onDoubleClick={() => handlePersonaOptionDoubleClick(option)}
                         disabled={personaLoading}
                       >
                         <span className="persona-option-text">{option}</span>
