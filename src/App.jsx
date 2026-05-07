@@ -698,7 +698,7 @@ function App() {
     setNicknameError('')
 
     const acceptNickname = (payload = {}) => {
-      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/#agentId=${encodeURIComponent(activeAgentId)}`)
+      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(activeAgentId)}`)
       setNicknameValue(targetNickname)
       setNicknameInput(targetNickname)
       setNicknameStatus('success')

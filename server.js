@@ -1003,7 +1003,7 @@ const serializePersonaHistory = (answers) =>
   }))
 
 const buildTerariumEnterUrl = (agentId) =>
-  `https://terarium.team-doob.com/#agentId=${encodeURIComponent(agentId)}`
+  `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(agentId)}`
 
 const APPEARANCE_VALUE_LABELS = {
   hair_style: {
