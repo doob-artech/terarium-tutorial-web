@@ -709,9 +709,7 @@ function App() {
     setNicknameError('')
 
     const acceptNickname = (payload = {}) => {
-      const fallbackParams = new URLSearchParams({ agentId: activeAgentId })
-      fallbackParams.set('nickname', targetNickname)
-      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?${fallbackParams.toString()}`)
+      setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(activeAgentId)}`)
       setNicknameValue(targetNickname)
       setNicknameInput(targetNickname)
       setNicknameStatus('success')

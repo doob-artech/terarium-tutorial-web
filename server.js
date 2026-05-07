@@ -76,6 +76,7 @@ const dbPool = new Pool({
 const ensureTutorialSchema = async () => {
   await dbPool.query(`
     ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS is_ready BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS profile_ready BOOLEAN NOT NULL DEFAULT false;
     ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS persona_json JSONB NOT NULL DEFAULT '{}'::jsonb;
     ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS routine_json JSONB NOT NULL DEFAULT '{}'::jsonb;
     ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS appearance_json JSONB NOT NULL DEFAULT '{}'::jsonb;
@@ -83,6 +84,10 @@ const ensureTutorialSchema = async () => {
     SET persona_json = social_persona_json
     WHERE persona_json = '{}'::jsonb
       AND COALESCE(social_persona_json, '{}'::jsonb) <> '{}'::jsonb;
+    UPDATE agent_profiles
+    SET profile_ready = true
+    WHERE COALESCE(agent_name, '') <> ''
+      AND agent_name <> agent_id;
     UPDATE agent_profiles
     SET is_ready = true
     WHERE COALESCE(agent_name, '') <> ''
@@ -1002,12 +1007,8 @@ const serializePersonaHistory = (answers) =>
     answerRiskSignals: Number.isInteger(entry.answerRiskSignals) ? entry.answerRiskSignals : 0,
   }))
 
-const buildTerariumEnterUrl = (agentId, nickname = '') => {
-  const params = new URLSearchParams({ agentId: String(agentId || '') })
-  const normalizedNickname = String(nickname || '').trim()
-  if (normalizedNickname) params.set('nickname', normalizedNickname)
-  return `https://terarium.team-doob.com/profile?${params.toString()}`
-}
+const buildTerariumEnterUrl = (agentId) =>
+  `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(agentId)}`
 
 const APPEARANCE_VALUE_LABELS = {
   hair_style: {
@@ -1928,6 +1929,7 @@ const completeTutorialAgent = async ({ agentId, appearance, personaResult, routi
           persona_json = $3::jsonb,
           routine_json = $4::jsonb,
           agent_name = CASE WHEN $5 <> '' THEN $5 ELSE agent_profiles.agent_name END,
+          profile_ready = true,
           is_ready = true,
           updated_at = NOW(),
           last_active_at = NOW()
@@ -1985,7 +1987,7 @@ const claimNickname = async ({ agentId, nickname }) => {
     const updated = await client.query(
       `
         UPDATE agent_profiles
-        SET agent_name = $1, is_ready = false, updated_at = NOW(), last_active_at = NOW()
+        SET agent_name = $1, profile_ready = true, is_ready = false, updated_at = NOW(), last_active_at = NOW()
         WHERE agent_id = $2
           AND NOT EXISTS (
             SELECT 1 FROM agent_profiles existing
@@ -2436,7 +2438,7 @@ app.post('/api/nickname/claim', async (req, res) => {
         agentId,
         nickname: normalizedNickname,
       },
-      enterUrl: buildTerariumEnterUrl(agentId, normalizedNickname),
+      enterUrl: buildTerariumEnterUrl(agentId),
       testMode: true,
       warning: 'Nickname uniqueness was skipped because SKIP_TUTORIAL_SCHEMA=true.',
     })
@@ -2456,7 +2458,7 @@ app.post('/api/nickname/claim', async (req, res) => {
     }
     res.json({
       ...payload,
-      enterUrl: buildTerariumEnterUrl(agentId, payload?.user?.nickname || nickname),
+      enterUrl: buildTerariumEnterUrl(agentId),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to claim nickname.'
@@ -2471,7 +2473,7 @@ app.post('/api/nickname/claim', async (req, res) => {
         session.updatedAt = Date.now()
         res.json({
           ...retryPayload,
-          enterUrl: buildTerariumEnterUrl(agentId, retryPayload?.user?.nickname || nickname),
+          enterUrl: buildTerariumEnterUrl(agentId),
         })
         return
       } catch (retryError) {
@@ -2487,7 +2489,7 @@ app.post('/api/nickname/claim', async (req, res) => {
           agentId,
           nickname,
         },
-        enterUrl: buildTerariumEnterUrl(agentId, nickname),
+        enterUrl: buildTerariumEnterUrl(agentId),
         dbFallback: true,
         warning: 'DB temporarily unavailable; nickname was stored in-memory only.',
       })
