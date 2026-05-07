@@ -89,6 +89,15 @@ const ensureTutorialSchema = async () => {
       AND agent_name <> agent_id
       AND COALESCE(persona_json, '{}'::jsonb) <> '{}'::jsonb
       AND COALESCE(routine_json, '{}'::jsonb) <> '{}'::jsonb;
+    UPDATE agent_profiles
+    SET is_ready = false
+    WHERE COALESCE(is_ready, false) = true
+      AND (
+        COALESCE(agent_name, '') = ''
+        OR agent_name = agent_id
+        OR COALESCE(persona_json, '{}'::jsonb) = '{}'::jsonb
+        OR COALESCE(routine_json, '{}'::jsonb) = '{}'::jsonb
+      );
   `)
 }
 
