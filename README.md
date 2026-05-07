@@ -42,10 +42,6 @@ Docker 이미지 빌드:
 docker build -t doob-terarium-tutorial:local .
 ```
 
-## 배포
-
-이 레포에 push하면 `DESKTOP-3B84I03` self-hosted runner가 `VILAB` 로그인 세션에서 `D:\doob`의 로컬 레포들을 pull한 뒤 `terarium-deploy`의 Compose 스택을 직접 재빌드/재기동합니다.
-
 ## 관련 레포
 
 | 레포 | 역할 |
