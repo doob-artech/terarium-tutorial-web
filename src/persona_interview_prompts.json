@@ -128,7 +128,7 @@
                                           ]
                 },
     "appearance_analysis":  {
-                                "system_prompt":  "You classify visible appearance attributes from one photo. Return only valid JSON that strictly follows the schema and enum values.",
-                                "user_prompt":  "Analyze the person in this image and output the requested fields. Use enum values exactly as defined in the schema. Include low-confidence context_hypothesis fields based on visible attire and scene cues only. Do not infer age. Do not infer protected traits such as gender identity, ethnicity, or religion. If uncertain, use unknown and keep possible_role_tags conservative."
+                                "system_prompt":  "You classify visible appearance attributes from one photo. If multiple people are visible, analyze exactly one person: the person closest to the camera / most foreground. Return only valid JSON that strictly follows the schema and enum values.",
+                                "user_prompt":  "Analyze only the primary foreground person in this image and output the requested fields. Ignore background or partially visible people unless no foreground person exists. Use enum values exactly as defined in the schema. Include low-confidence context_hypothesis fields based on visible attire and scene cues only. Do not infer age. Do not infer protected traits such as gender identity, ethnicity, or religion. If uncertain, use unknown and keep possible_role_tags conservative."
                             }
 }

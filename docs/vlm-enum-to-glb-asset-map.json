@@ -1,0 +1,194 @@
+{
+  "version": 4,
+  "policy": "VLM returns semantic asset tags. The build pipeline always resolves each required tag to the closest available asset. The preferred runtime path is source-GLB node selection: model/source/avatar_parts.glb is loaded, and only selected nodes are kept in the final avatar GLB.",
+  "source_assets": {
+    "runtime_glb": "model/source/avatar_parts.glb"
+  },
+  "semantic_asset_tags": {
+    "skin_texture": {
+      "soft_peach_skin": {
+        "texture": "model/skin/soft_peach_skin.png",
+        "color": "#f1c7a8"
+      },
+      "light_warm_skin": {
+        "texture": "model/skin/light_warm_skin.png",
+        "color": "#f4d0b4"
+      }
+    },
+    "eye_texture": {
+      "round_open_eyes": {
+        "texture": "model/eyes/round_open_eyes.png"
+      },
+      "almond_upturned_eyes": {
+        "texture": "model/eyes/almond_upturned_eyes.png"
+      },
+      "hooded_shadow_eyes": {
+        "texture": "model/eyes/hooded_shadow_eyes.png"
+      },
+      "sleepy_drooping_eyes": {
+        "texture": "model/eyes/sleepy_drooping_eyes.png"
+      },
+      "simple_block_eyes": {
+        "texture": "model/eyes/simple_block_eyes.png"
+      }
+    },
+    "mouth_texture": {
+      "slightly_parted_mouth": {
+        "texture": "model/mouth/slightly_parted_mouth.png"
+      },
+      "gentle_closed_smile": {
+        "texture": "model/mouth/gentle_closed_smile.png"
+      },
+      "broad_open_smile": {
+        "texture": "model/mouth/broad_open_smile.png"
+      },
+      "straight_neutral_mouth": {
+        "texture": "model/mouth/straight_neutral_mouth.png"
+      },
+      "pout_frown_mouth": {
+        "texture": "model/mouth/pout_frown_mouth.png"
+      },
+      "clenched_w_mouth": {
+        "texture": "model/mouth/clenched_w_mouth.png"
+      }
+    },
+    "hair_mesh": {
+      "bun_hair": {
+        "source_nodes": ["bun_hair"],
+        "color_source": "hair_color"
+      },
+      "bun_hair_with_bangs": {
+        "source_nodes": ["bangs_bun_hair"],
+        "color_source": "hair_color"
+      },
+      "bob_hair_with_bangs": {
+        "source_nodes": ["bangs_bobbed_hair"],
+        "color_source": "hair_color"
+      },
+      "permed_short_hair": {
+        "source_nodes": ["permed_hair"],
+        "color_source": "hair_color"
+      },
+      "half_ponytail_hair": {
+        "source_nodes": ["half_ponytail"],
+        "color_source": "hair_color"
+      },
+      "long_wave_hair_with_bangs": {
+        "source_nodes": ["bangs_long_wave_hair"],
+        "color_source": "hair_color"
+      },
+      "long_wave_hair": {
+        "source_nodes": ["long_wave_hair"],
+        "color_source": "hair_color"
+      },
+      "low_tied_hair": {
+        "source_nodes": ["tied_down_hair"],
+        "color_source": "hair_color"
+      },
+      "high_tied_hair": {
+        "source_nodes": ["tied_up_hair"],
+        "color_source": "hair_color"
+      },
+      "long_bangs_hair": {
+        "source_nodes": ["hair03"],
+        "description": "Long front-bangs hair",
+        "color_source": "hair_color"
+      }
+    },
+    "top_mesh": {
+      "long_sleeve_tshirt": {
+        "source_nodes": ["long_Tshirt"],
+        "color_source": "top_color"
+      },
+      "short_sleeve_tshirt": {
+        "source_nodes": ["short_Tshirt"],
+        "color_source": "top_color"
+      }
+    },
+    "bottom_mesh": {
+      "short_pants": {
+        "source_nodes": ["short_pants"],
+        "color_source": "bottom_color"
+      },
+      "short_skirt": {
+        "source_nodes": ["short_skirt"],
+        "color_source": "bottom_color"
+      }
+    },
+    "glasses_mesh": {
+      "none": {
+        "source_nodes": []
+      },
+      "round_glasses": {
+        "source_nodes": ["round_glasses"],
+        "color": "#171717"
+      },
+      "square_glasses": {
+        "source_nodes": ["square_glasses"],
+        "color": "#171717"
+      }
+    },
+    "necklace_mesh": {
+      "none": {
+        "source_nodes": []
+      },
+      "pearl_necklace": {
+        "source_nodes": ["pearl_necklace"],
+        "color": "#f0e5c8"
+      }
+    },
+    "earring_mesh": {
+      "none": {
+        "source_nodes": []
+      },
+      "hoop_earrings": {
+        "source_nodes": ["R_Earrings", "L_Earrings"],
+        "description": "Ring earrings",
+        "color": "#d7c27a"
+      },
+      "simple_earrings": {
+        "source_nodes": ["simple_earring_L", "simple_earring_R"],
+        "description": "Small non-hoop earrings",
+        "color": "#d7c27a"
+      }
+    },
+    "shoes": {
+      "default_black_shoes": {
+        "source_nodes": ["R_shoes", "L_shoes"],
+        "color": "#222222"
+      }
+    }
+  },
+  "semantic_to_asset_guidance": {
+    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh must always choose the nearest available semantic tag. Do not output unknown for these.",
+    "optional_asset_tags": "glasses_mesh, necklace_mesh, and earring_mesh may use none when not visible.",
+    "eye_type": {
+      "round_dog_eyes": "round_open_eyes",
+      "upturned_cat_eyes": "almond_upturned_eyes",
+      "narrow_long_eyes": "almond_upturned_eyes",
+      "dark_circles_eyes": "hooded_shadow_eyes",
+      "sleepy_eyes": "sleepy_drooping_eyes",
+      "smiling_crescent_eyes": "sleepy_drooping_eyes"
+    },
+    "mouth_type": {
+      "surprised": "slightly_parted_mouth",
+      "closed_smile": "gentle_closed_smile",
+      "smirk": "gentle_closed_smile",
+      "big_smile": "broad_open_smile",
+      "flat": "straight_neutral_mouth",
+      "pout": "pout_frown_mouth",
+      "w_shape": "clenched_w_mouth"
+    },
+    "hair_style": {
+      "bun": "bun_hair_with_bangs",
+      "bob_straight": "bob_hair_with_bangs",
+      "bob_c_curl": "bob_hair_with_bangs",
+      "long_straight": "long_bangs_hair",
+      "long_wave": "long_wave_hair_with_bangs",
+      "half_up": "half_ponytail_hair",
+      "ponytail_low": "low_tied_hair",
+      "ponytail_high": "high_tied_hair",
+      "short_cut": "bob_hair_with_bangs"
+    }
+  }
+}

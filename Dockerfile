@@ -23,6 +23,7 @@ COPY server.js ./server.js
 COPY src/persona_interview_prompts.json ./src/persona_interview_prompts.json
 COPY src/personaRuntime.js ./src/personaRuntime.js
 COPY scripts ./scripts
+COPY model ./model
 
 EXPOSE 8787
 

@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
+import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
 import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
@@ -26,10 +27,6 @@ const MOCK_APPEARANCE_RESULT = {
 function App() {
   const [stage, setStage] = useState('idle')
   const [countdown, setCountdown] = useState(null)
-  const [flashOn, setFlashOn] = useState(false)
-  const [showShutterText, setShowShutterText] = useState(false)
-  const [, setCameraError] = useState('')
-  const [, setAnalysisStatus] = useState('idle')
   const [analysisResult, setAnalysisResult] = useState(null)
   const [personaAgentId, setPersonaAgentId] = useState('')
   const [personaQuestion, setPersonaQuestion] = useState(null)
@@ -38,13 +35,10 @@ function App() {
   const [personaInput, setPersonaInput] = useState('')
   const [personaResult, setPersonaResult] = useState(null)
   const [nicknameInput, setNicknameInput] = useState('')
-  const [nicknameError, setNicknameError] = useState('')
   const [nicknameStatus, setNicknameStatus] = useState('idle')
   const [nicknameValue, setNicknameValue] = useState('')
   const [enterUrl, setEnterUrl] = useState('')
   const [avatarModelUrl, setAvatarModelUrl] = useState('')
-  const [avatarManifestUrl, setAvatarManifestUrl] = useState('')
-  const [, setAvatarBuildError] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState(null)
   const [selectedAnswerMode, setSelectedAnswerMode] = useState('suggested')
@@ -55,6 +49,9 @@ function App() {
   const [cameraReady, setCameraReady] = useState(false)
   const [isQuestionTransitionLoading, setIsQuestionTransitionLoading] = useState(false)
   const [isCaptureProcessing, setIsCaptureProcessing] = useState(false)
+  const [isAvatarPreloading, setIsAvatarPreloading] = useState(false)
+  const [isAvatarLoadingExit, setIsAvatarLoadingExit] = useState(false)
+  const [isAvatarHandoffCover, setIsAvatarHandoffCover] = useState(false)
   const timeoutIdsRef = useRef([])
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -65,6 +62,8 @@ function App() {
   const personaAgentIdRef = useRef('')
   const nicknameValueRef = useRef('')
   const nicknameInputRef = useRef('')
+  const avatarPreviewRotationRef = useRef({ yaw: 0, pitch: 0 })
+  const avatarTransitionFinishingRef = useRef(false)
 
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
@@ -90,6 +89,7 @@ function App() {
     nicknameValueRef.current = ''
     nicknameInputRef.current = ''
     syncedAppearanceAgentRef.current = ''
+    avatarTransitionFinishingRef.current = false
     setPersonaAgentId('')
     setPersonaQuestion(null)
     setPersonaLoading(false)
@@ -97,13 +97,13 @@ function App() {
     setPersonaInput('')
     setPersonaResult(null)
     setNicknameInput('')
-    setNicknameError('')
     setNicknameStatus('idle')
     setNicknameValue('')
     setEnterUrl('')
     setAvatarModelUrl('')
-    setAvatarManifestUrl('')
-    setAvatarBuildError('')
+    setIsAvatarPreloading(false)
+    setIsAvatarLoadingExit(false)
+    setIsAvatarHandoffCover(false)
     setAnsweredHistory([])
     setHistoryViewIndex(null)
     setSelectedAnswerMode('suggested')
@@ -131,9 +131,33 @@ function App() {
     return canvas.toDataURL('image/jpeg', 0.92)
   }
 
-  const analyzePhotoWithOpenAI = async (imageDataUrl) => {
-    setAnalysisStatus('analyzing')
+  const handleAvatarPreviewRotationChange = useCallback((rotation) => {
+    avatarPreviewRotationRef.current = {
+      yaw: Number.isFinite(rotation?.yaw) ? rotation.yaw : avatarPreviewRotationRef.current.yaw,
+      pitch: Number.isFinite(rotation?.pitch) ? rotation.pitch : avatarPreviewRotationRef.current.pitch,
+    }
+  }, [])
 
+  const beginAvatarIntroTransition = useCallback(() => {
+    setStage('avatarIntro')
+  }, [])
+
+  const finishAvatarLoadingTransition = useCallback(() => {
+    if (avatarTransitionFinishingRef.current) {
+      return
+    }
+    avatarTransitionFinishingRef.current = true
+    setIsAvatarLoadingExit(true)
+    const cleanupTimer = window.setTimeout(() => {
+      setIsAvatarPreloading(false)
+      setIsAvatarLoadingExit(false)
+      setIsAvatarHandoffCover(false)
+      avatarTransitionFinishingRef.current = false
+    }, 1980)
+    timeoutIdsRef.current.push(cleanupTimer)
+  }, [])
+
+  const analyzePhotoWithLlmServer = async (imageDataUrl) => {
     try {
       const response = await fetch('/api/analyze-appearance', {
         method: 'POST',
@@ -154,10 +178,8 @@ function App() {
       }
 
       setAnalysisResult(payload.result)
-      setAnalysisStatus('success')
       return payload.result
     } catch {
-      setAnalysisStatus('error')
       setAnalysisResult(null)
       return null
     }
@@ -198,7 +220,6 @@ function App() {
       return null
     }
 
-    setAvatarBuildError('')
     try {
       const response = await fetch('/api/avatar/build', {
         method: 'POST',
@@ -212,10 +233,9 @@ function App() {
         throw new Error(payload?.error ?? 'Avatar build request failed.')
       }
       setAvatarModelUrl(payload.modelUrl ?? '')
-      setAvatarManifestUrl(payload.manifestUrl ?? '')
       return payload
     } catch (error) {
-      setAvatarBuildError(error instanceof Error ? error.message : 'Unknown error while building avatar.')
+      console.warn(error instanceof Error ? error.message : 'Unknown error while building avatar.')
       return null
     }
   }
@@ -309,7 +329,6 @@ function App() {
 
     const startCamera = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('')
         return
       }
 
@@ -332,9 +351,8 @@ function App() {
           }
         }
         setCameraReady(true)
-        setCameraError('')
       } catch {
-        setCameraError('')
+        setCameraReady(false)
       }
     }
 
@@ -362,23 +380,6 @@ function App() {
     void syncAppearanceToAgent(personaAgentId, analysisResult)
   }, [personaAgentId, analysisResult, syncAppearanceToAgent])
 
-  const handleStart = (shouldAutoCapture = false) => {
-    if (stage !== 'idle') {
-      return
-    }
-
-    clearTimers()
-    resetPersonaSession()
-    setCaptureLocked(false)
-    setAutoCaptureRequested(Boolean(shouldAutoCapture))
-    setCameraReady(false)
-    setIsQuestionTransitionLoading(false)
-    setIsCaptureProcessing(false)
-    setAnalysisStatus('idle')
-    setAnalysisResult(null)
-    setStage(shouldAutoCapture ? 'cameraDesignCapture' : 'webcam')
-  }
-
   const handleEnterCameraDesignStep = () => {
     if (stage !== 'idle') {
       return
@@ -389,24 +390,20 @@ function App() {
     setAutoCaptureRequested(false)
     setCaptureLocked(false)
     setCountdown(null)
-    setFlashOn(false)
-    setShowShutterText(false)
     setCameraReady(false)
     setIsCaptureProcessing(false)
-    setAnalysisStatus('idle')
     setAnalysisResult(null)
     setStage('cameraDesignCapture')
   }
 
   const handleCapture = () => {
-    if (!['webcam', 'cameraDesignCapture'].includes(stage) || countdown !== null || flashOn || captureLocked || isCaptureProcessing) {
+    if (stage !== 'cameraDesignCapture' || countdown !== null || captureLocked || isCaptureProcessing) {
       return
     }
 
     setAutoCaptureRequested(false)
     setCaptureLocked(true)
     clearTimers()
-    setShowShutterText(false)
     setCountdown(3)
 
     const countTwoTimer = window.setTimeout(() => setCountdown(2), 1000)
@@ -416,23 +413,23 @@ function App() {
       const imageDataUrl = captureCurrentFrame()
 
       setCountdown(null)
-      setFlashOn(true)
-      setShowShutterText(true)
       setIsCaptureProcessing(true)
-      setStage('avatarIntro')
+      avatarPreviewRotationRef.current = { yaw: 0, pitch: 0 }
+      setIsAvatarPreloading(false)
+      setIsAvatarLoadingExit(false)
+      setIsAvatarHandoffCover(false)
+      avatarTransitionFinishingRef.current = false
+      setStage('avatarLoading')
 
       const capturePipeline = (async () => {
         try {
           let appearanceResult = null
           if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
-            setAnalysisStatus('success')
             setAnalysisResult(MOCK_APPEARANCE_RESULT)
             appearanceResult = MOCK_APPEARANCE_RESULT
           } else {
-            if (!imageDataUrl) {
-              setAnalysisStatus('error')
-            } else {
-              appearanceResult = await analyzePhotoWithOpenAI(imageDataUrl)
+            if (imageDataUrl) {
+              appearanceResult = await analyzePhotoWithLlmServer(imageDataUrl)
             }
           }
 
@@ -442,8 +439,9 @@ function App() {
           }
 
           const personaPayload = await startPersonaInterview(avatarAppearance)
+          let avatarPayload = null
           if (personaPayload?.agentId) {
-            await buildAvatarModel({
+            avatarPayload = await buildAvatarModel({
               agentId: personaPayload.agentId,
               appearance: avatarAppearance,
             })
@@ -461,6 +459,17 @@ function App() {
               }).catch(() => null)
             }
           }
+          if (avatarPayload?.modelUrl) {
+            setIsAvatarHandoffCover(true)
+            const handoffTimer = window.setTimeout(() => {
+              setIsAvatarPreloading(true)
+              setIsAvatarHandoffCover(false)
+              beginAvatarIntroTransition()
+            }, 260)
+            timeoutIdsRef.current.push(handoffTimer)
+          } else {
+            setStage('avatarIntro')
+          }
           return personaPayload
         } finally {
           setIsCaptureProcessing(false)
@@ -469,10 +478,7 @@ function App() {
       capturePipelineRef.current = capturePipeline
     }, 3000)
 
-    const flashOffTimer = window.setTimeout(() => setFlashOn(false), 3300)
-    const shutterOffTimer = window.setTimeout(() => setShowShutterText(false), 3800)
-
-    timeoutIdsRef.current.push(countTwoTimer, countOneTimer, flashTimer, flashOffTimer, shutterOffTimer)
+    timeoutIdsRef.current.push(countTwoTimer, countOneTimer, flashTimer)
   }
 
   useEffect(() => {
@@ -662,11 +668,6 @@ function App() {
   const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
   const canSubmitSelection = Boolean(selectedOption)
-  const canSubmitNickname = TEST_MODE_RELAXED_NICKNAME
-    ? nicknameInput.trim().length > 0
-    : /^[A-Za-z0-9가-힣 ]{2,12}$/.test(nicknameInput.trim())
-  const qrImageUrl = enterUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(enterUrl)}` : ''
-  const isNicknameStage = stage === 'nickname'
   const personaKeywords = [
     personaResult?.personality?.first_impression_style,
     personaResult?.personality?.trust_building_style,
@@ -689,7 +690,6 @@ function App() {
     let activeAgentId = personaAgentId || personaAgentIdRef.current
     if (!activeAgentId && capturePipelineRef.current) {
       setNicknameStatus('checking')
-      setNicknameError('')
       const pipelinePayload = await capturePipelineRef.current.catch(() => null)
       activeAgentId = pipelinePayload?.agentId || personaAgentIdRef.current
     }
@@ -697,7 +697,6 @@ function App() {
       activeAgentId = `test-${Date.now()}`
     }
     if (!activeAgentId) {
-      setNicknameError('질문을 준비하고 있습니다. 잠시만 기다려 주세요.')
       setNicknameStatus('idle')
       return false
     }
@@ -706,7 +705,6 @@ function App() {
     }
 
     setNicknameStatus('checking')
-    setNicknameError('')
 
     const acceptNickname = (payload = {}) => {
       setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(activeAgentId)}`)
@@ -750,7 +748,6 @@ function App() {
       const avatarPayload = await avatarResponse.json().catch(() => null)
       if (avatarResponse.ok && avatarPayload) {
         setAvatarModelUrl(avatarPayload.modelUrl ?? avatarModelUrl)
-        setAvatarManifestUrl(avatarPayload.manifestUrl ?? avatarManifestUrl)
       }
       return acceptNickname(payload)
     } catch (error) {
@@ -758,7 +755,7 @@ function App() {
         return acceptNickname()
       }
       setNicknameStatus('error')
-      setNicknameError(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
+      console.warn(error instanceof Error ? error.message : '닉네임 저장에 실패했습니다.')
       return false
     }
   }
@@ -778,6 +775,7 @@ function App() {
         <TutorialDesign
           initialId={8}
           onBeginCamera={handleCapture}
+          hideUi={captureLocked || countdown !== null || isCaptureProcessing}
           backgroundSlot={
             <video
               ref={videoRef}
@@ -799,21 +797,37 @@ function App() {
 
   if (stage === 'avatarLoading') {
     return (
-      <main className="avatar-loading-screen" aria-live="polite">
-        <p>loading</p>
+      <main className={`avatar-loading-screen ${isAvatarHandoffCover ? 'is-covered' : ''}`} aria-label="로딩 중" aria-live="polite">
+        <AvatarThreeViewer
+          className="avatar-loading-preview"
+          src="/model/basic/basic.glb"
+          alt="avatar loading preview"
+          variant="loadingBase"
+          distanceMultiplier={1.66}
+          initialYaw={avatarPreviewRotationRef.current.yaw}
+          onRotationChange={handleAvatarPreviewRotationChange}
+        />
       </main>
     )
   }
 
   if (stage === 'avatarIntro') {
     return (
-      <TutorialDesign
-        initialId={9}
-        avatarUrl={avatarModelUrl}
-        externalName={nicknameValue}
-        onNameSubmit={(name) => handleNicknameClaim(name, null)}
-        onStartQuestions={() => setStage('persona')}
-      />
+      <>
+        <TutorialDesign
+          initialId={9}
+          avatarUrl={avatarModelUrl}
+          avatarInitialYaw={avatarPreviewRotationRef.current.yaw}
+          externalName={nicknameValue}
+          onAvatarRotationChange={handleAvatarPreviewRotationChange}
+          onAvatarReady={isAvatarPreloading ? finishAvatarLoadingTransition : null}
+          onNameSubmit={(name) => handleNicknameClaim(name, null)}
+          onStartQuestions={() => setStage('persona')}
+        />
+        {isAvatarPreloading && (
+          <main className={`avatar-transition-overlay ${isAvatarLoadingExit ? 'is-exiting' : ''}`} aria-hidden="true" />
+        )}
+      </>
     )
   }
 
@@ -832,86 +846,31 @@ function App() {
 
   return (
     <div
-      className={`start-screen phase-${stage} ${stage !== 'idle' ? 'is-started' : ''} ${flashOn ? 'is-flashing' : ''}`}
+      className="start-screen phase-persona is-started"
       role="application"
-      aria-label="테라리움 튜토리얼 시작 화면"
+      aria-label="페르소나 인터뷰 화면"
     >
-      {stage === 'webcam' && (
-        <section className="webcam-stage" aria-label="웹캠 화면">
-          <video ref={videoRef} className="webcam-view" autoPlay playsInline muted />
-        </section>
-      )}
+      <section className="persona-stage" aria-label="페르소나 인터뷰 화면">
+        <div className="persona-brand-bg">TERARiUM</div>
 
-      {(stage === 'nickname' || stage === 'persona') && (
-        <section className="persona-stage" aria-label="페르소나 인터뷰 화면">
-          <div className="persona-brand-bg">TERARiUM</div>
+        <header className="persona-header">
+          <div className="persona-question-meta">
+            <span className="persona-meta-label">Question</span>
+            <span className="persona-meta-count">{`${displayQuestion ? displayQuestion.turn : 1}/${PERSONA_TOTAL_TURNS}`}</span>
+          </div>
+          <p className="persona-question">
+            {personaResult
+              ? '페르소나 분석이 완료되었습니다.'
+              : isQuestionTransitionLoading
+                ? ''
+              : personaQuestionText || (personaLoading ? '질문을 준비하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
+          </p>
+          {isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
+        </header>
 
-          <header className="persona-header">
-            <div className="persona-question-meta">
-              <span className="persona-meta-label">{isNicknameStage ? 'Profile' : 'Question'}</span>
-              <span className="persona-meta-count">{isNicknameStage ? '이름' : `${displayQuestion ? displayQuestion.turn : 1}/${PERSONA_TOTAL_TURNS}`}</span>
-            </div>
-            <p className="persona-question">
-              {isNicknameStage
-                ? '프로필에 사용할 이름을 정해주세요.'
-                : personaResult
-                ? '페르소나 분석이 완료되었습니다.'
-                : isQuestionTransitionLoading
-                  ? ''
-                : personaQuestionText || (personaLoading ? '질문을 준비하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
-            </p>
-            {!isNicknameStage && isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
-          </header>
-
-          <section className="persona-board" aria-live="polite">
-            <div key={personaTurnKey} className="persona-turn-block">
-
-              {isNicknameStage ? (
-                <article className="persona-result-card">
-                  <div className="nickname-card">
-                    <input
-                      className="nickname-input"
-                      type="text"
-                      inputMode="text"
-                      autoComplete="off"
-                      placeholder="이름"
-                      value={nicknameInput}
-                      onChange={(event) => {
-                        setNicknameInput(event.target.value)
-                        setNicknameError('')
-                        setNicknameStatus('idle')
-                      }}
-                      disabled={nicknameStatus === 'checking'}
-                    />
-                    {nicknameError && <p className="nickname-error">{nicknameError}</p>}
-                    <button
-                      className="nickname-submit-btn"
-                      type="button"
-                      onClick={() => void handleNicknameClaim()}
-                      disabled={!canSubmitNickname || nicknameStatus === 'checking'}
-                    >
-                      {nicknameStatus === 'checking' ? '이름 확인 중...' : personaLoading ? '분석 중...' : '다음으로'}
-                    </button>
-                  </div>
-                </article>
-              ) : personaResult ? (
-                <article className="persona-result-card">
-                  <div className="nickname-card">
-                    {enterUrl ? (
-                      <div className="nickname-qr-wrap">
-                        <p className="nickname-card-title">{nicknameValue || nicknameInput.trim()}님의 개인 입장 QR입니다.</p>
-                        <p className="nickname-card-copy">모바일로 스캔하면 로그인된 상태로 테라리움에 들어갑니다.</p>
-                        <img className="nickname-qr-image" src={qrImageUrl} alt="개인 입장 QR 코드" />
-                        <a className="nickname-link" href={enterUrl} target="_blank" rel="noreferrer">
-                          {enterUrl}
-                        </a>
-                      </div>
-                    ) : (
-                      <p className="nickname-card-copy">링크를 준비하고 있습니다.</p>
-                    )}
-                  </div>
-                </article>
-              ) : !displayQuestion ? (
+        <section className="persona-board" aria-live="polite">
+          <div key={personaTurnKey} className="persona-turn-block">
+            {!displayQuestion ? (
                 <article className="persona-status-card">
                   <p className="persona-status-text">
                     {personaLoading ? '분석 중...' : personaError || '질문을 다시 불러와 주세요.'}
@@ -993,7 +952,7 @@ function App() {
             </div>
           </section>
 
-          {!isNicknameStage && !personaResult && displayQuestion && (
+          {!personaResult && displayQuestion && (
             <nav className="persona-bottom-nav">
               {isViewingHistory || answeredHistory.length > 0 || selectedOption || isPersonaCustomInputOpen || personaInput.trim() ? (
                 <button
@@ -1021,26 +980,6 @@ function App() {
           )}
 
         </section>
-      )}
-
-      {stage === 'webcam' && countdown !== null && (
-        <section className="countdown-overlay" aria-live="polite">
-          <p className="countdown-text">{countdown}</p>
-        </section>
-      )}
-
-      {stage === 'webcam' && showShutterText && <p className="shutter-text">찰칵!</p>}
-
-      {stage === 'webcam' && flashOn && <div className="flash-overlay" aria-hidden="true" />}
-
-      {stage === 'webcam' && isCaptureProcessing && (
-        <section className="capture-processing-overlay" aria-live="polite">
-          <div className="capture-processing-pill">
-            <span className="capture-processing-dot" />
-            <p className="capture-processing-text">분석 중...</p>
-          </div>
-        </section>
-      )}
     </div>
   )
 }

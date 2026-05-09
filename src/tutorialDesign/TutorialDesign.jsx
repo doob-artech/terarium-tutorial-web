@@ -6,7 +6,7 @@ import doobCloseUpVideo from './assets/DoobCloseUp.mp4';
 import viewAllVideo from './assets/viewAll.mp4';
 import characterBackground from './assets/character.jpg';
 import qrImage from './assets/qr.png';
-import '@google/model-viewer';
+import AvatarThreeViewer from './AvatarThreeViewer';
 import './TutorialDesign.css';
 
 const SKY_BACKGROUND = 'linear-gradient(180deg, #9FD1FC 0%, #FFF 100%)';
@@ -23,13 +23,12 @@ const ANSWER_BACKGROUNDS = {
 };
 
 const SKY_BACKGROUND_STEPS = new Set([9, 10, 11, 12, 13]);
-const DEFAULT_CHARACTER_EXCLUDED_STEPS = new Set([12, 15]);
+const DEFAULT_CHARACTER_EXCLUDED_STEPS = new Set([10, 12, 15]);
 
 const STEP_CHARACTERS = {
   3: 'responseGuide',
   4: 'responseGuide',
   9: 'avatar',
-  10: 'avatarSmall',
   11: 'avatarResult',
 };
 
@@ -130,12 +129,17 @@ const TutorialDesign = ({
   initialId = 0,
   externalName = '',
   avatarUrl = '',
+  avatarReveal = false,
+  avatarInitialYaw = 0,
   keywords = [],
   enterUrl = '',
   backgroundSlot = null,
+  hideUi = false,
   onCameraStepEnter,
   onBeginCamera,
   onNameSubmit,
+  onAvatarRotationChange,
+  onAvatarReady,
   onStartQuestions,
   onFinish,
 }) => {
@@ -147,6 +151,7 @@ const TutorialDesign = ({
   const [nameError, setNameError] = useState('');
   const [isNameSubmitting, setIsNameSubmitting] = useState(false);
   const [forceCompleteText, setForceCompleteText] = useState(false);
+  const cameraSkipClickRef = useRef({ count: 0, startedAt: 0 });
 
   const step =
     TUTORIAL_DATA.find((item) => item.id === currentId) || TUTORIAL_DATA[0];
@@ -181,6 +186,8 @@ const TutorialDesign = ({
     : null;
   const shouldRenderAvatarModel =
     avatarUrl && ['avatar', 'avatarSmall', 'avatarResult'].includes(characterKey);
+  const shouldHoldAvatarFallback =
+    !avatarUrl && ['avatar', 'avatarSmall', 'avatarResult'].includes(characterKey);
   const qrCodeSrc = enterUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(enterUrl)}`
     : qrImage;
@@ -217,7 +224,7 @@ const TutorialDesign = ({
     if (currentId === 10) {
       const trimmedName = userName.trim();
       if (!trimmedName) {
-        setNameError('??已????낆젾??雅뚯눘苑??');
+        setNameError('이름을 입력해주세요.');
         return;
       }
 
@@ -227,7 +234,7 @@ const TutorialDesign = ({
       setIsNameSubmitting(false);
 
       if (ok === false) {
-        setNameError('??? ????餓λ쵐????已??곷퓠?? ??삘뀲 ??已????낆젾??雅뚯눘苑??');
+        setNameError('이미 사용 중이거나 사용할 수 없는 이름입니다. 다른 이름을 입력해주세요.');
         return;
       }
     }
@@ -267,7 +274,7 @@ const TutorialDesign = ({
   };
 
   const formatText = (text) =>
-    text?.replace(/{{name}}/g, userName || externalName || '??已???곸벉');
+    text?.replace(/{{name}}/g, userName || externalName || '아바타');
 
   const nameHighlightProps = userName
     ? {
@@ -294,6 +301,22 @@ const TutorialDesign = ({
     setIsTextDone(true);
   };
 
+  const handleCameraSkipClick = () => {
+    if (currentId !== 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const previous = cameraSkipClickRef.current;
+    const count = now - previous.startedAt > 2500 ? 1 : previous.count + 1;
+    cameraSkipClickRef.current = { count, startedAt: count === 1 ? now : previous.startedAt };
+
+    if (count >= 5) {
+      cameraSkipClickRef.current = { count: 0, startedAt: 0 };
+      onCameraStepEnter?.();
+    }
+  };
+
   const handleNameIntroComplete = () => {
     setTimeout(() => {
       setIsNameIntroDone(true);
@@ -301,7 +324,15 @@ const TutorialDesign = ({
   };
 
   return (
-    <div id="tutorial-container">
+    <div id="tutorial-container" className={hideUi ? 'is-ui-hidden' : ''}>
+      {currentId === 0 && (
+        <button
+          type="button"
+          className="camera-skip-hotspot"
+          aria-label="카메라 단계로 건너뛰기"
+          onClick={handleCameraSkipClick}
+        />
+      )}
       <div
         className="layer-bg"
         style={layerBackgroundStyle}
@@ -380,21 +411,21 @@ const TutorialDesign = ({
                 } ${character.layerClass || ''} step-character-${currentId}`}
               >
                 {shouldRenderAvatarModel ? (
-                  <model-viewer
-                    class="character-img tutorial-avatar-model"
+                  <AvatarThreeViewer
+                    className={`character-img tutorial-avatar-model ${
+                      currentId === 11 ? 'is-name-input-avatar' : ''
+                    }`}
                     src={avatarUrl}
                     alt={character.alt || 'avatar'}
-                    style={character.style}
-                    camera-controls
-                    disable-zoom
-                    auto-rotate
-                    auto-rotate-delay="0"
-                    rotation-per-second="24deg"
-                    shadow-intensity="0.65"
-                    exposure="1"
-                    camera-orbit="0deg 76deg 2.8m"
-                    field-of-view="28deg"
+                    style={currentId === 11 ? null : character.style}
+                    variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
+                    distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
+                    initialYaw={currentId === 9 ? avatarInitialYaw : 0}
+                    onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
+                    onReady={currentId === 9 ? onAvatarReady : null}
                   />
+                ) : shouldHoldAvatarFallback ? (
+                  <div className="character-img tutorial-avatar-placeholder" aria-hidden="true" />
                 ) : (
                   <img
                     src={character.src}
@@ -662,4 +693,3 @@ const TutorialDesign = ({
 };
 
 export default TutorialDesign;
-
