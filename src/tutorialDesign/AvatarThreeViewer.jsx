@@ -300,6 +300,7 @@ const AvatarThreeViewer = ({
         alpha: true,
         antialias: true,
         powerPreference: 'high-performance',
+        preserveDrawingBuffer: Boolean(onReadyRef.current),
       });
     } catch (error) {
       console.error('Avatar viewer failed to initialize WebGL.', error);
@@ -470,7 +471,14 @@ const AvatarThreeViewer = ({
         fitCameraToObject(camera, modelRoot, target, distanceMultiplier, variant === 'staticFront');
         renderer.domElement.style.opacity = '1';
         setLoadState('ready');
-        onReadyRef.current?.();
+        onReadyRef.current?.({
+          capturePng: () => {
+            renderer.render(scene, camera);
+            return renderer.domElement.toDataURL('image/png');
+          },
+          variant,
+          src,
+        });
       },
       undefined,
       (error) => {

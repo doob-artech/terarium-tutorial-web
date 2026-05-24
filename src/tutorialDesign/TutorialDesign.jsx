@@ -140,6 +140,7 @@ const TutorialDesign = ({
   onNameSubmit,
   onAvatarRotationChange,
   onAvatarReady,
+  onAvatarProfileImageReady,
   onStartQuestions,
   onFinish,
 }) => {
@@ -422,7 +423,7 @@ const TutorialDesign = ({
                     distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
                     initialYaw={currentId === 9 ? avatarInitialYaw : 0}
                     onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
-                    onReady={currentId === 9 ? onAvatarReady : null}
+                    onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
                   />
                 ) : shouldHoldAvatarFallback ? (
                   <div className="character-img tutorial-avatar-placeholder" aria-hidden="true" />

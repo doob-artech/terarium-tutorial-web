@@ -12,7 +12,7 @@ const MOCK_APPEARANCE_RESULT = {
   hair_part_direction: 'center',
   bangs_type: 'none',
   hair_color: 'black',
-  eye_type: 'round_dog_eyes',
+  eye_type: 'round_open_eyes',
   eye_color: 'dark_brown',
   mouth_type: 'closed_smile',
   top_type: 'hoodie',
@@ -64,6 +64,7 @@ function App() {
   const nicknameInputRef = useRef('')
   const avatarPreviewRotationRef = useRef({ yaw: 0, pitch: 0 })
   const avatarTransitionFinishingRef = useRef(false)
+  const uploadedProfileImageKeyRef = useRef('')
 
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
@@ -90,6 +91,7 @@ function App() {
     nicknameInputRef.current = ''
     syncedAppearanceAgentRef.current = ''
     avatarTransitionFinishingRef.current = false
+    uploadedProfileImageKeyRef.current = ''
     setPersonaAgentId('')
     setPersonaQuestion(null)
     setPersonaLoading(false)
@@ -239,6 +241,41 @@ function App() {
       return null
     }
   }
+
+  const handleAvatarProfileImageReady = useCallback(async (viewerApi) => {
+    const activeAgentId = personaAgentIdRef.current || personaAgentId
+    if (!activeAgentId || !viewerApi || typeof viewerApi.capturePng !== 'function') {
+      return
+    }
+
+    const uploadKey = `${activeAgentId}:${avatarModelUrl}`
+    if (uploadedProfileImageKeyRef.current === uploadKey) {
+      return
+    }
+    uploadedProfileImageKeyRef.current = uploadKey
+
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 120))
+      const imageDataUrl = viewerApi.capturePng()
+      if (!imageDataUrl || !imageDataUrl.startsWith('data:image/')) {
+        return
+      }
+
+      await fetch('/api/avatar/profile-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agentId: activeAgentId,
+          imageDataUrl,
+        }),
+      })
+    } catch (error) {
+      uploadedProfileImageKeyRef.current = ''
+      console.warn(error instanceof Error ? error.message : 'Unknown error while saving avatar profile image.')
+    }
+  }, [avatarModelUrl, personaAgentId])
 
   const startPersonaInterview = useCallback(async (appearanceOverride = null) => {
     if (startInterviewInFlightRef.current) {
@@ -821,6 +858,7 @@ function App() {
           externalName={nicknameValue}
           onAvatarRotationChange={handleAvatarPreviewRotationChange}
           onAvatarReady={isAvatarPreloading ? finishAvatarLoadingTransition : null}
+          onAvatarProfileImageReady={handleAvatarProfileImageReady}
           onNameSubmit={(name) => handleNicknameClaim(name, null)}
           onStartQuestions={() => setStage('persona')}
         />

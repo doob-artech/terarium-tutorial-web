@@ -1,4 +1,4 @@
-# VLM Enum to GLB Asset Mapping
+﻿# VLM Enum to GLB Asset Mapping
 
 This is the current strict mapping from tutorial VLM enum outputs to actual assets in `model/`.
 
@@ -11,7 +11,17 @@ Machine-readable map: `docs/vlm-enum-to-glb-asset-map.json`.
 | Slot | Asset |
 | --- | --- |
 | base body | `model/basic/basic.glb` |
-| skin texture | `model/skin/skin.png` |
+
+## Skin
+
+`skin_texture` must choose exactly one of these texture assets.
+
+| VLM enum | Texture asset | Selection rule |
+| --- | --- | --- |
+| `soft_peach_skin` | `model/skin/soft_peach_skin.png` | Default peach skin when no visible cheek blush style is present. |
+| `light_warm_skin` | `model/skin/light_warm_skin.png` | Light warm skin when no visible cheek blush style is present. |
+| `skin01` | `model/skin/skin01.png` | Use when cheeks show short diagonal blush lines. |
+| `skin02` | `model/skin/skin02.png` | Use when cheeks show soft round or blurred blush patches. |
 
 ## Hair
 
@@ -65,25 +75,23 @@ Rule: assets containing `_with_bangs` are valid only when `bangs_type` is `see_t
 
 | VLM enum | Texture asset |
 | --- | --- |
-| `upturned_cat_eyes` | `model/eyes/almond eye shape.png` |
-| `round_dog_eyes` | `model/eyes/round eyes.png` |
-| `narrow_long_eyes` | `model/eyes/almond eye shape.png` |
-| `smiling_crescent_eyes` | `null` |
-| `sleepy_eyes` | `model/eyes/eyes with a slightly drooping outer corner.png` |
-| `dark_circles_eyes` | `null` |
+| `round_open_eyes` | `model/eyes/round_open_eyes.png` |
+| `almond_upturned_eyes` | `model/eyes/almond_upturned_eyes.png` |
+| `hooded_shadow_eyes` | `model/eyes/hooded_shadow_eyes.png` |
+| `sleepy_drooping_eyes` | `model/eyes/sleepy_drooping_eyes.png` |
+| `simple_block_eyes` | `model/eyes/simple_block_eyes.png` |
 | `unknown` | `null` |
 
 ## Mouth
 
 | VLM enum | Texture asset |
 | --- | --- |
-| `flat` | `model/mouth/a straight-faced mouth.png` |
-| `closed_smile` | `model/mouth/lips curved into a gentle smile.png` |
-| `big_smile` | `model/mouth/a broad smile.png` |
-| `pout` | `null` |
-| `smirk` | `null` |
-| `w_shape` | `null` |
-| `surprised` | `model/mouth/slightly parted lips.png` |
+| `bored` | `model/mouth/bored_mouth.png` |
+| `closed_smile` | `model/mouth/closed_smile_mouth.png` |
+| `big_smile` | `model/mouth/broad_smile_mouth.png` |
+| `smirk` | `model/mouth/smirk_mouth.png` |
+| `w_shape` | `model/mouth/w_shape_mouth.png` |
+| `toothy_smile` | `model/mouth/toothy_smile_mouth.png` |
 | `unknown` | `null` |
 
 ## Top
@@ -114,12 +122,12 @@ Rule: assets containing `_with_bangs` are valid only when `bangs_type` is `see_t
 | `shoe_type.sneakers` | `null` |
 | `shoe_type.unknown` | `null` |
 | `accessories.glasses_type.none` | `null` |
-| `accessories.glasses_type.round` | `null` |
-| `accessories.glasses_type.square` | `null` |
+| `accessories.glasses_type.round` | `round_glasses` source node |
+| `accessories.glasses_type.square` | `square_glasses` source node |
 | `accessories.glasses_type.unknown` | `null` |
-| `accessories.has_necklace.true` | `null` |
+| `accessories.has_necklace.true` | `pearl_necklace` source node |
 | `accessories.has_necklace.false` | `null` |
-| `accessories.has_earrings.true` | `null` |
+| `accessories.has_earrings.true` | `simple_earring_L`, `simple_earring_R` source nodes |
 | `accessories.has_earrings.false` | `null` |
 
 ## Color Fields

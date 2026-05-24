@@ -1,8 +1,9 @@
 {
-  "version": 4,
-  "policy": "VLM returns semantic asset tags. The build pipeline always resolves each required tag to the closest available asset. The preferred runtime path is source-GLB node selection: model/source/avatar_parts.glb is loaded, and only selected nodes are kept in the final avatar GLB.",
+  "version": 8,
+  "policy": "VLM returns semantic asset tags. The build pipeline always resolves each required tag to the closest available asset. The tutorial preview path can still use source-GLB node selection from model/source/avatar_parts_v2.glb. Unity world runtime prefers rigged body resources for body/top/bottom and uses source-GLB nodes for hair, shoes, and accessories.",
   "source_assets": {
-    "runtime_glb": "model/source/avatar_parts.glb"
+    "runtime_glb": "model/source/avatar_parts_v2.glb",
+    "unity_rigged_body_resource_root": "Assets/Resources/Terarium/RiggedBodies"
   },
   "semantic_asset_tags": {
     "skin_texture": {
@@ -13,6 +14,16 @@
       "light_warm_skin": {
         "texture": "model/skin/light_warm_skin.png",
         "color": "#f4d0b4"
+      },
+      "skin01": {
+        "texture": "model/skin/skin01.png",
+        "color": "#f8ded0",
+        "selection_rule": "Use only when the face has short diagonal cheek blush lines."
+      },
+      "skin02": {
+        "texture": "model/skin/skin02.png",
+        "color": "#f8ded0",
+        "selection_rule": "Use only when the face has soft round or blurred cheek blush patches."
       }
     },
     "eye_texture": {
@@ -33,23 +44,23 @@
       }
     },
     "mouth_texture": {
-      "slightly_parted_mouth": {
-        "texture": "model/mouth/slightly_parted_mouth.png"
+      "bored_mouth": {
+        "texture": "model/mouth/bored_mouth.png"
       },
-      "gentle_closed_smile": {
-        "texture": "model/mouth/gentle_closed_smile.png"
+      "closed_smile_mouth": {
+        "texture": "model/mouth/closed_smile_mouth.png"
       },
-      "broad_open_smile": {
-        "texture": "model/mouth/broad_open_smile.png"
+      "broad_smile_mouth": {
+        "texture": "model/mouth/broad_smile_mouth.png"
       },
-      "straight_neutral_mouth": {
-        "texture": "model/mouth/straight_neutral_mouth.png"
+      "smirk_mouth": {
+        "texture": "model/mouth/smirk_mouth.png"
       },
-      "pout_frown_mouth": {
-        "texture": "model/mouth/pout_frown_mouth.png"
+      "w_shape_mouth": {
+        "texture": "model/mouth/w_shape_mouth.png"
       },
-      "clenched_w_mouth": {
-        "texture": "model/mouth/clenched_w_mouth.png"
+      "toothy_smile_mouth": {
+        "texture": "model/mouth/toothy_smile_mouth.png"
       }
     },
     "hair_mesh": {
@@ -89,9 +100,24 @@
         "source_nodes": ["tied_up_hair"],
         "color_source": "hair_color"
       },
-      "long_bangs_hair": {
-        "source_nodes": ["hair03"],
-        "description": "Long front-bangs hair",
+      "long_straight_hair": {
+        "source_nodes": ["long_straight_hair"],
+        "description": "Long straight hair",
+        "color_source": "hair_color"
+      },
+      "bowl_cut_hair": {
+        "source_nodes": ["bowl_cut_hair"],
+        "description": "Bowl cut hair",
+        "color_source": "hair_color"
+      },
+      "gael_cut_hair": {
+        "source_nodes": ["gael_cut_hair"],
+        "description": "Gael cut hair",
+        "color_source": "hair_color"
+      },
+      "dandy_cut_hair": {
+        "source_nodes": ["dandy_cut_hair"],
+        "description": "Dandy cut hair",
         "color_source": "hair_color"
       }
     },
@@ -113,6 +139,24 @@
       "short_skirt": {
         "source_nodes": ["short_skirt"],
         "color_source": "bottom_color"
+      }
+    },
+    "unity_body_variant": {
+      "basic_body": {
+        "resource": "Terarium/RiggedBodies/Basic_Body",
+        "uses": ["body only"]
+      },
+      "pants_long_tshirt": {
+        "resource": "Terarium/RiggedBodies/Body_Pants_and_Long_Tshirt",
+        "uses": ["short_pants", "long_sleeve_tshirt"]
+      },
+      "pants_short_tshirt": {
+        "resource": "Terarium/RiggedBodies/Body_Pants_and_Short_Tshirt",
+        "uses": ["short_pants", "short_sleeve_tshirt"]
+      },
+      "skirt_long_tshirt": {
+        "resource": "Terarium/RiggedBodies/Body_Skirt_and_Long_Tshirt",
+        "uses": ["short_skirt", "long_sleeve_tshirt", "short_sleeve_tshirt fallback"]
       }
     },
     "glasses_mesh": {
@@ -160,30 +204,37 @@
     }
   },
   "semantic_to_asset_guidance": {
-    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh must always choose the nearest available semantic tag. Do not output unknown for these.",
+    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh must always choose the nearest available semantic tag. Do not output unknown for these. skin_texture must be exactly one of soft_peach_skin, light_warm_skin, skin01, or skin02. Unity derives unity_body_variant from top_mesh and bottom_mesh.",
     "optional_asset_tags": "glasses_mesh, necklace_mesh, and earring_mesh may use none when not visible.",
+    "skin_texture": {
+      "soft_peach_skin": "soft_peach_skin",
+      "light_warm_skin": "light_warm_skin",
+      "skin01": "skin01 when cheeks show short diagonal blush lines",
+      "skin02": "skin02 when cheeks show soft round or blurred blush patches"
+    },
     "eye_type": {
-      "round_dog_eyes": "round_open_eyes",
-      "upturned_cat_eyes": "almond_upturned_eyes",
-      "narrow_long_eyes": "almond_upturned_eyes",
-      "dark_circles_eyes": "hooded_shadow_eyes",
-      "sleepy_eyes": "sleepy_drooping_eyes",
-      "smiling_crescent_eyes": "sleepy_drooping_eyes"
+      "round_open_eyes": "round_open_eyes",
+      "almond_upturned_eyes": "almond_upturned_eyes",
+      "hooded_shadow_eyes": "hooded_shadow_eyes",
+      "sleepy_drooping_eyes": "sleepy_drooping_eyes",
+      "simple_block_eyes": "simple_block_eyes"
     },
     "mouth_type": {
-      "surprised": "slightly_parted_mouth",
-      "closed_smile": "gentle_closed_smile",
-      "smirk": "gentle_closed_smile",
-      "big_smile": "broad_open_smile",
-      "flat": "straight_neutral_mouth",
-      "pout": "pout_frown_mouth",
-      "w_shape": "clenched_w_mouth"
+      "bored": "bored_mouth",
+      "closed_smile": "closed_smile_mouth",
+      "big_smile": "broad_smile_mouth",
+      "smirk": "smirk_mouth",
+      "w_shape": "w_shape_mouth",
+      "toothy_smile": "toothy_smile_mouth"
     },
     "hair_style": {
       "bun": "bun_hair_with_bangs",
+      "bowl_cut": "bowl_cut_hair",
+      "gael_cut": "gael_cut_hair",
+      "dandy_cut": "dandy_cut_hair",
       "bob_straight": "bob_hair_with_bangs",
       "bob_c_curl": "bob_hair_with_bangs",
-      "long_straight": "long_bangs_hair",
+      "long_straight": "long_straight_hair",
       "long_wave": "long_wave_hair_with_bangs",
       "half_up": "half_ponytail_hair",
       "ponytail_low": "low_tied_hair",
