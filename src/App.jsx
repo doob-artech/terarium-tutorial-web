@@ -10,6 +10,99 @@ const PERSONA_TOTAL_TURNS = 5
 const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
 
+const DEBUG_AVATAR_OPTIONS = {
+  hair: [
+    ['bun_hair', '번 헤어'],
+    ['bun_hair_with_bangs', '앞머리 번'],
+    ['bob_hair_with_bangs', '단발 앞머리'],
+    ['permed_short_hair', '펌 숏헤어'],
+    ['half_ponytail_hair', '하프 포니테일'],
+    ['long_wave_hair_with_bangs', '긴 웨이브 앞머리'],
+    ['long_wave_hair', '긴 웨이브'],
+    ['low_tied_hair', '낮게 묶은 머리'],
+    ['high_tied_hair', '높게 묶은 머리'],
+    ['bowl_cut_hair', '바가지 컷'],
+    ['gael_cut_left_hair', '가엘컷 왼쪽'],
+    ['gael_cut_right_hair', '가엘컷 오른쪽'],
+    ['wolf_cut_hair', '울프컷'],
+    ['pompadour_hair', '포마드'],
+    ['dandy_cut_hair', '댄디컷'],
+  ],
+  skin: [
+    ['soft_peach_skin', '피치 피부'],
+    ['light_warm_skin', '밝은 웜 피부'],
+  ],
+  eye: [
+    ['round_open_eyes', '동그란 눈'],
+    ['almond_upturned_eyes', '올라간 눈'],
+    ['hooded_shadow_eyes', '그늘진 눈'],
+    ['simple_block_eyes', '심플 눈'],
+  ],
+  mouth: [
+    ['closed_smile_mouth', '닫힌 미소'],
+    ['bored_mouth', '무심한 입'],
+    ['broad_smile_mouth', '큰 미소'],
+    ['smirk_mouth', '스마크'],
+    ['w_shape_mouth', 'W 입'],
+    ['toothy_smile_mouth', '치아 미소'],
+  ],
+  top: [
+    ['short_sleeve_tshirt', '반팔 티셔츠'],
+    ['long_sleeve_tshirt', '긴팔 티셔츠'],
+    ['button_shirt', '단추 셔츠'],
+  ],
+  bottom: [
+    ['short_pants', '짧은 바지'],
+    ['long_pants', '긴 바지'],
+    ['short_skirt', '짧은 치마'],
+    ['long_skirt', '긴 치마'],
+  ],
+  outfit: [
+    ['none', '원피스 없음'],
+    ['short_onepiece', '짧은 원피스'],
+    ['long_onepiece', '긴 원피스'],
+  ],
+  shoes: [
+    ['sneakers', '운동화'],
+    ['sandals', '샌달'],
+  ],
+}
+
+const DEBUG_ASSET_TO_APPEARANCE = {
+  hair: {
+    bun_hair: ['bun', 'none', 'center'],
+    bun_hair_with_bangs: ['bun', 'full_bang', 'center'],
+    bob_hair_with_bangs: ['bob_straight', 'full_bang', 'center'],
+    permed_short_hair: ['short_cut', 'none', 'center'],
+    half_ponytail_hair: ['half_up', 'none', 'center'],
+    long_wave_hair_with_bangs: ['long_wave', 'full_bang', 'center'],
+    long_wave_hair: ['long_wave', 'none', 'center'],
+    low_tied_hair: ['ponytail_low', 'none', 'center'],
+    high_tied_hair: ['ponytail_high', 'none', 'center'],
+    bowl_cut_hair: ['bowl_cut', 'full_bang', 'center'],
+    gael_cut_left_hair: ['gael_cut_left', 'none', 'left'],
+    gael_cut_right_hair: ['gael_cut_right', 'none', 'right'],
+    wolf_cut_hair: ['wolf_cut', 'none', 'center'],
+    pompadour_hair: ['pomade', 'none', 'center'],
+    dandy_cut_hair: ['dandy_cut', 'none', 'center'],
+  },
+  top: {
+    short_sleeve_tshirt: 'short_sleeve_tshirt',
+    long_sleeve_tshirt: 'long_sleeve_tshirt',
+    button_shirt: 'button_shirt',
+  },
+  bottom: {
+    short_pants: 'shorts',
+    long_pants: 'long_pants',
+    short_skirt: 'short_skirt',
+    long_skirt: 'long_skirt',
+  },
+  outfit: {
+    short_onepiece: 'short_onepiece',
+    long_onepiece: 'long_onepiece',
+  },
+}
+
 let personaClickAudioPool = []
 let personaClickAudioPoolIndex = 0
 let personaClickBlockedUntil = 0
@@ -71,6 +164,9 @@ const MOCK_APPEARANCE_RESULT = {
 
 function App() {
   const urlParams = new URLSearchParams(window.location.search)
+  if (window.location.pathname === '/debug') {
+    return <AvatarDebugPage />
+  }
   const isProfileCaptureRoute = window.location.pathname === '/avatar-profile-capture'
     || urlParams.get('mode') === 'avatar-profile-capture'
   if (isProfileCaptureRoute) {
@@ -78,6 +174,163 @@ function App() {
   }
 
   return <TutorialApp />
+}
+
+function AvatarDebugPage() {
+  const [selection, setSelection] = useState({
+    hair: 'long_wave_hair',
+    skin: 'soft_peach_skin',
+    eye: 'round_open_eyes',
+    mouth: 'closed_smile_mouth',
+    top: 'short_sleeve_tshirt',
+    bottom: 'short_pants',
+    outfit: 'none',
+    shoes: 'sneakers',
+  })
+  const [modelUrl, setModelUrl] = useState('')
+  const [manifest, setManifest] = useState(null)
+  const [status, setStatus] = useState('idle')
+  const [error, setError] = useState('')
+  const requestSeqRef = useRef(0)
+
+  const updateSelection = (key, value) => {
+    setSelection((current) => ({ ...current, [key]: value }))
+  }
+
+  useEffect(() => {
+    const requestSeq = requestSeqRef.current + 1
+    requestSeqRef.current = requestSeq
+    const controller = new AbortController()
+    const build = async () => {
+      setStatus('loading')
+      setError('')
+      const hairInfo = DEBUG_ASSET_TO_APPEARANCE.hair[selection.hair] || ['long_wave', 'none', 'center']
+      const hasOutfit = selection.outfit !== 'none'
+      const appearance = {
+        hair_style: hairInfo[0],
+        hair_part_direction: hairInfo[2],
+        bangs_type: hairInfo[1],
+        hair_color: 'black',
+        eye_type: selection.eye,
+        eye_color: 'dark_brown',
+        mouth_type: selection.mouth.replace(/_mouth$/, '').replace('broad_smile', 'big_smile'),
+        top_type: DEBUG_ASSET_TO_APPEARANCE.top[selection.top],
+        top_color: 'white',
+        bottom_type: hasOutfit
+          ? DEBUG_ASSET_TO_APPEARANCE.outfit[selection.outfit]
+          : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
+        bottom_color: hasOutfit ? 'white' : 'black',
+        shoe_type: selection.shoes,
+        accessories: {
+          glasses_type: 'none',
+          has_necklace: false,
+          has_earrings: false,
+        },
+        asset_tags: {
+          skin_texture: selection.skin,
+          eye_texture: selection.eye,
+          mouth_texture: selection.mouth,
+          hair_mesh: selection.hair,
+          top_mesh: selection.top,
+          bottom_mesh: selection.bottom,
+          outfit_mesh: selection.outfit,
+          shoe_mesh: selection.shoes,
+          glasses_mesh: 'none',
+          necklace_mesh: 'none',
+          earring_mesh: 'none',
+        },
+      }
+
+      try {
+        const response = await fetch('/api/avatar/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentId: `debug-avatar-${requestSeq}`,
+            appearance,
+          }),
+          signal: controller.signal,
+        })
+        const payload = await response.json()
+        if (!response.ok) {
+          throw new Error(payload?.error || 'avatar build failed')
+        }
+        if (requestSeqRef.current !== requestSeq) return
+        setModelUrl(payload.modelUrl || '')
+        setManifest(payload)
+        setStatus('ready')
+      } catch (buildError) {
+        if (controller.signal.aborted || requestSeqRef.current !== requestSeq) return
+        setStatus('error')
+        setError(buildError instanceof Error ? buildError.message : 'avatar build failed')
+      }
+    }
+
+    const timer = window.setTimeout(build, 120)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [selection])
+
+  const hasOutfit = selection.outfit !== 'none'
+  const selectedNodes = manifest?.merge?.selectedNodes || []
+
+  return (
+    <main className="debug-avatar-page">
+      <section className="debug-avatar-view">
+        <div className="debug-avatar-stage">
+          {modelUrl ? (
+            <AvatarThreeViewer
+              src={modelUrl}
+              alt="아바타 디버그 미리보기"
+              variant="avatar"
+              distanceMultiplier={1.7}
+              className="debug-avatar-canvas"
+            />
+          ) : (
+            <div className="debug-avatar-empty">아바타 생성 중</div>
+          )}
+        </div>
+        <div className="debug-avatar-state">
+          <span>{status === 'loading' ? '생성 중' : status === 'ready' ? '준비됨' : status === 'error' ? '오류' : '대기'}</span>
+          {error ? <strong>{error}</strong> : null}
+        </div>
+      </section>
+
+      <aside className="debug-avatar-panel" aria-label="아바타 에셋 선택">
+        <h1>Avatar Debug</h1>
+        <DebugSelect label="머리" value={selection.hair} options={DEBUG_AVATAR_OPTIONS.hair} onChange={(value) => updateSelection('hair', value)} />
+        <DebugSelect label="피부" value={selection.skin} options={DEBUG_AVATAR_OPTIONS.skin} onChange={(value) => updateSelection('skin', value)} />
+        <DebugSelect label="눈" value={selection.eye} options={DEBUG_AVATAR_OPTIONS.eye} onChange={(value) => updateSelection('eye', value)} />
+        <DebugSelect label="입" value={selection.mouth} options={DEBUG_AVATAR_OPTIONS.mouth} onChange={(value) => updateSelection('mouth', value)} />
+        <DebugSelect label="원피스" value={selection.outfit} options={DEBUG_AVATAR_OPTIONS.outfit} onChange={(value) => updateSelection('outfit', value)} />
+        <DebugSelect label="상의" value={selection.top} options={DEBUG_AVATAR_OPTIONS.top} disabled={hasOutfit} onChange={(value) => updateSelection('top', value)} />
+        <DebugSelect label="하의" value={selection.bottom} options={DEBUG_AVATAR_OPTIONS.bottom} disabled={hasOutfit} onChange={(value) => updateSelection('bottom', value)} />
+        <DebugSelect label="신발" value={selection.shoes} options={DEBUG_AVATAR_OPTIONS.shoes} onChange={(value) => updateSelection('shoes', value)} />
+
+        <div className="debug-avatar-nodes">
+          <h2>selectedNodes</h2>
+          <code>{selectedNodes.length ? selectedNodes.join(', ') : '-'}</code>
+        </div>
+      </aside>
+    </main>
+  )
+}
+
+function DebugSelect({ label, value, options, disabled = false, onChange }) {
+  return (
+    <label className={`debug-select ${disabled ? 'is-disabled' : ''}`}>
+      <span>{label}</span>
+      <select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
 }
 
 function TutorialApp() {
