@@ -135,14 +135,15 @@ body,
   left: 50%;
   top: 40%;
   transform: translate(-50%, -50%);
-  width: 100%;
+  width: min(86vw, 1280px);
   color: rgba(255, 255, 255, 0.3);
   text-align: center;
   font-family: 'ChangwonDangamAsac', 'NanumSquareNeo', sans-serif !important;
-  font-size: 440px;
+  font-size: clamp(52px, 7vw, 128px);
   font-style: normal;
   font-weight: 700;
-  line-height: 100%;
+  line-height: 112%;
+  word-break: keep-all;
   pointer-events: none;
   user-select: none;
 }
@@ -1126,7 +1127,8 @@ body,
 }
 
 .character-layer.step-character-12 .character-img {
-  left: 50% !important;
+  left: 50vw !important;
+  right: auto !important;
   top: auto !important;
   bottom: 34vh !important;
   width: clamp(220px, 26vw, 420px) !important;

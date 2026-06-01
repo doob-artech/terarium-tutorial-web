@@ -18,11 +18,11 @@ const SKY_BACKGROUND = 'linear-gradient(180deg, #9FD1FC 0%, #FFF 100%)';
 
 const ANSWER_BACKGROUNDS = {
   3: {
-    label: 'YES',
+    label: '응, AI도 지능을 가진 존재라면 가능할 것 같아.',
     background: 'linear-gradient(0deg, #FFF 0%, #5D9CEC 73.08%)',
   },
   4: {
-    label: 'NO',
+    label: '아니, 결국 미리 학습한 결과야.',
     background: 'linear-gradient(0deg, #FFF 0%, #FF8C5A 73.08%)',
   },
 };
