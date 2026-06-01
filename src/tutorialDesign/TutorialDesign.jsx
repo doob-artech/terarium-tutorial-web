@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TUTORIAL_DATA } from './data';
 import { CHARACTER_PRESETS } from './tutorialAssets';
 import sceneDayVideo from './assets/SceneDAY.mp4';
-import doobCloseUpVideo from './assets/DoobCloseUp.mp4';
 import viewAllVideo from './assets/viewAll.mp4';
 import characterBackground from './assets/character.jpg';
 import qrImage from './assets/qr.png';
+import cameraBubbleImage from './assets/bubble.png';
+import cameraButtonImage from './assets/camera.png';
+import questionImage from './assets/question.png';
+import typingSoundSrc from './assets/talking.ogg';
+import introBgmSrc from './assets/bgm1.wav';
+import clickSoundSrc from './assets/click1.mp3';
 import AvatarThreeViewer from './AvatarThreeViewer';
 import './TutorialDesign.css';
 
@@ -22,20 +27,146 @@ const ANSWER_BACKGROUNDS = {
   },
 };
 
-const SKY_BACKGROUND_STEPS = new Set([9, 10, 11, 12, 13]);
-const DEFAULT_CHARACTER_EXCLUDED_STEPS = new Set([10, 12, 15]);
+const STEP_BACKGROUNDS = {
+  7: 'radial-gradient(50% 50% at 50% 50%, #FFF 0.48%, #9FD1FC 60.1%)',
+};
 
-const STEP_CHARACTERS = {
-  3: 'responseGuide',
-  4: 'responseGuide',
+const SKY_BACKGROUND_STEPS = new Set([9, 10, 11, 12]);
+const DEFAULT_CHARACTER_EXCLUDED_STEPS = new Set([10, 12, 15]);
+const SCENE_ONE_SWITCH_MS = 3200;
+const PREVIEW_AVATAR_URL = '/model/basic/basic.glb';
+const DUPLICATE_NAME_ERROR = '그 이름은 이미 누군가 사용하고 있어. 다시 입력해줄래?';
+const DUPLICATE_NAME_NOTICE =
+  '이미 다른 친구가 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!';
+
+const STEP_SCENE_CHARACTERS = {
+  2: 'scene2',
+  3: 'scene3',
+  4: 'scene4',
+  7: 'scene7',
+  8: 'scene8',
+  10: 'scene10',
+  12: 'defaultStand',
+  14: 'scene14',
+  15: 'scene15',
+};
+
+const STEP_SPECIAL_CHARACTERS = {
   9: 'avatar',
   11: 'avatarResult',
 };
 
 const STEP_BACKGROUND_VIDEOS = {
-  1: { src: doobCloseUpVideo, loop: false },
-  2: { src: doobCloseUpVideo, loop: false },
+  0: { src: sceneDayVideo, loop: true },
+  1: { src: sceneDayVideo, loop: true },
+  2: { src: sceneDayVideo, loop: true },
   5: { src: viewAllVideo, loop: false },
+};
+
+let typingAudioPool = [];
+let typingAudioPoolIndex = 0;
+let lastTypingSoundAt = 0;
+let clickAudioPool = [];
+let clickAudioPoolIndex = 0;
+let typingAudioBlockedUntil = 0;
+const TYPING_SOUND_CLIP_MS = 90;
+const CLICK_SOUND_FALLBACK_MS = 320;
+const CLICK_SOUND_TAIL_GAP_MS = 40;
+
+const getTypingAudioPool = () => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  if (typingAudioPool.length === 0) {
+    typingAudioPool = Array.from({ length: 4 }, () => {
+      const audio = new Audio(typingSoundSrc);
+      audio.preload = 'auto';
+      audio.volume = 1;
+      return audio;
+    });
+  }
+
+  return typingAudioPool;
+};
+
+const playTypingSound = (char) => {
+  if (!char || /\s/.test(char)) {
+    return;
+  }
+
+  const now = Date.now();
+  if (now < typingAudioBlockedUntil) {
+    return;
+  }
+
+  if (now - lastTypingSoundAt < 35) {
+    return;
+  }
+  lastTypingSoundAt = now;
+
+  const pool = getTypingAudioPool();
+  if (pool.length === 0) {
+    return;
+  }
+
+  const audio = pool[typingAudioPoolIndex];
+  typingAudioPoolIndex = (typingAudioPoolIndex + 1) % pool.length;
+  audio.currentTime = 0;
+  void audio.play().catch(() => {});
+  window.setTimeout(() => {
+    audio.pause();
+    audio.currentTime = 0;
+  }, TYPING_SOUND_CLIP_MS);
+};
+
+const stopTypingSounds = () => {
+  typingAudioPool.forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
+  });
+};
+
+const getClickAudioPool = () => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  if (clickAudioPool.length === 0) {
+    clickAudioPool = Array.from({ length: 3 }, () => {
+      const audio = new Audio(clickSoundSrc);
+      audio.preload = 'auto';
+      audio.volume = 1;
+      return audio;
+    });
+  }
+
+  return clickAudioPool;
+};
+
+const playClickSound = () => {
+  const pool = getClickAudioPool();
+  if (pool.length === 0) {
+    return;
+  }
+
+  const audio = pool[clickAudioPoolIndex];
+  clickAudioPoolIndex = (clickAudioPoolIndex + 1) % pool.length;
+  const clickDurationMs =
+    Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration * 1000
+      : CLICK_SOUND_FALLBACK_MS;
+  typingAudioBlockedUntil = Math.max(
+    typingAudioBlockedUntil,
+    Date.now() + clickDurationMs + CLICK_SOUND_TAIL_GAP_MS,
+  );
+  audio.currentTime = 0;
+  void audio.play().catch(() => {});
+};
+
+const getTypingStartDelay = (baseDelay) => {
+  const remainingClickMs = typingAudioBlockedUntil - Date.now();
+  return Math.max(baseDelay, remainingClickMs > 0 ? remainingClickMs : 0);
 };
 
 const Typewriter = ({
@@ -58,11 +189,13 @@ const Typewriter = ({
 
   useEffect(() => {
     if (!text) {
+      stopTypingSounds();
       onCompleteRef.current?.();
       return;
     }
 
     if (forceComplete) {
+      stopTypingSounds();
       setDisplayedText(text);
       onCompleteRef.current?.();
       return;
@@ -76,8 +209,10 @@ const Typewriter = ({
     const nextTick = () => {
       index += 1;
       setDisplayedText(text.substring(0, index));
+      playTypingSound(text[index - 1]);
 
       if (index >= text.length) {
+        stopTypingSounds();
         onCompleteRef.current?.();
         if (repeat) {
           timer = setTimeout(() => {
@@ -95,9 +230,12 @@ const Typewriter = ({
       timer = setTimeout(nextTick, delay);
     };
 
-    timer = setTimeout(nextTick, speed);
+    timer = setTimeout(nextTick, getTypingStartDelay(speed));
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      stopTypingSounds();
+    };
   }, [text, speed, pauseTime, repeat, repeatDelay, forceComplete]);
 
   if (!highlightText) {
@@ -132,7 +270,6 @@ const TutorialDesign = ({
   avatarReveal = false,
   avatarInitialYaw = 0,
   keywords = [],
-  personaBlock = '',
   enterUrl = '',
   backgroundSlot = null,
   hideUi = false,
@@ -153,7 +290,10 @@ const TutorialDesign = ({
   const [nameError, setNameError] = useState('');
   const [isNameSubmitting, setIsNameSubmitting] = useState(false);
   const [forceCompleteText, setForceCompleteText] = useState(false);
+  const [isSceneOneLooping, setIsSceneOneLooping] = useState(false);
+  const [isIntroBgmPlaying, setIsIntroBgmPlaying] = useState(false);
   const cameraSkipClickRef = useRef({ count: 0, startedAt: 0 });
+  const introBgmRef = useRef(null);
 
   const step =
     TUTORIAL_DATA.find((item) => item.id === currentId) || TUTORIAL_DATA[0];
@@ -164,6 +304,7 @@ const TutorialDesign = ({
   const characterImageBackground = `url(${characterBackground})`;
   const currentBackground =
     step.background ||
+    STEP_BACKGROUNDS[currentId] ||
     answerBackground?.background ||
     (SKY_BACKGROUND_STEPS.has(currentId) || currentId >= 14
       ? SKY_BACKGROUND
@@ -178,18 +319,27 @@ const TutorialDesign = ({
     isWhiteLayerTransition || currentId === 2;
 
   const characterKey =
-    step.character ||
-    STEP_CHARACTERS[currentId] ||
+    currentId === 1
+      ? isSceneOneLooping
+        ? 'scene1OnlyHi'
+        : 'scene1'
+      : STEP_SCENE_CHARACTERS[currentId] ||
+    STEP_SPECIAL_CHARACTERS[currentId] ||
     (currentId >= 5 && !DEFAULT_CHARACTER_EXCLUDED_STEPS.has(currentId)
       ? 'bubbleGuide'
-      : null);
+      : step.character || null);
   const character = characterKey
     ? CHARACTER_PRESETS[characterKey]
     : null;
+  const supplementalCharacter =
+    currentId === 10 && nameError === DUPLICATE_NAME_ERROR
+      ? CHARACTER_PRESETS.scene9One
+      : currentId === 9 || currentId === 11
+        ? CHARACTER_PRESETS.scene9
+        : null;
+  const avatarPreviewUrl = avatarUrl || PREVIEW_AVATAR_URL;
   const shouldRenderAvatarModel =
-    avatarUrl && ['avatar', 'avatarSmall', 'avatarResult'].includes(characterKey);
-  const shouldHoldAvatarFallback =
-    !avatarUrl && ['avatar', 'avatarSmall', 'avatarResult'].includes(characterKey);
+    ['avatar', 'avatarSmall', 'avatarResult'].includes(characterKey);
   const qrCodeSrc = enterUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(enterUrl)}`
     : qrImage;
@@ -199,6 +349,22 @@ const TutorialDesign = ({
     setIsNameIntroDone(false);
     setNameError('');
     setForceCompleteText(false);
+    setIsSceneOneLooping(false);
+  }, [currentId]);
+
+  useEffect(() => {
+    if (currentId !== 1) {
+      return undefined;
+    }
+
+    const loopImage = new Image();
+    loopImage.src = CHARACTER_PRESETS.scene1OnlyHi.src;
+
+    const timer = setTimeout(() => {
+      setIsSceneOneLooping(true);
+    }, SCENE_ONE_SWITCH_MS);
+
+    return () => clearTimeout(timer);
   }, [currentId]);
 
   useEffect(() => {
@@ -212,6 +378,26 @@ const TutorialDesign = ({
   }, [externalName]);
 
   useEffect(() => {
+    const introBgm = introBgmRef.current;
+    if (!introBgm) {
+      return;
+    }
+
+    if (currentId === 0) {
+      introBgm.volume = 1;
+      void introBgm
+        .play()
+        .then(() => setIsIntroBgmPlaying(true))
+        .catch(() => setIsIntroBgmPlaying(false));
+      return;
+    }
+
+    introBgm.pause();
+    introBgm.currentTime = 0;
+    setIsIntroBgmPlaying(false);
+  }, [currentId]);
+
+  useEffect(() => {
     if (step.type === 'CAMERA') {
       onCameraStepEnter?.();
     }
@@ -219,6 +405,7 @@ const TutorialDesign = ({
 
   const handleNext = async (nextId) => {
     if (step.type === 'CAMERA') {
+      playClickSound();
       onBeginCamera?.();
       return;
     }
@@ -236,7 +423,7 @@ const TutorialDesign = ({
       setIsNameSubmitting(false);
 
       if (ok === false) {
-        setNameError('이미 사용 중이거나 사용할 수 없는 이름입니다. 다른 이름을 입력해주세요.');
+        setNameError(DUPLICATE_NAME_ERROR);
         return;
       }
     }
@@ -266,6 +453,12 @@ const TutorialDesign = ({
   };
 
   const handleProgressiveNext = (nextId) => {
+    playClickSound();
+
+    if (currentId === 0) {
+      void introBgmRef.current?.play().catch(() => {});
+    }
+
     if (!isTextDone) {
       setForceCompleteText(true);
       setIsTextDone(true);
@@ -319,6 +512,25 @@ const TutorialDesign = ({
     }
   };
 
+  const handleIntroBgmToggle = () => {
+    const introBgm = introBgmRef.current;
+    if (!introBgm) {
+      return;
+    }
+
+    if (isIntroBgmPlaying) {
+      introBgm.pause();
+      setIsIntroBgmPlaying(false);
+      return;
+    }
+
+    introBgm.volume = 1;
+    void introBgm
+      .play()
+      .then(() => setIsIntroBgmPlaying(true))
+      .catch(() => setIsIntroBgmPlaying(false));
+  };
+
   const handleNameIntroComplete = () => {
     setTimeout(() => {
       setIsNameIntroDone(true);
@@ -327,6 +539,17 @@ const TutorialDesign = ({
 
   return (
     <div id="tutorial-container" className={hideUi ? 'is-ui-hidden' : ''}>
+      <audio ref={introBgmRef} src={introBgmSrc} loop preload="auto" />
+      {currentId === 0 && (
+        <button
+          type="button"
+          className={`intro-bgm-toggle ${isIntroBgmPlaying ? 'is-playing' : ''}`}
+          onClick={handleIntroBgmToggle}
+          aria-label={isIntroBgmPlaying ? '배경음 끄기' : '배경음 켜기'}
+        >
+          {isIntroBgmPlaying ? '소리 끄기' : '소리 켜기'}
+        </button>
+      )}
       {currentId === 0 && (
         <button
           type="button"
@@ -365,23 +588,18 @@ const TutorialDesign = ({
           shouldShowWhiteLayer ? 'show' : ''
         }`}
       />
+      {currentId === 12 && (
+        <img
+          src={questionImage}
+          alt=""
+          className="question-background-image"
+          aria-hidden="true"
+        />
+      )}
 
       <main className="ui-root">
         {step.type === 'INTRO' ? (
           <div className="intro-screen">
-            <video
-              className="intro-bg-video"
-              autoPlay
-              muted
-              loop
-              playsInline
-              aria-hidden="true"
-              onError={(event) => {
-                event.currentTarget.style.display = 'none';
-              }}
-            >
-              <source src={sceneDayVideo} type="video/mp4" />
-            </video>
             <div className="intro-overlay" />
 
             <div className="intro-content">
@@ -417,7 +635,7 @@ const TutorialDesign = ({
                     className={`character-img tutorial-avatar-model ${
                       currentId === 11 ? 'is-name-input-avatar' : ''
                     }`}
-                    src={avatarUrl}
+                    src={avatarPreviewUrl}
                     alt={character.alt || 'avatar'}
                     style={currentId === 11 ? null : character.style}
                     variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
@@ -426,20 +644,35 @@ const TutorialDesign = ({
                     onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
                     onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
                   />
-                ) : shouldHoldAvatarFallback ? (
-                  <div className="character-img tutorial-avatar-placeholder" aria-hidden="true" />
                 ) : (
                   <img
                     src={character.src}
                     alt={character.alt || 'character'}
-                    className="character-img"
+                    className={`character-img ${
+                      currentId === 1 ? 'scene-one-img' : ''
+                    }`}
                     style={character.style}
                   />
                 )}
               </div>
             )}
+            {supplementalCharacter && (
+              <div
+                key={`supplemental-character-${currentId}`}
+                className={`character-layer ${
+                  supplementalCharacter.layerClass || ''
+                } step-character-${currentId}-supplemental`}
+              >
+                <img
+                  src={supplementalCharacter.src}
+                  alt={supplementalCharacter.alt || 'character'}
+                  className="character-img"
+                  style={supplementalCharacter.style}
+                />
+              </div>
+            )}
 
-            {currentId !== 12 && currentId !== 14 && (step.type === 'AUTO_STACK' ||
+            {currentId !== 12 && (step.type === 'AUTO_STACK' ||
               step.type === 'RESULT_DISPLAY') && (
               <div key={`floating-${currentId}`} className="floating-layer">
                 {step.stackList?.map((item, i) => (
@@ -472,7 +705,35 @@ const TutorialDesign = ({
               key={`card-${currentId}`}
               className={`glass-bubble-card type-${step.type} step-${step.id}`}
             >
-              {currentId === 12 ? (
+              {currentId === 8 ? (
+                <div className="camera-step-layout">
+                  <div className="camera-step-bottom-bar" aria-hidden="true" />
+                  <div className="camera-step-bubble-wrap">
+                    <img
+                      src={cameraBubbleImage}
+                      alt=""
+                      className="camera-step-bubble-img"
+                      aria-hidden="true"
+                    />
+                    <p className="camera-step-bubble-text">
+                      {renderTypewriter(step.text, {
+                        onComplete: handleTextComplete,
+                      })}
+                    </p>
+                  </div>
+
+                  <button
+                    className="camera-step-button"
+                    type="button"
+                    aria-label={step.buttonText}
+                    onClick={() => {
+                      void handleNext(step.nextId);
+                    }}
+                  >
+                    <img src={cameraButtonImage} alt="" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : false && currentId === 12 ? (
                 <div className="stack-layout">
                   <section className="stack-head-box">
                     <p className="main-desc">
@@ -520,6 +781,8 @@ const TutorialDesign = ({
                     {typeof step.textList === 'string' && (
                       <p className="main-desc">
                         {renderTypewriter(step.textList, {
+                          highlightText: DUPLICATE_NAME_NOTICE,
+                          highlightClassName: 'duplicate-name-highlight',
                           onComplete: handleTextComplete,
                         })}
                       </p>
@@ -585,26 +848,6 @@ const TutorialDesign = ({
                       </div>
                     </section>
                   )}
-                </div>
-              ) : currentId === 14 ? (
-                <div className="persona-result-layout">
-                  <section className="persona-result-block">
-                    <p className="persona-result-text">
-                      {renderTypewriter(personaBlock || step.text, {
-                        speed: 18,
-                        onComplete: handleTextComplete,
-                      })}
-                    </p>
-                  </section>
-
-                  <div className="action-row show">
-                    <button
-                      className="primary-next-btn"
-                      onClick={() => handleProgressiveNext(step.nextId)}
-                    >
-                      {step.buttonText}
-                    </button>
-                  </div>
                 </div>
               ) : currentId === 15 ? (
                 <div className="qr-layout">
