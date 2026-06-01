@@ -1127,10 +1127,10 @@ body,
 
 .character-layer.step-character-12 .character-img {
   left: 50% !important;
-  top: 46% !important;
-  bottom: auto !important;
-  width: 30vw !important;
-  translate: -50% -50% !important;
+  top: auto !important;
+  bottom: 34vh !important;
+  width: clamp(220px, 26vw, 420px) !important;
+  translate: -50% 0 !important;
   transform: none !important;
 }
 
