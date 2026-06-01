@@ -1,8 +1,8 @@
 {
   "version": 8,
-  "policy": "VLM returns semantic asset tags. The build pipeline always resolves each required tag to the closest available asset. The tutorial preview path can still use source-GLB node selection from model/source/avatar_parts_v2.glb. Unity world runtime prefers rigged body resources for body/top/bottom and uses source-GLB nodes for hair, shoes, and accessories.",
+  "policy": "VLM returns semantic asset tags. The build pipeline always resolves each required tag to the closest available asset. The tutorial preview path can still use source-GLB node selection from model/source/avatar_v2.glb. Unity world runtime prefers rigged body resources for body/top/bottom and uses source-GLB nodes for hair, shoes, and accessories.",
   "source_assets": {
-    "runtime_glb": "model/source/avatar_parts_v2.glb",
+    "runtime_glb": "model/source/avatar_v2.glb",
     "unity_rigged_body_resource_root": "Assets/Resources/Terarium/RiggedBodies"
   },
   "semantic_asset_tags": {
@@ -91,22 +91,22 @@
         "color_source": "hair_color"
       },
       "long_straight_hair": {
-        "source_nodes": ["long_straight_hair"],
-        "description": "Long straight hair",
+        "source_nodes": ["long_wave_hair"],
+        "description": "Fallback to long wave hair because avatar_v2.glb has no separate long straight hair mesh",
         "color_source": "hair_color"
       },
       "bowl_cut_hair": {
-        "source_nodes": ["bowl_cut_hair"],
+        "source_nodes": ["bowl_cut"],
         "description": "Bowl cut hair",
         "color_source": "hair_color"
       },
       "gael_cut_hair": {
-        "source_nodes": ["gael_cut_hair"],
+        "source_nodes": ["gael_cut_1", "gael_cut_2"],
         "description": "Gael cut hair",
         "color_source": "hair_color"
       },
       "dandy_cut_hair": {
-        "source_nodes": ["dandy_cut_hair"],
+        "source_nodes": ["dandy_cut"],
         "description": "Dandy cut hair",
         "color_source": "hair_color"
       }
@@ -181,7 +181,7 @@
         "color": "#d7c27a"
       },
       "simple_earrings": {
-        "source_nodes": ["simple_earring_L", "simple_earring_R"],
+        "source_nodes": ["L", "R"],
         "description": "Small non-hoop earrings",
         "color": "#d7c27a"
       }

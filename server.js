@@ -20,8 +20,8 @@ import {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const AVATAR_SOURCE_GLB_PUBLIC_PATH = '/model/source/avatar_parts_v2.glb'
-const AVATAR_SOURCE_GLB_PATH = path.join(__dirname, 'model', 'source', 'avatar_parts_v2.glb')
+const AVATAR_SOURCE_GLB_PUBLIC_PATH = '/model/source/avatar_v2.glb'
+const AVATAR_SOURCE_GLB_PATH = path.join(__dirname, 'model', 'source', 'avatar_v2.glb')
 
 const APPEARANCE_LLM_SERVER_URL = String(process.env.LLM_SERVER_URL || 'http://terarium-llm-server:18200').replace(/\/+$/, '')
 const APPEARANCE_LLM_SERVER_API_KEY = String(process.env.LLM_SERVER_API_KEY || process.env.LLM_API_KEY || '').trim()
@@ -305,10 +305,10 @@ const HAIR_ASSET_TAGS = {
   long_wave_hair: 'long_wave_hair',
   low_tied_hair: 'tied_down_hair',
   high_tied_hair: 'tied_up_hair',
-  long_straight_hair: 'long_straight_hair',
-  bowl_cut_hair: 'bowl_cut_hair',
-  gael_cut_hair: 'gael_cut_hair',
-  dandy_cut_hair: 'dandy_cut_hair',
+  long_straight_hair: 'long_wave_hair',
+  bowl_cut_hair: 'bowl_cut',
+  gael_cut_hair: ['gael_cut_1', 'gael_cut_2'],
+  dandy_cut_hair: 'dandy_cut',
 }
 
 const TOP_ASSET_TAGS = {
@@ -336,7 +336,7 @@ const EARRING_ASSET_TAGS = {
 }
 
 const AVATAR_SOURCE_NODE_GROUPS = {
-  base: ['body', 'R_shoes', 'L_shoes'],
+  base: ['t_pose:body', 'R_shoes', 'L_shoes'],
   skin_texture: SKIN_ASSET_TAGS,
   eye_texture: EYE_ASSET_TAGS,
   mouth_texture: MOUTH_ASSET_TAGS,
@@ -347,19 +347,19 @@ const AVATAR_SOURCE_NODE_GROUPS = {
   necklace_mesh: NECKLACE_ASSET_TAGS,
   earring_mesh: {
     hoop_earrings: ['R_Earrings', 'L_Earrings'],
-    simple_earrings: ['simple_earring_L', 'simple_earring_R'],
+    simple_earrings: ['L', 'R'],
   },
 }
 
 const AVATAR_SOURCE_NODE_ORDER = [
-  'body',
+  't_pose:body',
   'round_glasses',
   'square_glasses',
   'pearl_necklace',
   'R_Earrings',
   'L_Earrings',
-  'simple_earring_L',
-  'simple_earring_R',
+  'L',
+  'R',
   'bun_hair',
   'bangs_bun_hair',
   'bangs_bobbed_hair',
@@ -369,10 +369,10 @@ const AVATAR_SOURCE_NODE_ORDER = [
   'long_wave_hair',
   'tied_down_hair',
   'tied_up_hair',
-  'long_straight_hair',
-  'bowl_cut_hair',
-  'gael_cut_hair',
-  'dandy_cut_hair',
+  'bowl_cut',
+  'gael_cut_1',
+  'gael_cut_2',
+  'dandy_cut',
   'long_Tshirt',
   'short_Tshirt',
   'short_skirt',
@@ -387,8 +387,8 @@ const AVATAR_ACCESSORY_NODE_NAMES = new Set([
   'pearl_necklace',
   'R_Earrings',
   'L_Earrings',
-  'simple_earring_L',
-  'simple_earring_R',
+  'L',
+  'R',
 ])
 
 const ASSET_TAG_FALLBACKS = {
@@ -2708,7 +2708,7 @@ const buildAvatarFromSourceNodes = async ({ outputPath, plan }) => {
   const selectedNodeNames = selectedAvatarNodeNames(plan)
   const transformFixes = normalizeAvatarSourceNodeTransforms(document, selectedNodeNames)
   const nodeFilter = clearUnselectedMeshes(document, selectedNodeNames)
-  const skinTexture = await applySkinTextureToDocument(document, plan.selected, findDocumentNodesByName(document, ['body']))
+  const skinTexture = await applySkinTextureToDocument(document, plan.selected, findDocumentNodesByName(document, ['body', 't_pose:body']))
   const materialColors = tintAvatarSourceNodes(document, plan)
   const keptNodes = nodeFilter.kept.map((item) => item.nodeName || item.meshName).filter(Boolean)
 
