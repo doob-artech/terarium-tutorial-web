@@ -369,6 +369,103 @@
   opacity: 0.46;
 }
 
+.debug-stepper {
+  display: grid;
+  gap: 7px;
+}
+
+.debug-stepper-label {
+  color: #4b5565;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.debug-stepper-control {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.debug-stepper-control button {
+  height: 44px;
+  border: 1px solid #cad3df;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #111827;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.debug-stepper-control button:hover:not(:disabled) {
+  background: #edf4ff;
+  border-color: #5a95f5;
+}
+
+.debug-stepper-control button:focus-visible {
+  outline: 3px solid rgba(90, 149, 245, 0.24);
+  border-color: #5a95f5;
+}
+
+.debug-stepper-control button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.debug-stepper-value {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "swatch label"
+    "swatch key";
+  column-gap: 10px;
+  align-items: center;
+  border: 1px solid #cad3df;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px 10px;
+}
+
+.debug-stepper-value i {
+  grid-area: swatch;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+}
+
+.debug-stepper-value strong {
+  grid-area: label;
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-stepper-value small {
+  grid-area: key;
+  min-width: 0;
+  overflow: hidden;
+  color: #697386;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debug-stepper.is-disabled {
+  opacity: 0.46;
+}
+
 .debug-avatar-nodes {
   margin-top: 12px;
   padding-top: 16px;

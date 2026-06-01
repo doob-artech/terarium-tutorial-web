@@ -22,6 +22,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const AVATAR_SOURCE_GLB_PUBLIC_PATH = '/model/source/avatar_v2.glb'
 const AVATAR_SOURCE_GLB_PATH = path.join(__dirname, 'model', 'source', 'avatar_v2.glb')
+const AVATAR_HAIR_VERTICAL_OFFSET = 0.1
 
 const APPEARANCE_LLM_SERVER_URL = String(process.env.LLM_SERVER_URL || 'http://terarium-llm-server:18200').replace(/\/+$/, '')
 const APPEARANCE_LLM_SERVER_API_KEY = String(process.env.LLM_SERVER_API_KEY || process.env.LLM_API_KEY || '').trim()
@@ -2542,6 +2543,33 @@ const normalizeAvatarSourceNodeTransforms = (document, selectedNodeNames) => {
   return applied
 }
 
+const applyAvatarHairOffset = (document, plan) => {
+  const tag = plan.appearance.asset_tags?.hair_mesh
+  const hairNodes = asNodeNameList(AVATAR_SOURCE_NODE_GROUPS.hair_mesh?.[tag] || resolveSemanticAssetTag('hair_mesh', tag))
+  const applied = []
+  if (hairNodes.length === 0) return applied
+
+  for (const node of findDocumentNodesByName(document, hairNodes)) {
+    const nodeName = node.getName() || ''
+    const meshName = node.getMesh()?.getName() || ''
+    const previousTranslation = node.getTranslation()
+    const nextTranslation = [
+      previousTranslation[0],
+      previousTranslation[1] + AVATAR_HAIR_VERTICAL_OFFSET,
+      previousTranslation[2],
+    ]
+    node.setTranslation(nextTranslation)
+    applied.push({
+      nodeName,
+      meshName,
+      adjustment: 'hair_vertical_offset',
+      previousTranslation,
+      nextTranslation,
+    })
+  }
+  return applied
+}
+
 const findDocumentNodesByName = (document, names) => {
   const lookup = new Set(asNodeNameList(names))
   return document
@@ -2590,7 +2618,10 @@ const buildAvatarFromSourceNodes = async ({ outputPath, plan }) => {
   const document = await io.read(AVATAR_SOURCE_GLB_PATH)
   const sourceNodeNames = applyAvatarSourceFallbackNodeNames(document)
   const selectedNodeNames = selectedAvatarNodeNames(plan)
-  const transformFixes = normalizeAvatarSourceNodeTransforms(document, selectedNodeNames)
+  const transformFixes = [
+    ...normalizeAvatarSourceNodeTransforms(document, selectedNodeNames),
+    ...applyAvatarHairOffset(document, plan),
+  ]
   const nodeFilter = clearUnselectedMeshes(document, selectedNodeNames)
   const skinTexture = await applySkinTextureToDocument(document, plan.selected, findDocumentNodesByName(document, ['body', 't_pose:body']))
   const materialColors = tintAvatarSourceNodes(document, plan)

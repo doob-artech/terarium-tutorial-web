@@ -104,6 +104,24 @@ const DEBUG_ASSET_TO_APPEARANCE = {
   },
 }
 
+const DEBUG_COLOR_OPTIONS = [
+  ['black', 'Black', '#101010'],
+  ['dark_brown', 'Dark brown', '#1b120d'],
+  ['brown', 'Brown', '#5a3524'],
+  ['light_brown', 'Light brown', '#9a6a43'],
+  ['blonde', 'Blonde', '#d8bd65'],
+  ['gray', 'Gray', '#777777'],
+  ['white', 'White', '#f4f4f0'],
+  ['red', 'Red', '#a63d3d'],
+  ['orange', 'Orange', '#c96a2c'],
+  ['yellow', 'Yellow', '#d7b53f'],
+  ['green', 'Green', '#4c9a58'],
+  ['blue', 'Blue', '#3f6fb5'],
+  ['navy', 'Navy', '#1d2e5f'],
+  ['purple', 'Purple', '#7a4aa0'],
+  ['pink', 'Pink', '#d879a7'],
+]
+
 let personaClickAudioPool = []
 let personaClickAudioPoolIndex = 0
 let personaClickBlockedUntil = 0
@@ -166,7 +184,7 @@ const MOCK_APPEARANCE_RESULT = {
 function App() {
   const urlParams = new URLSearchParams(window.location.search)
   if (window.location.pathname === '/debug') {
-    return <AvatarDebugPage />
+    return <AvatarDebugPageV2 />
   }
   const isProfileCaptureRoute = window.location.pathname === '/avatar-profile-capture'
     || urlParams.get('mode') === 'avatar-profile-capture'
@@ -177,7 +195,7 @@ function App() {
   return <TutorialApp />
 }
 
-function AvatarDebugPage() {
+function AvatarDebugPageV2() {
   const [selection, setSelection] = useState({
     hair: 'long_wave_hair',
     skin: 'soft_peach_skin',
@@ -187,6 +205,9 @@ function AvatarDebugPage() {
     bottom: 'short_pants',
     outfit: 'none',
     shoes: 'sneakers',
+    hairColor: 'black',
+    topColor: 'white',
+    bottomColor: 'black',
   })
   const [modelUrl, setModelUrl] = useState('')
   const [manifest, setManifest] = useState(null)
@@ -211,16 +232,194 @@ function AvatarDebugPage() {
         hair_style: hairInfo[0],
         hair_part_direction: hairInfo[2],
         bangs_type: hairInfo[1],
-        hair_color: 'black',
+        hair_color: selection.hairColor,
         eye_type: selection.eye,
         eye_color: 'dark_brown',
         mouth_type: selection.mouth.replace(/_mouth$/, '').replace('broad_smile', 'big_smile'),
         top_type: DEBUG_ASSET_TO_APPEARANCE.top[selection.top],
-        top_color: 'white',
+        top_color: selection.topColor,
         bottom_type: hasOutfit
           ? DEBUG_ASSET_TO_APPEARANCE.outfit[selection.outfit]
           : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
-        bottom_color: hasOutfit ? 'white' : 'black',
+        bottom_color: hasOutfit ? selection.topColor : selection.bottomColor,
+        shoe_type: selection.shoes,
+        accessories: {
+          glasses_type: 'none',
+          has_necklace: false,
+          has_earrings: false,
+        },
+        asset_tags: {
+          skin_texture: selection.skin,
+          eye_texture: selection.eye,
+          mouth_texture: selection.mouth,
+          hair_mesh: selection.hair,
+          top_mesh: selection.top,
+          bottom_mesh: selection.bottom,
+          outfit_mesh: selection.outfit,
+          shoe_mesh: selection.shoes,
+          glasses_mesh: 'none',
+          necklace_mesh: 'none',
+          earring_mesh: 'none',
+        },
+      }
+
+      try {
+        const response = await fetch('/api/avatar/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentId: `debug-avatar-${requestSeq}`,
+            appearance,
+          }),
+          signal: controller.signal,
+        })
+        const payload = await response.json()
+        if (!response.ok) {
+          throw new Error(payload?.error || 'avatar build failed')
+        }
+        if (requestSeqRef.current !== requestSeq) return
+        setModelUrl(payload.modelUrl || '')
+        setManifest(payload)
+        setStatus('ready')
+      } catch (buildError) {
+        if (controller.signal.aborted || requestSeqRef.current !== requestSeq) return
+        setStatus('error')
+        setError(buildError instanceof Error ? buildError.message : 'avatar build failed')
+      }
+    }
+
+    const timer = window.setTimeout(build, 120)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [selection])
+
+  const hasOutfit = selection.outfit !== 'none'
+  const selectedNodes = manifest?.merge?.selectedNodes || []
+
+  return (
+    <main className="debug-avatar-page">
+      <section className="debug-avatar-view">
+        <div className="debug-avatar-stage">
+          {modelUrl ? (
+            <AvatarThreeViewer
+              src={modelUrl}
+              alt="Avatar debug preview"
+              variant="avatar"
+              distanceMultiplier={1.7}
+              className="debug-avatar-canvas"
+            />
+          ) : (
+            <div className="debug-avatar-empty">Building avatar</div>
+          )}
+        </div>
+        <div className="debug-avatar-state">
+          <span>{status === 'loading' ? 'Building' : status === 'ready' ? 'Ready' : status === 'error' ? 'Error' : 'Idle'}</span>
+          {error ? <strong>{error}</strong> : null}
+        </div>
+      </section>
+
+      <aside className="debug-avatar-panel" aria-label="Avatar asset selector">
+        <h1>Avatar Debug</h1>
+        <DebugStepper label="Hair" value={selection.hair} options={DEBUG_AVATAR_OPTIONS.hair} onChange={(value) => updateSelection('hair', value)} />
+        <DebugStepper label="Hair color" value={selection.hairColor} options={DEBUG_COLOR_OPTIONS} onChange={(value) => updateSelection('hairColor', value)} />
+        <DebugStepper label="Skin" value={selection.skin} options={DEBUG_AVATAR_OPTIONS.skin} onChange={(value) => updateSelection('skin', value)} />
+        <DebugStepper label="Eyes" value={selection.eye} options={DEBUG_AVATAR_OPTIONS.eye} onChange={(value) => updateSelection('eye', value)} />
+        <DebugStepper label="Mouth" value={selection.mouth} options={DEBUG_AVATAR_OPTIONS.mouth} onChange={(value) => updateSelection('mouth', value)} />
+        <DebugStepper label="One-piece" value={selection.outfit} options={DEBUG_AVATAR_OPTIONS.outfit} onChange={(value) => updateSelection('outfit', value)} />
+        <DebugStepper label="Top" value={selection.top} options={DEBUG_AVATAR_OPTIONS.top} disabled={hasOutfit} onChange={(value) => updateSelection('top', value)} />
+        <DebugStepper label="Top color" value={selection.topColor} options={DEBUG_COLOR_OPTIONS} onChange={(value) => updateSelection('topColor', value)} />
+        <DebugStepper label="Bottom" value={selection.bottom} options={DEBUG_AVATAR_OPTIONS.bottom} disabled={hasOutfit} onChange={(value) => updateSelection('bottom', value)} />
+        <DebugStepper label="Bottom color" value={selection.bottomColor} options={DEBUG_COLOR_OPTIONS} disabled={hasOutfit} onChange={(value) => updateSelection('bottomColor', value)} />
+        <DebugStepper label="Shoes" value={selection.shoes} options={DEBUG_AVATAR_OPTIONS.shoes} onChange={(value) => updateSelection('shoes', value)} />
+
+        <div className="debug-avatar-nodes">
+          <h2>selectedNodes</h2>
+          <code>{selectedNodes.length ? selectedNodes.join(', ') : '-'}</code>
+        </div>
+      </aside>
+    </main>
+  )
+}
+
+function DebugStepper({ label, value, options, disabled = false, onChange }) {
+  const currentIndex = Math.max(0, options.findIndex(([optionValue]) => optionValue === value))
+  const currentOption = options[currentIndex] || options[0]
+  const swatch = currentOption?.[2] || ''
+  const step = (direction) => {
+    if (disabled || options.length === 0) return
+    const nextIndex = (currentIndex + direction + options.length) % options.length
+    onChange(options[nextIndex][0])
+  }
+
+  return (
+    <div className={`debug-stepper ${disabled ? 'is-disabled' : ''}`}>
+      <span className="debug-stepper-label">{label}</span>
+      <div className="debug-stepper-control">
+        <button type="button" disabled={disabled} aria-label={`${label} previous`} onClick={() => step(-1)}>
+          &lt;
+        </button>
+        <div className="debug-stepper-value">
+          {swatch ? <i style={{ background: swatch }} aria-hidden="true" /> : null}
+          <strong>{currentOption?.[1] || value}</strong>
+          <small>{value}</small>
+        </div>
+        <button type="button" disabled={disabled} aria-label={`${label} next`} onClick={() => step(1)}>
+          &gt;
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AvatarDebugPage() {
+  const [selection, setSelection] = useState({
+    hair: 'long_wave_hair',
+    skin: 'soft_peach_skin',
+    eye: 'round_open_eyes',
+    mouth: 'closed_smile_mouth',
+    top: 'short_sleeve_tshirt',
+    bottom: 'short_pants',
+    outfit: 'none',
+    shoes: 'sneakers',
+    hairColor: 'black',
+    topColor: 'white',
+    bottomColor: 'black',
+  })
+  const [modelUrl, setModelUrl] = useState('')
+  const [manifest, setManifest] = useState(null)
+  const [status, setStatus] = useState('idle')
+  const [error, setError] = useState('')
+  const requestSeqRef = useRef(0)
+
+  const updateSelection = (key, value) => {
+    setSelection((current) => ({ ...current, [key]: value }))
+  }
+
+  useEffect(() => {
+    const requestSeq = requestSeqRef.current + 1
+    requestSeqRef.current = requestSeq
+    const controller = new AbortController()
+    const build = async () => {
+      setStatus('loading')
+      setError('')
+      const hairInfo = DEBUG_ASSET_TO_APPEARANCE.hair[selection.hair] || ['long_wave', 'none', 'center']
+      const hasOutfit = selection.outfit !== 'none'
+      const appearance = {
+        hair_style: hairInfo[0],
+        hair_part_direction: hairInfo[2],
+        bangs_type: hairInfo[1],
+        hair_color: selection.hairColor,
+        eye_type: selection.eye,
+        eye_color: 'dark_brown',
+        mouth_type: selection.mouth.replace(/_mouth$/, '').replace('broad_smile', 'big_smile'),
+        top_type: DEBUG_ASSET_TO_APPEARANCE.top[selection.top],
+        top_color: selection.topColor,
+        bottom_type: hasOutfit
+          ? DEBUG_ASSET_TO_APPEARANCE.outfit[selection.outfit]
+          : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
+        bottom_color: hasOutfit ? selection.topColor : selection.bottomColor,
         shoe_type: selection.shoes,
         accessories: {
           glasses_type: 'none',
