@@ -668,7 +668,7 @@ transform: scale(1.01) translateY(-2px) !important;
     linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 16, 12, 0.22) 42%, rgba(16, 13, 10, 0.54) 100%),
     var(--persona-option-bg, linear-gradient(135deg, #ffef66 0%, #ffd64d 100%));
   background-position: center center, center center, center center;
-  background-size: cover, 110% 110%, cover;
+  background-size: cover, 110% auto, cover;
   background-repeat: no-repeat;
   
   display: flex;
@@ -757,7 +757,7 @@ transform: scale(1.01) translateY(-2px) !important;
     linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 16, 12, 0.22) 42%, rgba(16, 13, 10, 0.54) 100%),
     var(--persona-option-bg, linear-gradient(135deg, #ffef66 0%, #ffd64d 100%));
   background-position: center center, center center, center center;
-  background-size: cover, 110% 110%, cover;
+  background-size: cover, 110% auto, cover;
   background-repeat: no-repeat;
 }
 
@@ -766,7 +766,7 @@ transform: scale(1.01) translateY(-2px) !important;
     linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 16, 12, 0.22) 42%, rgba(16, 13, 10, 0.54) 100%),
     var(--persona-option-bg, linear-gradient(135deg, #ffef66 0%, #ffd64d 100%));
   background-position: center center, center center, center center;
-  background-size: cover, 110% 110%, cover;
+  background-size: cover, 110% auto, cover;
   background-repeat: no-repeat;
 }
 
