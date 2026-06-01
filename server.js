@@ -22,7 +22,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const AVATAR_SOURCE_GLB_PUBLIC_PATH = '/model/source/avatar_v2.glb'
 const AVATAR_SOURCE_GLB_PATH = path.join(__dirname, 'model', 'source', 'avatar_v2.glb')
-const AVATAR_HAIR_VERTICAL_OFFSET = 0.1
+const AVATAR_HAIR_VERTICAL_OFFSET = 0.001
 
 const APPEARANCE_LLM_SERVER_URL = String(process.env.LLM_SERVER_URL || 'http://terarium-llm-server:18200').replace(/\/+$/, '')
 const APPEARANCE_LLM_SERVER_API_KEY = String(process.env.LLM_SERVER_API_KEY || process.env.LLM_API_KEY || '').trim()
