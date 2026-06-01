@@ -1,11 +1,56 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
+import clickSoundSrc from './tutorialDesign/assets/click1.mp3'
 import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
 const PERSONA_TOTAL_TURNS = 5
+const CLICK_SOUND_FALLBACK_MS = 320
+const CLICK_SOUND_TAIL_GAP_MS = 40
+
+let personaClickAudioPool = []
+let personaClickAudioPoolIndex = 0
+let personaClickBlockedUntil = 0
+
+const getPersonaClickAudioPool = () => {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  if (personaClickAudioPool.length === 0) {
+    personaClickAudioPool = Array.from({ length: 3 }, () => {
+      const audio = new Audio(clickSoundSrc)
+      audio.preload = 'auto'
+      audio.volume = 1
+      return audio
+    })
+  }
+
+  return personaClickAudioPool
+}
+
+const playPersonaClickSound = () => {
+  if (Date.now() < personaClickBlockedUntil) {
+    return
+  }
+
+  const pool = getPersonaClickAudioPool()
+  if (pool.length === 0) {
+    return
+  }
+
+  const audio = pool[personaClickAudioPoolIndex]
+  personaClickAudioPoolIndex = (personaClickAudioPoolIndex + 1) % pool.length
+  const clickDurationMs =
+    Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration * 1000
+      : CLICK_SOUND_FALLBACK_MS
+  personaClickBlockedUntil = Date.now() + clickDurationMs + CLICK_SOUND_TAIL_GAP_MS
+  audio.currentTime = 0
+  void audio.play().catch(() => {})
+}
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -637,6 +682,7 @@ function TutorialApp() {
 
     const optionId = option?.id
     if (!optionId) return
+    playPersonaClickSound()
 
     setSelectedOptionIds((prev) => {
       const isSelected = prev.includes(optionId)
