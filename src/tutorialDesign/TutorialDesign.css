@@ -398,10 +398,10 @@ body,
 
 .camera-step-bubble-wrap {
   position: absolute;
-  left: 62%;
-  top: 75%;
+  left: 58%;
+  top: 73%;
   z-index: 2;
-  width: min(60vw, 580px);
+  width: min(72vw, 720px);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
@@ -414,14 +414,14 @@ body,
 
 .camera-step-bubble-text {
   position: absolute;
-  left: 12%;
-  right: 15%;
-  top: 55%;
+  left: 9%;
+  right: 12%;
+  top: 54%;
   color: #111;
   text-align: center;
-  font-size: clamp(18px, 1.25vw, 24px);
+  font-size: clamp(18px, 1.35vw, 26px);
   font-weight: 800;
-  line-height: 1.45;
+  line-height: 1.38;
   word-break: keep-all;
   white-space: pre-line;
   transform: translateY(-50%);
