@@ -101,8 +101,28 @@
         "color_source": "hair_color"
       },
       "gael_cut_hair": {
-        "source_nodes": ["gael_cut_1", "gael_cut_2"],
-        "description": "Gael cut hair",
+        "source_nodes": ["gael_cut_1"],
+        "description": "Default gael cut hair",
+        "color_source": "hair_color"
+      },
+      "gael_cut_left_hair": {
+        "source_nodes": ["gael_cut_1"],
+        "description": "Left-side gael cut hair",
+        "color_source": "hair_color"
+      },
+      "gael_cut_right_hair": {
+        "source_nodes": ["gael_cut_2"],
+        "description": "Right-side gael cut hair",
+        "color_source": "hair_color"
+      },
+      "wolf_cut_hair": {
+        "source_nodes": ["wolf_cut"],
+        "description": "Wolf cut hair",
+        "color_source": "hair_color"
+      },
+      "pompadour_hair": {
+        "source_nodes": ["pompadour_cut"],
+        "description": "Pompadour hair",
         "color_source": "hair_color"
       },
       "dandy_cut_hair": {
@@ -119,6 +139,11 @@
       "short_sleeve_tshirt": {
         "source_nodes": ["short_Tshirt"],
         "color_source": "top_color"
+      },
+      "button_shirt": {
+        "source_nodes": ["shirts"],
+        "description": "Button shirt",
+        "color_source": "top_color"
       }
     },
     "bottom_mesh": {
@@ -126,9 +151,32 @@
         "source_nodes": ["short_pants"],
         "color_source": "bottom_color"
       },
+      "long_pants": {
+        "source_nodes": ["long_pants"],
+        "color_source": "bottom_color"
+      },
       "short_skirt": {
         "source_nodes": ["short_skirt"],
         "color_source": "bottom_color"
+      },
+      "long_skirt": {
+        "source_nodes": ["long_skirt"],
+        "color_source": "bottom_color"
+      }
+    },
+    "outfit_mesh": {
+      "none": {
+        "source_nodes": []
+      },
+      "short_onepiece": {
+        "source_nodes": ["onepiece_1"],
+        "description": "Short one-piece dress",
+        "color_source": "top_color"
+      },
+      "long_onepiece": {
+        "source_nodes": ["onepiece_2"],
+        "description": "Long one-piece dress",
+        "color_source": "top_color"
       }
     },
     "unity_body_variant": {
@@ -186,15 +234,19 @@
         "color": "#d7c27a"
       }
     },
-    "shoes": {
-      "default_black_shoes": {
+    "shoe_mesh": {
+      "sneakers": {
         "source_nodes": ["R_shoes", "L_shoes"],
+        "color": "#222222"
+      },
+      "sandals": {
+        "source_nodes": ["R_sandals", "L_sandals"],
         "color": "#222222"
       }
     }
   },
   "semantic_to_asset_guidance": {
-    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh must always choose the nearest available semantic tag. Do not output unknown for these. skin_texture must be exactly one of soft_peach_skin or light_warm_skin. Unity derives unity_body_variant from top_mesh and bottom_mesh.",
+    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, bottom_mesh, outfit_mesh, and shoe_mesh must always choose the nearest available semantic tag. Use outfit_mesh none unless a one-piece/dress is visible. Do not output unknown for these. skin_texture must be exactly one of soft_peach_skin or light_warm_skin. Unity derives unity_body_variant from top_mesh and bottom_mesh.",
     "optional_asset_tags": "glasses_mesh, necklace_mesh, and earring_mesh may use none when not visible.",
     "skin_texture": {
       "soft_peach_skin": "soft_peach_skin",
@@ -219,7 +271,11 @@
       "bun": "bun_hair_with_bangs",
       "bowl_cut": "bowl_cut_hair",
       "gael_cut": "gael_cut_hair",
+      "gael_cut_left": "gael_cut_left_hair",
+      "gael_cut_right": "gael_cut_right_hair",
       "dandy_cut": "dandy_cut_hair",
+      "wolf_cut": "wolf_cut_hair",
+      "pomade": "pompadour_hair",
       "bob_straight": "bob_hair_with_bangs",
       "bob_c_curl": "bob_hair_with_bangs",
       "long_straight": "long_straight_hair",
@@ -228,6 +284,28 @@
       "ponytail_low": "low_tied_hair",
       "ponytail_high": "high_tied_hair",
       "short_cut": "bob_hair_with_bangs"
+    },
+    "top_type": {
+      "short_sleeve_tshirt": "short_sleeve_tshirt",
+      "long_sleeve_tshirt": "long_sleeve_tshirt",
+      "shirt": "button_shirt",
+      "button_shirt": "button_shirt"
+    },
+    "bottom_type": {
+      "shorts": "short_pants",
+      "long_pants": "long_pants",
+      "wide_long_pants": "long_pants",
+      "short_skirt": "short_skirt",
+      "long_skirt": "long_skirt"
+    },
+    "outfit_type": {
+      "none": "none",
+      "short_onepiece": "short_onepiece",
+      "long_onepiece": "long_onepiece"
+    },
+    "shoe_type": {
+      "sneakers": "sneakers",
+      "sandals": "sandals"
     }
   }
 }

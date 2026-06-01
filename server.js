@@ -307,18 +307,36 @@ const HAIR_ASSET_TAGS = {
   high_tied_hair: 'tied_up_hair',
   long_straight_hair: 'long_wave_hair',
   bowl_cut_hair: 'bowl_cut',
-  gael_cut_hair: ['gael_cut_1', 'gael_cut_2'],
+  gael_cut_hair: 'gael_cut_1',
+  gael_cut_left_hair: 'gael_cut_1',
+  gael_cut_right_hair: 'gael_cut_2',
+  wolf_cut_hair: 'wolf_cut',
+  pompadour_hair: 'pompadour_cut',
   dandy_cut_hair: 'dandy_cut',
 }
 
 const TOP_ASSET_TAGS = {
   long_sleeve_tshirt: 'long_Tshirt',
   short_sleeve_tshirt: 'short_Tshirt',
+  button_shirt: 'shirts',
 }
 
 const BOTTOM_ASSET_TAGS = {
   short_pants: 'short_pants',
+  long_pants: 'long_pants',
   short_skirt: 'short_skirt',
+  long_skirt: 'long_skirt',
+}
+
+const OUTFIT_ASSET_TAGS = {
+  none: 'none',
+  short_onepiece: 'onepiece_1',
+  long_onepiece: 'onepiece_2',
+}
+
+const SHOE_ASSET_TAGS = {
+  sneakers: ['R_shoes', 'L_shoes'],
+  sandals: ['R_sandals', 'L_sandals'],
 }
 
 const GLASSES_ASSET_TAGS = {
@@ -336,13 +354,15 @@ const EARRING_ASSET_TAGS = {
 }
 
 const AVATAR_SOURCE_NODE_GROUPS = {
-  base: ['t_pose:body', 'R_shoes', 'L_shoes'],
+  base: ['t_pose:body'],
   skin_texture: SKIN_ASSET_TAGS,
   eye_texture: EYE_ASSET_TAGS,
   mouth_texture: MOUTH_ASSET_TAGS,
   hair_mesh: HAIR_ASSET_TAGS,
   top_mesh: TOP_ASSET_TAGS,
   bottom_mesh: BOTTOM_ASSET_TAGS,
+  outfit_mesh: OUTFIT_ASSET_TAGS,
+  shoe_mesh: SHOE_ASSET_TAGS,
   glasses_mesh: GLASSES_ASSET_TAGS,
   necklace_mesh: NECKLACE_ASSET_TAGS,
   earring_mesh: {
@@ -372,13 +392,22 @@ const AVATAR_SOURCE_NODE_ORDER = [
   'bowl_cut',
   'gael_cut_1',
   'gael_cut_2',
+  'wolf_cut',
+  'pompadour_cut',
   'dandy_cut',
   'long_Tshirt',
   'short_Tshirt',
+  'shirts',
+  'long_skirt',
   'short_skirt',
+  'onepiece_1',
+  'onepiece_2',
+  'long_pants',
   'short_pants',
   'R_shoes',
   'L_shoes',
+  'R_sandals',
+  'L_sandals',
 ]
 
 const AVATAR_ACCESSORY_NODE_NAMES = new Set([
@@ -398,6 +427,8 @@ const ASSET_TAG_FALLBACKS = {
   hair_mesh: 'long_straight_hair',
   top_mesh: 'short_sleeve_tshirt',
   bottom_mesh: 'short_pants',
+  outfit_mesh: 'none',
+  shoe_mesh: 'sneakers',
   glasses_mesh: 'none',
   necklace_mesh: 'none',
   earring_mesh: 'none',
@@ -443,6 +474,16 @@ const ASSET_TAG_SCHEMA = {
       enum: assetSemanticKeys(BOTTOM_ASSET_TAGS),
       description: 'Closest available semantic bottom mesh.',
     },
+    outfit_mesh: {
+      type: 'string',
+      enum: assetSemanticKeys(OUTFIT_ASSET_TAGS),
+      description: 'One-piece outfit mesh. Choose short_onepiece or long_onepiece only when the person is wearing a dress/one-piece outfit; otherwise choose none.',
+    },
+    shoe_mesh: {
+      type: 'string',
+      enum: assetSemanticKeys(SHOE_ASSET_TAGS),
+      description: 'Closest available semantic shoe mesh. Choose sandals for open sandals; choose sneakers for closed shoes.',
+    },
     glasses_mesh: {
       type: 'string',
       enum: assetSemanticKeys(GLASSES_ASSET_TAGS, ['none']),
@@ -459,7 +500,7 @@ const ASSET_TAG_SCHEMA = {
       description: 'Closest available semantic earring mesh. hoop_earrings are ring earrings; simple_earrings are non-hoop earrings.',
     },
   },
-  required: ['skin_texture', 'eye_texture', 'mouth_texture', 'hair_mesh', 'top_mesh', 'bottom_mesh', 'glasses_mesh', 'necklace_mesh', 'earring_mesh'],
+  required: ['skin_texture', 'eye_texture', 'mouth_texture', 'hair_mesh', 'top_mesh', 'bottom_mesh', 'outfit_mesh', 'shoe_mesh', 'glasses_mesh', 'necklace_mesh', 'earring_mesh'],
   description: 'Direct nearest available avatar asset tags. Choose the closest available asset; do not invent missing assets.',
 }
 
@@ -475,8 +516,11 @@ const APPEARANCE_SCHEMA = {
         'two_block',
         'bowl_cut',
         'gael_cut',
+        'gael_cut_left',
+        'gael_cut_right',
         'dandy_cut',
         'pomade',
+        'wolf_cut',
         'bob_straight',
         'bob_c_curl',
         'long_straight',
@@ -527,7 +571,7 @@ const APPEARANCE_SCHEMA = {
     },
     top_type: {
       type: 'string',
-      enum: ['short_sleeve_tshirt', 'long_sleeve_tshirt', 'shirt', 'hoodie', 'casual_zip_jacket'],
+      enum: ['short_sleeve_tshirt', 'long_sleeve_tshirt', 'button_shirt', 'shirt', 'hoodie', 'casual_zip_jacket'],
       description: 'Top clothing type.',
     },
     top_color: {
@@ -537,7 +581,7 @@ const APPEARANCE_SCHEMA = {
     },
     bottom_type: {
       type: 'string',
-      enum: ['wide_long_pants', 'shorts', 'long_skirt', 'short_skirt'],
+      enum: ['wide_long_pants', 'long_pants', 'shorts', 'long_skirt', 'short_skirt', 'short_onepiece', 'long_onepiece'],
       description: 'Bottom clothing type.',
     },
     bottom_color: {
@@ -547,7 +591,7 @@ const APPEARANCE_SCHEMA = {
     },
     shoe_type: {
       type: 'string',
-      enum: ['sneakers'],
+      enum: ['sneakers', 'sandals'],
       description: 'Visible shoe type.',
     },
     accessories: {
@@ -692,6 +736,41 @@ const ASSET_TAG_ALIASES = {
     light_skin: 'light_warm_skin',
     light_warm: 'light_warm_skin',
   },
+  hair_mesh: {
+    gael_cut: 'gael_cut_hair',
+    gael_cut_left: 'gael_cut_left_hair',
+    gael_cut_right: 'gael_cut_right_hair',
+    wolf_cut: 'wolf_cut_hair',
+    wolf: 'wolf_cut_hair',
+    pomade: 'pompadour_hair',
+    pompadour: 'pompadour_hair',
+  },
+  top_mesh: {
+    shirt: 'button_shirt',
+    button_up: 'button_shirt',
+    button_up_shirt: 'button_shirt',
+    button_shirt: 'button_shirt',
+  },
+  bottom_mesh: {
+    shorts: 'short_pants',
+    pants: 'long_pants',
+    trousers: 'long_pants',
+    wide_long_pants: 'long_pants',
+  },
+  outfit_mesh: {
+    dress: 'short_onepiece',
+    onepiece: 'short_onepiece',
+    one_piece: 'short_onepiece',
+    short_dress: 'short_onepiece',
+    long_dress: 'long_onepiece',
+  },
+  shoe_mesh: {
+    shoes: 'sneakers',
+    sneaker: 'sneakers',
+    closed_shoes: 'sneakers',
+    sandal: 'sandals',
+    open_sandals: 'sandals',
+  },
 }
 
 const MOUTH_TYPE_ALIASES = {
@@ -713,6 +792,72 @@ const normalizeMouthTypeValue = (value) => {
   const text = String(value || '').trim()
   const aliased = MOUTH_TYPE_ALIASES[text] || text
   return normalizeEnumValue(aliased, APPEARANCE_SCHEMA.properties.mouth_type.enum, 'closed_smile')
+}
+
+const deriveHairAssetTags = (raw, assetTags) => {
+  const derived = { ...assetTags }
+  if (raw?.asset_tags?.hair_mesh && !shouldFillAccessoryAssetTag(derived.hair_mesh)) {
+    return derived
+  }
+  const hairMap = {
+    bun: 'bun_hair',
+    bowl_cut: 'bowl_cut_hair',
+    gael_cut: raw?.hair_part_direction === 'right' ? 'gael_cut_right_hair' : 'gael_cut_left_hair',
+    gael_cut_left: 'gael_cut_left_hair',
+    gael_cut_right: 'gael_cut_right_hair',
+    dandy_cut: 'dandy_cut_hair',
+    pomade: 'pompadour_hair',
+    wolf_cut: 'wolf_cut_hair',
+    bob_straight: 'bob_hair_with_bangs',
+    bob_c_curl: 'bob_hair_with_bangs',
+    long_straight: 'long_straight_hair',
+    long_wave: raw?.bangs_type && raw.bangs_type !== 'none' ? 'long_wave_hair_with_bangs' : 'long_wave_hair',
+    ponytail_low: 'low_tied_hair',
+    ponytail_high: 'high_tied_hair',
+    half_up: 'half_ponytail_hair',
+  }
+  const hairStyle = normalizeEnumValue(raw?.hair_style, APPEARANCE_SCHEMA.properties.hair_style.enum, 'long_straight')
+  derived.hair_mesh = hairMap[hairStyle] || derived.hair_mesh
+  return derived
+}
+
+const deriveClothingAssetTags = (raw, assetTags) => {
+  const derived = { ...assetTags }
+  const topType = normalizeEnumValue(raw?.top_type, APPEARANCE_SCHEMA.properties.top_type.enum, 'short_sleeve_tshirt')
+  const bottomType = normalizeEnumValue(raw?.bottom_type, APPEARANCE_SCHEMA.properties.bottom_type.enum, 'shorts')
+  const shoeType = normalizeEnumValue(raw?.shoe_type, APPEARANCE_SCHEMA.properties.shoe_type.enum, 'sneakers')
+  const topMap = {
+    short_sleeve_tshirt: 'short_sleeve_tshirt',
+    long_sleeve_tshirt: 'long_sleeve_tshirt',
+    button_shirt: 'button_shirt',
+    shirt: 'button_shirt',
+  }
+  const bottomMap = {
+    wide_long_pants: 'long_pants',
+    long_pants: 'long_pants',
+    shorts: 'short_pants',
+    long_skirt: 'long_skirt',
+    short_skirt: 'short_skirt',
+  }
+  const outfitMap = {
+    short_onepiece: 'short_onepiece',
+    long_onepiece: 'long_onepiece',
+  }
+
+  if ((!raw?.asset_tags?.top_mesh || shouldFillAccessoryAssetTag(derived.top_mesh)) && topMap[topType]) {
+    derived.top_mesh = topMap[topType]
+  }
+  if ((!raw?.asset_tags?.bottom_mesh || shouldFillAccessoryAssetTag(derived.bottom_mesh)) && bottomMap[bottomType]) {
+    derived.bottom_mesh = bottomMap[bottomType]
+  }
+  if (!raw?.asset_tags?.outfit_mesh || shouldFillAccessoryAssetTag(derived.outfit_mesh) || derived.outfit_mesh === 'none') {
+    derived.outfit_mesh = outfitMap[bottomType] || 'none'
+  }
+  if (!raw?.asset_tags?.shoe_mesh || shouldFillAccessoryAssetTag(derived.shoe_mesh)) {
+    derived.shoe_mesh = shoeType
+  }
+
+  return derived
 }
 
 const shouldFillAccessoryAssetTag = (value) => {
@@ -760,6 +905,8 @@ const resolveSemanticAssetTag = (fieldName, value) => {
     hair_mesh: HAIR_ASSET_TAGS,
     top_mesh: TOP_ASSET_TAGS,
     bottom_mesh: BOTTOM_ASSET_TAGS,
+    outfit_mesh: OUTFIT_ASSET_TAGS,
+    shoe_mesh: SHOE_ASSET_TAGS,
     glasses_mesh: GLASSES_ASSET_TAGS,
     necklace_mesh: NECKLACE_ASSET_TAGS,
     earring_mesh: EARRING_ASSET_TAGS,
@@ -774,17 +921,25 @@ const normalizeAppearanceResult = (raw = {}) => {
     has_necklace: normalizeBooleanValue(raw?.accessories?.has_necklace),
     has_earrings: normalizeBooleanValue(raw?.accessories?.has_earrings),
   }
-  const assetTags = deriveAccessoryAssetTags(accessories, {
-    skin_texture: normalizeAssetTagValue(raw?.asset_tags?.skin_texture, 'skin_texture'),
-    eye_texture: normalizeAssetTagValue(raw?.asset_tags?.eye_texture, 'eye_texture'),
-    mouth_texture: normalizeAssetTagValue(raw?.asset_tags?.mouth_texture, 'mouth_texture'),
-    hair_mesh: normalizeAssetTagValue(raw?.asset_tags?.hair_mesh, 'hair_mesh'),
-    top_mesh: normalizeAssetTagValue(raw?.asset_tags?.top_mesh, 'top_mesh'),
-    bottom_mesh: normalizeAssetTagValue(raw?.asset_tags?.bottom_mesh, 'bottom_mesh'),
-    glasses_mesh: normalizeAssetTagValue(raw?.asset_tags?.glasses_mesh, 'glasses_mesh'),
-    necklace_mesh: normalizeAssetTagValue(raw?.asset_tags?.necklace_mesh, 'necklace_mesh'),
-    earring_mesh: normalizeAssetTagValue(raw?.asset_tags?.earring_mesh, 'earring_mesh'),
-  })
+  const assetTags = deriveAccessoryAssetTags(
+    accessories,
+    deriveClothingAssetTags(
+      raw,
+      deriveHairAssetTags(raw, {
+        skin_texture: normalizeAssetTagValue(raw?.asset_tags?.skin_texture, 'skin_texture'),
+        eye_texture: normalizeAssetTagValue(raw?.asset_tags?.eye_texture, 'eye_texture'),
+        mouth_texture: normalizeAssetTagValue(raw?.asset_tags?.mouth_texture, 'mouth_texture'),
+        hair_mesh: normalizeAssetTagValue(raw?.asset_tags?.hair_mesh, 'hair_mesh'),
+        top_mesh: normalizeAssetTagValue(raw?.asset_tags?.top_mesh, 'top_mesh'),
+        bottom_mesh: normalizeAssetTagValue(raw?.asset_tags?.bottom_mesh, 'bottom_mesh'),
+        outfit_mesh: normalizeAssetTagValue(raw?.asset_tags?.outfit_mesh, 'outfit_mesh'),
+        shoe_mesh: normalizeAssetTagValue(raw?.asset_tags?.shoe_mesh || raw?.shoe_type, 'shoe_mesh'),
+        glasses_mesh: normalizeAssetTagValue(raw?.asset_tags?.glasses_mesh, 'glasses_mesh'),
+        necklace_mesh: normalizeAssetTagValue(raw?.asset_tags?.necklace_mesh, 'necklace_mesh'),
+        earring_mesh: normalizeAssetTagValue(raw?.asset_tags?.earring_mesh, 'earring_mesh'),
+      }),
+    ),
+  )
 
   const rawEyeType = String(raw.eye_type || '').trim()
   const normalizedEyeType = /sleepy|drooping|closed|blink/i.test(rawEyeType)
@@ -827,6 +982,7 @@ const inferAppearanceFromDescription = (description) => {
   else if (has(/\bgael cut\b|\bgaell cut\b/)) hair_style = 'gael_cut'
   else if (has(/\bdandy cut\b/)) hair_style = 'dandy_cut'
   else if (has(/\bpomade\b|slicked back/)) hair_style = 'pomade'
+  else if (has(/\bwolf cut\b|\bwolfcut\b/)) hair_style = 'wolf_cut'
   else if (has(/\bbob\b/)) hair_style = 'bob_straight'
   else if (has(/\blong wavy\b|\blong wave\b|\bwavy hair\b/)) hair_style = 'long_wave'
   else if (has(/\blong hair\b/)) hair_style = 'long_straight'
@@ -891,7 +1047,7 @@ const inferAppearanceFromDescription = (description) => {
   let top_type = 'unknown'
   if (has(/\bhoodie\b/)) top_type = 'hoodie'
   else if (has(/\bzip jacket\b|\bjacket\b/)) top_type = 'casual_zip_jacket'
-  else if (has(/\bshirt\b|button[- ]?up/)) top_type = 'shirt'
+  else if (has(/\bshirt\b|button[- ]?up/)) top_type = 'button_shirt'
   else if (has(/\blong-sleeve\b|\blong sleeve\b/)) top_type = 'long_sleeve_tshirt'
   else if (has(/\bt-shirt\b|\btshirt\b|\btee\b|\bsleeveless top\b|\btop\b/)) top_type = 'short_sleeve_tshirt'
 
@@ -914,10 +1070,12 @@ const inferAppearanceFromDescription = (description) => {
   else if (has(/\bmulticolor(ed)? (shirt|top|tee|t-shirt|tshirt|hoodie|jacket)\b/)) top_color = 'multicolor'
 
   let bottom_type = 'unknown'
-  if (has(/\bshorts\b/)) bottom_type = 'shorts'
+  if (has(/\blong dress\b|\blong one[- ]?piece\b|\bmaxi dress\b/)) bottom_type = 'long_onepiece'
+  else if (has(/\bdress\b|\bone[- ]?piece\b|\bshort dress\b/)) bottom_type = 'short_onepiece'
+  else if (has(/\bshorts\b/)) bottom_type = 'shorts'
   else if (has(/\blong skirt\b|\bmaxi skirt\b/)) bottom_type = 'long_skirt'
   else if (has(/\bshort skirt\b|\bmini skirt\b/)) bottom_type = 'short_skirt'
-  else if (has(/\bpants\b|\btrousers\b|\bjeans\b/)) bottom_type = 'wide_long_pants'
+  else if (has(/\bpants\b|\btrousers\b|\bjeans\b/)) bottom_type = 'long_pants'
 
   let bottom_color = 'unknown'
   if (has(/\bblack (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'black'
@@ -938,7 +1096,8 @@ const inferAppearanceFromDescription = (description) => {
   else if (has(/\bmulticolor(ed)? (pants|trousers|jeans|shorts|skirt)\b/)) bottom_color = 'multicolor'
 
   let shoe_type = 'unknown'
-  if (has(/\bsneakers\b|\btrainers\b|\btennis shoes\b|\brunning shoes\b/)) shoe_type = 'sneakers'
+  if (has(/\bsandals?\b/)) shoe_type = 'sandals'
+  else if (has(/\bsneakers\b|\btrainers\b|\btennis shoes\b|\brunning shoes\b/)) shoe_type = 'sneakers'
 
   const negGlasses = has(/\bno glasses\b|without glasses|no eyewear/)
   const glasses_type = negGlasses ? 'none' : has(/\bround glasses\b/) ? 'round' : has(/\bsquare glasses\b/) ? 'square' : 'unknown'
@@ -1093,7 +1252,7 @@ const requestAppearanceJsonViaGptFallback = async ({ imageDataUrl }) => {
               'For eye_type, never choose closed, blinking, crescent, or sleeping eyes. A blink is a temporary animation state; choose the closest open-eye style instead.',
               'For skin_texture, choose exactly one of soft_peach_skin or light_warm_skin.',
               'For mouth_type, use only bored, closed_smile, big_smile, smirk, w_shape, or toothy_smile.',
-              'For asset_tags, choose exactly one closest available semantic asset tag for skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh. Optional accessory asset_tags should usually be none unless clearly visible.',
+              'For asset_tags, choose exactly one closest available semantic asset tag for skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, bottom_mesh, outfit_mesh, and shoe_mesh. Use outfit_mesh=short_onepiece or long_onepiece for one-piece/dress outfits and none otherwise. Optional accessory asset_tags should usually be none unless clearly visible.',
               `Allowed schema: ${JSON.stringify(APPEARANCE_SCHEMA)}`,
             ].join('\n'),
           },
@@ -1163,7 +1322,7 @@ const requestAppearanceJsonViaLlmServer = async ({ imageDataUrl }) => {
               'For skin_texture, choose exactly one of soft_peach_skin or light_warm_skin.',
             'For mouth_type, use only bored, closed_smile, big_smile, smirk, w_shape, or toothy_smile.',
             'For accessories, keep accessories and asset_tags consistent: visible round/square glasses must set the matching glasses_mesh, a visible necklace must set pearl_necklace, and visible earrings must set simple_earrings unless hoop_earrings are clearly visible. If hidden by hair, cropped, blurry, uncertain, or only suggested by shadows, choose none/false.',
-            'For asset_tags, always choose exactly one closest available semantic asset tag for skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh. Never return unknown for these required asset_tags. Optional accessory asset_tags should usually be none unless clearly visible. Do not use raw production node names like Earring01, Earring02, or eye01 in asset_tags.',
+            'For asset_tags, always choose exactly one closest available semantic asset tag for skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, bottom_mesh, outfit_mesh, and shoe_mesh. Never return unknown for these required asset_tags. Use outfit_mesh=short_onepiece or long_onepiece for one-piece/dress outfits and none otherwise. Optional accessory asset_tags should usually be none unless clearly visible. Do not use raw production node names like Earring01, Earring02, or eye01 in asset_tags.',
             `Allowed schema: ${JSON.stringify(APPEARANCE_SCHEMA)}`,
           ].join('\n'),
         },
@@ -1614,8 +1773,11 @@ const APPEARANCE_VALUE_LABELS = {
     two_block: 'two-block cut',
     bowl_cut: 'bowl cut',
     gael_cut: 'gael cut',
+    gael_cut_left: 'left-side gael cut',
+    gael_cut_right: 'right-side gael cut',
     dandy_cut: 'dandy cut',
     pomade: 'pomade style',
+    wolf_cut: 'wolf cut',
     bob_straight: 'straight bob',
     bob_c_curl: 'C-curl bob',
     long_straight: 'long straight hair',
@@ -1681,6 +1843,7 @@ const APPEARANCE_VALUE_LABELS = {
   top_type: {
     short_sleeve_tshirt: 'short-sleeve tee',
     long_sleeve_tshirt: 'long-sleeve tee',
+    button_shirt: 'button shirt',
     shirt: 'shirt',
     hoodie: 'hoodie',
     casual_zip_jacket: 'casual zip jacket',
@@ -1705,9 +1868,12 @@ const APPEARANCE_VALUE_LABELS = {
   },
   bottom_type: {
     wide_long_pants: 'wide long pants',
+    long_pants: 'long pants',
     shorts: 'shorts',
     long_skirt: 'long skirt',
     short_skirt: 'short skirt',
+    short_onepiece: 'short one-piece dress',
+    long_onepiece: 'long one-piece dress',
   },
   bottom_color: {
     black: 'black bottom',
@@ -1729,6 +1895,7 @@ const APPEARANCE_VALUE_LABELS = {
   },
   shoe_type: {
     sneakers: 'sneakers',
+    sandals: 'sandals',
   },
   glasses_type: {
     none: 'no glasses',
@@ -1851,6 +2018,8 @@ const DEFAULT_APPEARANCE_PAYLOAD = {
     hair_mesh: 'bob_hair_with_bangs',
     top_mesh: 'short_sleeve_tshirt',
     bottom_mesh: 'short_pants',
+    outfit_mesh: 'none',
+    shoe_mesh: 'sneakers',
     glasses_mesh: 'none',
     necklace_mesh: 'none',
     earring_mesh: 'none',
@@ -1873,10 +2042,7 @@ const normalizeAppearancePayload = (value) => {
       ...DEFAULT_APPEARANCE_PAYLOAD.accessories,
       ...accessories,
     },
-    asset_tags: {
-      ...DEFAULT_APPEARANCE_PAYLOAD.asset_tags,
-      ...assetTags,
-    },
+    asset_tags: assetTags,
   })
 }
 
@@ -2153,8 +2319,8 @@ const resolveBottomCandidates = ({ rawAppearance, normalizedAppearance, seed }) 
       rawAppearance?.sex ||
       '',
   ).trim().toLowerCase()
-  const allBottoms = ['wide_long_pants', 'short_pants', 'shorts', 'long_skirt', 'short_skirt', 'default']
-  const pantsBottoms = ['wide_long_pants', 'short_pants', 'shorts', 'pants', 'default']
+  const allBottoms = ['long_pants', 'wide_long_pants', 'short_pants', 'shorts', 'long_skirt', 'short_skirt', 'short_onepiece', 'long_onepiece', 'default']
+  const pantsBottoms = ['long_pants', 'wide_long_pants', 'short_pants', 'shorts', 'pants', 'default']
   const normalizedBottom =
     normalizedAppearance.bottom_type && normalizedAppearance.bottom_type !== 'unknown'
       ? normalizedAppearance.bottom_type
@@ -2170,7 +2336,7 @@ const resolveBottomCandidates = ({ rawAppearance, normalizedAppearance, seed }) 
     return uniqueAssetCandidates([directBottom, picked, normalizedBottom, ...allBottoms])
   }
 
-  return uniqueAssetCandidates([directBottom, normalizedBottom, 'wide_long_pants', 'short_pants', 'short_skirt', 'default'])
+  return uniqueAssetCandidates([directBottom, normalizedBottom, 'long_pants', 'wide_long_pants', 'short_pants', 'short_skirt', 'default'])
 }
 
 const resolveTopCandidates = (appearance) => {
@@ -2178,8 +2344,10 @@ const resolveTopCandidates = (appearance) => {
   const mappedTop = {
     short_Tshirt: 'Short_Sleeve',
     long_Tshirt: 'long_sleeve',
+    shirts: 'shirt',
     short_sleeve_tshirt: 'Short_Sleeve',
     long_sleeve_tshirt: 'long_sleeve',
+    button_shirt: 'shirt',
     shirt: 'shirt',
     hoodie: 'hoodie',
     casual_zip_jacket: 'casual_zip_jacket',
@@ -2282,6 +2450,20 @@ const buildSelectionDiagnostics = ({ normalized, selected, candidates }) => {
       analyzedValue: `${normalized.bottom_type}, color=${normalized.bottom_color}`,
       candidates: candidates.bottoms,
       asset: selected.bottoms,
+    },
+    {
+      role: 'outfit',
+      analyzedValue: normalized?.asset_tags?.outfit_mesh || 'none',
+      candidates: [normalized?.asset_tags?.outfit_mesh || 'none'],
+      asset: null,
+      reason: 'Source-GLB node selection applies one-piece outfits directly when outfit_mesh is not none.',
+    },
+    {
+      role: 'shoes',
+      analyzedValue: normalized?.asset_tags?.shoe_mesh || normalized.shoe_type,
+      candidates: [normalized?.asset_tags?.shoe_mesh || normalized.shoe_type],
+      asset: null,
+      reason: 'Source-GLB node selection applies shoe meshes directly.',
     },
   ]
 
@@ -2591,6 +2773,7 @@ const applyAvatarSourceFallbackNodeNames = (document) => {
 const selectedAvatarNodeNames = (plan) => {
   const tags = plan.appearance.asset_tags || {}
   const nodes = new Set(AVATAR_SOURCE_NODE_GROUPS.base)
+  const hasOutfit = tags.outfit_mesh && tags.outfit_mesh !== 'none' && tags.outfit_mesh !== 'unknown'
   const addFieldNode = (fieldName) => {
     const tag = tags[fieldName]
     if (!tag || tag === 'none' || tag === 'unknown') return
@@ -2598,8 +2781,13 @@ const selectedAvatarNodeNames = (plan) => {
   }
 
   addFieldNode('hair_mesh')
-  addFieldNode('top_mesh')
-  addFieldNode('bottom_mesh')
+  if (hasOutfit) {
+    addFieldNode('outfit_mesh')
+  } else {
+    addFieldNode('top_mesh')
+    addFieldNode('bottom_mesh')
+  }
+  addFieldNode('shoe_mesh')
   addFieldNode('glasses_mesh')
   addFieldNode('necklace_mesh')
   addFieldNode('earring_mesh')
@@ -2677,13 +2865,17 @@ const tintAvatarSourceNodes = (document, plan) => {
     { role: 'hair', fieldName: 'hair_mesh', color: plan.colors.hair },
     { role: 'top', fieldName: 'top_mesh', color: plan.colors.top },
     { role: 'bottoms', fieldName: 'bottom_mesh', color: plan.colors.bottoms },
-    { role: 'shoes', nodes: ['R_shoes', 'L_shoes'], color: plan.colors.shoes },
+    { role: 'outfit', fieldName: 'outfit_mesh', color: plan.colors.top },
+    { role: 'shoes', fieldName: 'shoe_mesh', color: plan.colors.shoes },
     { role: 'glasses', fieldName: 'glasses_mesh', color: plan.colors.glasses },
     { role: 'necklace', fieldName: 'necklace_mesh', color: plan.colors.necklace },
     { role: 'earrings', fieldName: 'earring_mesh', color: plan.colors.earrings },
   ]
 
   for (const target of colorTargets) {
+    if (tags.outfit_mesh && tags.outfit_mesh !== 'none' && ['top_mesh', 'bottom_mesh'].includes(target.fieldName)) {
+      continue
+    }
     const tag = target.fieldName ? tags[target.fieldName] : null
     const nodes = target.nodes || AVATAR_SOURCE_NODE_GROUPS[target.fieldName]?.[tag]
     if (!nodes || tag === 'none' || tag === 'unknown') continue
