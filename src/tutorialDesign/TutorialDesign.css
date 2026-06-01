@@ -919,6 +919,39 @@ body,
   animation: keywordSlotPop 0.42s cubic-bezier(0.2, 1.45, 0.34, 1) both;
 }
 
+.persona-result-layout {
+  position: relative;
+  z-index: 3;
+  width: min(86vw, 1120px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(28px, 4vh, 54px);
+}
+
+.persona-result-block {
+  width: 100%;
+  min-height: clamp(300px, 46vh, 560px);
+  border-radius: clamp(18px, 2vw, 28px);
+  background: rgba(255, 253, 224, 0.94);
+  box-shadow: 0 16px 36px rgba(44, 57, 39, 0.18);
+  padding: clamp(28px, 3vw, 58px);
+  display: flex;
+  align-items: center;
+}
+
+.persona-result-text {
+  margin: 0;
+  color: #2f332f;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-size: clamp(20px, 2.1vw, 34px);
+  font-weight: 700;
+  line-height: 1.62;
+  word-break: keep-all;
+  white-space: pre-wrap;
+}
+
 @keyframes keywordSlotPop {
   from {
     opacity: 0;

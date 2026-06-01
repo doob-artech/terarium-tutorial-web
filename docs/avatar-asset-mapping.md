@@ -20,8 +20,6 @@ Machine-readable map: `docs/vlm-enum-to-glb-asset-map.json`.
 | --- | --- | --- |
 | `soft_peach_skin` | `model/skin/soft_peach_skin.png` | Default peach skin when no visible cheek blush style is present. |
 | `light_warm_skin` | `model/skin/light_warm_skin.png` | Light warm skin when no visible cheek blush style is present. |
-| `skin01` | `model/skin/skin01.png` | Use when cheeks show short diagonal blush lines. |
-| `skin02` | `model/skin/skin02.png` | Use when cheeks show soft round or blurred blush patches. |
 
 ## Hair
 

@@ -132,6 +132,7 @@ const TutorialDesign = ({
   avatarReveal = false,
   avatarInitialYaw = 0,
   keywords = [],
+  personaBlock = '',
   enterUrl = '',
   backgroundSlot = null,
   hideUi = false,
@@ -438,7 +439,7 @@ const TutorialDesign = ({
               </div>
             )}
 
-            {currentId !== 12 && (step.type === 'AUTO_STACK' ||
+            {currentId !== 12 && currentId !== 14 && (step.type === 'AUTO_STACK' ||
               step.type === 'RESULT_DISPLAY') && (
               <div key={`floating-${currentId}`} className="floating-layer">
                 {step.stackList?.map((item, i) => (
@@ -584,6 +585,26 @@ const TutorialDesign = ({
                       </div>
                     </section>
                   )}
+                </div>
+              ) : currentId === 14 ? (
+                <div className="persona-result-layout">
+                  <section className="persona-result-block">
+                    <p className="persona-result-text">
+                      {renderTypewriter(personaBlock || step.text, {
+                        speed: 18,
+                        onComplete: handleTextComplete,
+                      })}
+                    </p>
+                  </section>
+
+                  <div className="action-row show">
+                    <button
+                      className="primary-next-btn"
+                      onClick={() => handleProgressiveNext(step.nextId)}
+                    >
+                      {step.buttonText}
+                    </button>
+                  </div>
                 </div>
               ) : currentId === 15 ? (
                 <div className="qr-layout">

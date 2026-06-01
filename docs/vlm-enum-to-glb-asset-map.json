@@ -14,16 +14,6 @@
       "light_warm_skin": {
         "texture": "model/skin/light_warm_skin.png",
         "color": "#f4d0b4"
-      },
-      "skin01": {
-        "texture": "model/skin/skin01.png",
-        "color": "#f8ded0",
-        "selection_rule": "Use only when the face has short diagonal cheek blush lines."
-      },
-      "skin02": {
-        "texture": "model/skin/skin02.png",
-        "color": "#f8ded0",
-        "selection_rule": "Use only when the face has soft round or blurred cheek blush patches."
       }
     },
     "eye_texture": {
@@ -204,13 +194,11 @@
     }
   },
   "semantic_to_asset_guidance": {
-    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh must always choose the nearest available semantic tag. Do not output unknown for these. skin_texture must be exactly one of soft_peach_skin, light_warm_skin, skin01, or skin02. Unity derives unity_body_variant from top_mesh and bottom_mesh.",
+    "required_asset_tags": "skin_texture, eye_texture, mouth_texture, hair_mesh, top_mesh, and bottom_mesh must always choose the nearest available semantic tag. Do not output unknown for these. skin_texture must be exactly one of soft_peach_skin or light_warm_skin. Unity derives unity_body_variant from top_mesh and bottom_mesh.",
     "optional_asset_tags": "glasses_mesh, necklace_mesh, and earring_mesh may use none when not visible.",
     "skin_texture": {
       "soft_peach_skin": "soft_peach_skin",
-      "light_warm_skin": "light_warm_skin",
-      "skin01": "skin01 when cheeks show short diagonal blush lines",
-      "skin02": "skin02 when cheeks show soft round or blurred blush patches"
+      "light_warm_skin": "light_warm_skin"
     },
     "eye_type": {
       "round_open_eyes": "round_open_eyes",

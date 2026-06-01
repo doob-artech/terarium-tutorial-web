@@ -386,6 +386,29 @@
   pointer-events: none;
 }
 
+.avatar-profile-capture-page {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+}
+
+.avatar-profile-capture-viewer {
+  width: 100vw;
+  height: 100vh;
+}
+
+.avatar-profile-capture-status {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: transparent;
+  pointer-events: none;
+}
+
 .tutorial-camera-background-video {
   position: absolute;
   inset: 0;
@@ -484,8 +507,8 @@
 .persona-turn-block {
   position: relative;
   z-index: 2;
-  width: 90%;
-  max-width: 1160px;
+  width: min(94%, 1320px);
+  max-width: 1320px;
   margin: 0 auto;
   animation: persona-turn-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -535,8 +558,8 @@
 
 .persona-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(14px, 1.5vh, 22px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.1vh, 14px);
   width: 100%;
   margin: 0 auto;
 }
@@ -634,35 +657,53 @@ transform: scale(1.01) translateY(-2px) !important;
 
 .persona-option {
   width: 100%;
-  min-height: clamp(96px, 10vh, 138px); 
+  min-height: clamp(92px, 11vh, 132px); 
   height: auto; 
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   
-  border: 0;
-  border-radius: clamp(16px, 1.5vw, 28px);
-  background: #ffffff;
+  border-radius: clamp(10px, 0.9vw, 14px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 16, 12, 0.22) 42%, rgba(16, 13, 10, 0.54) 100%),
+    var(--persona-option-bg, linear-gradient(135deg, #ffef66 0%, #ffd64d 100%));
+  background-position: center;
+  background-size: cover;
   
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(12px, 1.8vh, 26px) clamp(30px, 4.1vw, 60px);
+  padding: clamp(12px, 1.5vh, 20px) clamp(16px, 1.7vw, 28px);
   
   cursor: pointer;
-  word-break: break-all; 
+  word-break: keep-all; 
   overflow-wrap: break-word; 
-  border: 8px solid transparent;
+  border: 2px solid rgba(255, 255, 255, 0.35);
 
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
-    background-color 0.2s ease;
+    border-color 0.2s ease,
+    filter 0.2s ease;
   animation: persona-option-enter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.persona-option::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.24), transparent 34%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.2));
+  pointer-events: none;
 }
 
 .persona-option:hover {
 transform: scale(1.01) translateY(-2px) !important;
-  border: 8px solid #FFEE69;
+  border-color: #ffd93f;
   box-sizing: border-box;
-  box-shadow: 0 12px 20px rgba(62, 56, 19, 0.2);
+  box-shadow: 0 12px 22px rgba(62, 56, 19, 0.3);
   /* background: #f6efbb; */
 }
 
@@ -674,24 +715,68 @@ transform: scale(1.01) translateY(-2px) !important;
 }
 
 .persona-option-text {
+  position: relative;
+  z-index: 1;
   font-family: 'Pretendard', sans-serif;
-  font-size: clamp(20px, 2.9vh, 30px); 
+  font-size: clamp(16px, 2vh, 22px); 
   
-  color: #464646;
-  font-weight: 500;
-  line-height: 1.4;
+  color: #fff7d6;
+  font-weight: 800;
+  line-height: 1.28;
   text-align: center;
   white-space: normal;
   display: block;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.72);
   width: 100%;
 }
 
+.persona-option-rank {
+  position: absolute;
+  left: clamp(-6px, -0.4vw, -3px);
+  top: clamp(-8px, -0.5vw, -4px);
+  width: clamp(22px, 1.7vw, 30px);
+  height: clamp(22px, 1.7vw, 30px);
+  border-radius: 999px;
+  background: #ff4a25;
+  color: #ffffff;
+  border: 2px solid #ffef66;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(12px, 1.1vw, 16px);
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 4px 10px rgba(255, 74, 37, 0.26);
+}
+
 .persona-option:nth-of-type(odd) {
-  background: #E6F4F1;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 16, 12, 0.22) 42%, rgba(16, 13, 10, 0.54) 100%),
+    var(--persona-option-bg, linear-gradient(135deg, #ffef66 0%, #ffd64d 100%));
 }
 
 .persona-option:nth-of-type(even) {
-  background: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(18, 16, 12, 0.22) 42%, rgba(16, 13, 10, 0.54) 100%),
+    var(--persona-option-bg, linear-gradient(135deg, #ffef66 0%, #ffd64d 100%));
+}
+
+.persona-option.is-custom {
+  grid-column: 1 / -1;
+  min-height: clamp(54px, 6vh, 72px);
+  background: #ffef66;
+  border-color: transparent;
+  box-shadow: 0 8px 16px rgba(66, 59, 18, 0.14);
+}
+
+.persona-option.is-custom::before {
+  display: none;
+}
+
+.persona-option.is-custom .persona-option-text {
+  color: #2f2b13;
+  text-shadow: none;
 }
 
 .persona-custom-editor {
@@ -776,27 +861,26 @@ transform: scale(1.01) translateY(-2px) !important;
 }
 
 .persona-option.is-selected {
-  background: #ffffff;
-  border: 8px solid #ffe942;
-  box-shadow: 0 10px 20px rgba(255, 233, 66, 0.3);
+  border-color: #ff4a25;
+  box-shadow: 0 0 0 3px #ff4a25, 0 12px 24px rgba(255, 74, 37, 0.34);
   transform: translateY(-2px);
 }
 
 .persona-option.is-selected .persona-option-text {
-  color: #111;
-  font-weight: 700;
+  color: #fff8d8;
+  font-weight: 800;
 }
 
 .persona-option.is-dimmed,
 .persona-custom-trigger.is-dimmed {
-  background: rgba(255, 255, 255, 0.4);
   box-shadow: none;
   transform: none;
+  filter: saturate(0.72) brightness(0.78);
 }
 
 .persona-option.is-dimmed .persona-option-text,
 .persona-custom-trigger.is-dimmed {
-  color: rgba(61, 61, 61, 0.4);
+  color: rgba(255, 247, 214, 0.62);
 }
 
 /* Bottom Nav */
@@ -1613,6 +1697,22 @@ transform: scale(1.01) translateY(-2px) !important;
   line-height: 1.5;
   white-space: pre-line;
   word-break: keep-all;
+}
+
+@media (max-width: 900px) {
+  .persona-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .persona-option {
+    min-height: 84px;
+    padding: 10px 8px;
+  }
+
+  .persona-option-text {
+    font-size: 14px;
+  }
 }
 
 @keyframes pageSoftIn {

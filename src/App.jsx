@@ -5,7 +5,7 @@ import './App.css'
 
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
-const PERSONA_TOTAL_TURNS = 8
+const PERSONA_TOTAL_TURNS = 5
 
 const MOCK_APPEARANCE_RESULT = {
   hair_style: 'short_cut',
@@ -25,6 +25,17 @@ const MOCK_APPEARANCE_RESULT = {
 }
 
 function App() {
+  const urlParams = new URLSearchParams(window.location.search)
+  const isProfileCaptureRoute = window.location.pathname === '/avatar-profile-capture'
+    || urlParams.get('mode') === 'avatar-profile-capture'
+  if (isProfileCaptureRoute) {
+    return <AvatarProfileCapturePage />
+  }
+
+  return <TutorialApp />
+}
+
+function TutorialApp() {
   const [stage, setStage] = useState('idle')
   const [countdown, setCountdown] = useState(null)
   const [analysisResult, setAnalysisResult] = useState(null)
@@ -40,8 +51,8 @@ function App() {
   const [enterUrl, setEnterUrl] = useState('')
   const [avatarModelUrl, setAvatarModelUrl] = useState('')
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
-  const [selectedOption, setSelectedOption] = useState(null)
-  const [selectedAnswerMode, setSelectedAnswerMode] = useState('suggested')
+  const [selectedOptionIds, setSelectedOptionIds] = useState([])
+  const [starredOptionId, setStarredOptionId] = useState('')
   const [answeredHistory, setAnsweredHistory] = useState([])
   const [historyViewIndex, setHistoryViewIndex] = useState(null)
   const [captureLocked, setCaptureLocked] = useState(false)
@@ -108,8 +119,8 @@ function App() {
     setIsAvatarHandoffCover(false)
     setAnsweredHistory([])
     setHistoryViewIndex(null)
-    setSelectedAnswerMode('suggested')
-    setSelectedOption(null)
+    setSelectedOptionIds([])
+    setStarredOptionId('')
     setIsCaptureProcessing(false)
   }
 
@@ -320,8 +331,8 @@ function App() {
       setPersonaResult(null)
       setPersonaInput('')
       setPersonaError('')
-      setSelectedOption(null)
-      setSelectedAnswerMode('suggested')
+      setSelectedOptionIds([])
+      setStarredOptionId('')
       setAnsweredHistory([])
       setHistoryViewIndex(null)
       return payload
@@ -470,11 +481,11 @@ function App() {
             }
           }
 
-          const avatarAppearance = appearanceResult ?? MOCK_APPEARANCE_RESULT
           if (!appearanceResult) {
-            setAnalysisResult(avatarAppearance)
+            throw new Error('외형 분석에 실패했습니다. 다시 촬영해 주세요.')
           }
 
+          const avatarAppearance = appearanceResult
           const personaPayload = await startPersonaInterview(avatarAppearance)
           let avatarPayload = null
           if (personaPayload?.agentId) {
@@ -508,6 +519,12 @@ function App() {
             setStage('avatarIntro')
           }
           return personaPayload
+        } catch (error) {
+          setAnalysisResult(null)
+          setPersonaError(error instanceof Error ? error.message : '외형 분석 또는 페르소나 시작에 실패했습니다.')
+          setCaptureLocked(false)
+          setStage('cameraDesignCapture')
+          return null
         } finally {
           setIsCaptureProcessing(false)
         }
@@ -531,13 +548,14 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, autoCaptureRequested, cameraReady, captureLocked, isCaptureProcessing, countdown])
 
-  const submitPersonaAnswer = async (answerText, answerMode = 'suggested') => {
+  const submitPersonaAnswer = async (answerPayload, answerText) => {
     if (!personaQuestion || !personaAgentId || personaResult || personaLoading) {
       return
     }
 
-    const trimmedInput = typeof answerText === 'string' ? answerText.trim() : ''
-    if (!trimmedInput) {
+    const safePayload = answerPayload && typeof answerPayload === 'object' ? answerPayload : null
+    const trimmedAnswerText = typeof answerText === 'string' ? answerText.trim() : ''
+    if (!safePayload || selectedOptionIds.length === 0 || !trimmedAnswerText) {
       return
     }
 
@@ -553,8 +571,7 @@ function App() {
         },
         body: JSON.stringify({
           agentId: personaAgentId,
-          answer: trimmedInput,
-          answerMode,
+          answer: safePayload,
           turn: personaQuestion.turn,
         }),
       })
@@ -573,8 +590,8 @@ function App() {
             ...prev,
             {
               question: submittedQuestion,
-              answerText: trimmedInput,
-              answerMode,
+              answerText: trimmedAnswerText,
+              answerMode: 'taste',
             },
           ])
         }
@@ -592,17 +609,17 @@ function App() {
       if (submittedQuestion) {
         setAnsweredHistory((prev) => [
           ...prev,
-          {
-            question: submittedQuestion,
-            answerText: trimmedInput,
-            answerMode,
-          },
-        ])
-      }
+            {
+              question: submittedQuestion,
+              answerText: trimmedAnswerText,
+              answerMode: 'taste',
+            },
+          ])
+        }
 
       setPersonaQuestion(payload.question)
-      setSelectedOption(null)
-      setSelectedAnswerMode('suggested')
+      setSelectedOptionIds([])
+      setStarredOptionId('')
       setIsPersonaCustomInputOpen(false)
       setIsQuestionTransitionLoading(false)
     } catch (error) {
@@ -618,24 +635,34 @@ function App() {
       return
     }
 
-    setIsPersonaCustomInputOpen(false)
-    setSelectedAnswerMode('suggested')
-    if (selectedOption === option) {
-      setSelectedOption(null)
-    } else {
-      setSelectedOption(option)
-    }
-  }
+    const optionId = option?.id
+    if (!optionId) return
 
-  const handlePersonaOptionDoubleClick = (option) => {
-    if (historyViewIndex !== null || personaLoading || isQuestionTransitionLoading || personaResult) {
-      return
-    }
-    setIsPersonaCustomInputOpen(false)
-    setSelectedAnswerMode('suggested')
-    setSelectedOption(option)
-    setIsQuestionTransitionLoading(true)
-    void submitPersonaAnswer(option, 'suggested')
+    setSelectedOptionIds((prev) => {
+      const isSelected = prev.includes(optionId)
+      if (isSelected) {
+        const next = prev.filter((id) => id !== optionId)
+        if (starredOptionId === optionId) {
+          setStarredOptionId(next[0] || '')
+        }
+        if (optionId === 'other_custom') {
+          setIsPersonaCustomInputOpen(false)
+          setPersonaInput('')
+        }
+        return next
+      }
+
+      if (prev.length >= (displayQuestion?.maxSelections || displayQuestion?.max_select || 3)) {
+        return prev
+      }
+
+      const next = [...prev, optionId]
+      setStarredOptionId(next[0] || '')
+      if (option?.allowsCustom) {
+        setIsPersonaCustomInputOpen(true)
+      }
+      return next
+    })
   }
 
   const handleNextClick = () => {
@@ -648,21 +675,22 @@ function App() {
       return
     }
 
-    if (isPersonaCustomInputOpen && personaInput.trim().length >= 3) {
+    if (canSubmitSelection) {
       setIsQuestionTransitionLoading(true)
-      void submitPersonaAnswer(personaInput.trim(), 'custom')
-      return
-    }
-
-    if (selectedOption) {
-      setIsQuestionTransitionLoading(true)
-      void submitPersonaAnswer(selectedOption, selectedAnswerMode)
+      void submitPersonaAnswer(
+        {
+          selectedOptionIds,
+          starredOptionId: selectedOptionIds[0] || '',
+          customText: selectedOptionIds.includes('other_custom') ? personaInput.trim() : '',
+        },
+        selectedAnswerText,
+      )
     }
   }
 
   const resetCurrentSelection = () => {
-    setSelectedOption(null)
-    setSelectedAnswerMode('suggested')
+    setSelectedOptionIds([])
+    setStarredOptionId('')
     setIsPersonaCustomInputOpen(false)
     setPersonaInput('')
   }
@@ -691,7 +719,7 @@ function App() {
       return
     }
 
-    if (selectedOption || isPersonaCustomInputOpen || personaInput.trim()) {
+    if (selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim()) {
       resetCurrentSelection()
     }
   }
@@ -700,16 +728,22 @@ function App() {
   const viewingHistoryEntry = historyViewIndex !== null ? answeredHistory[historyViewIndex] ?? null : null
   const displayQuestion = viewingHistoryEntry?.question ?? currentQuestion
   const personaQuestionText = displayQuestion?.question ?? ''
+  const personaTotalTurns = Number(displayQuestion?.total_turns || displayQuestion?.totalTurns || PERSONA_TOTAL_TURNS) || PERSONA_TOTAL_TURNS
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
   const isViewingHistory = historyViewIndex !== null
-  const canSubmitCustomInput = isPersonaCustomInputOpen && personaInput.trim().length >= 3
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
-  const canSubmitSelection = Boolean(selectedOption)
+  const optionLabelMap = new Map(displayOptions.map((option) => [option.id, option]))
+  const selectedOptionLabels = selectedOptionIds
+    .map((optionId) => optionLabelMap.get(optionId))
+    .filter(Boolean)
+    .map((option) => (option.id === 'other_custom' && personaInput.trim() ? `직접입력: ${personaInput.trim()}` : option.label))
+  const selectedAnswerText = selectedOptionLabels.join(' / ')
+  const hasSelectedCustom = selectedOptionIds.includes('other_custom')
+  const canSubmitSelection = selectedOptionIds.length > 0
+    && (!hasSelectedCustom || personaInput.trim().length >= 2)
   const personaKeywords = [
-    personaResult?.personality?.first_impression_style,
-    personaResult?.personality?.trust_building_style,
-    personaResult?.personality?.decision_bias,
-    personaResult?.personality?.stress_response,
+    ...(Array.isArray(personaResult?.survey_trace?.starred_tastes) ? personaResult.survey_trace.starred_tastes : []),
+    ...(Array.isArray(personaResult?.survey_trace?.dominant_tokens) ? personaResult.survey_trace.dominant_tokens : []),
   ]
     .map((value) => String(value || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/)[0])
     .filter(Boolean)
@@ -894,7 +928,7 @@ function App() {
         <header className="persona-header">
           <div className="persona-question-meta">
             <span className="persona-meta-label">Question</span>
-            <span className="persona-meta-count">{`${displayQuestion ? displayQuestion.turn : 1}/${PERSONA_TOTAL_TURNS}`}</span>
+            <span className="persona-meta-count">{`${displayQuestion ? displayQuestion.turn : 1}/${personaTotalTurns}`}</span>
           </div>
           <p className="persona-question">
             {personaResult
@@ -921,14 +955,13 @@ function App() {
                 </article>
               ) : isQuestionTransitionLoading ? (
                 <section className="persona-options" aria-label="분석 중">
-                  {Array.from({ length: 6 }).map((_, index) => (
+                  {Array.from({ length: 10 }).map((_, index) => (
                     <div
                       key={`persona-option-skeleton-${index}`}
                       className="persona-option-skeleton"
                       style={{ animationDelay: `${index * 0.08}s` }}
                     />
                   ))}
-                  <div className="persona-custom-skeleton" />
                 </section>
               ) : isViewingHistory ? (
                 <section className="persona-options" aria-label="이전 질문 답변 보기">
@@ -943,20 +976,32 @@ function App() {
                 <section className="persona-options" aria-label="선택지">
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
 
-                  {!isPersonaCustomInputOpen &&
-                    displayOptions.map((option, index) => (
-                      <button
-                        key={`persona-option-${displayQuestion.turn}-${index}`}
-                        type="button"
-                        className={`persona-option ${selectedOption === option ? 'is-selected' : selectedOption ? 'is-dimmed' : ''}`}
-                        style={{ animationDelay: `${0.1 + index * 0.07}s` }}
-                        onClick={() => handlePersonaOptionClick(option)}
-                        onDoubleClick={() => handlePersonaOptionDoubleClick(option)}
-                        disabled={personaLoading}
-                      >
-                        <span className="persona-option-text">{option}</span>
-                      </button>
-                    ))}
+                  {displayOptions.map((option, index) => {
+                      const isSelected = selectedOptionIds.includes(option.id)
+                      const selectionRank = selectedOptionIds.indexOf(option.id) + 1
+                      const isDimmed = selectedOptionIds.length > 0 && !isSelected
+                      const isCustom = option.allowsCustom || option.id === 'other_custom'
+                      return (
+                        <button
+                          key={`persona-option-${displayQuestion.turn}-${option.id || index}`}
+                          type="button"
+                          className={`persona-option ${isSelected ? 'is-selected' : ''} ${isDimmed ? 'is-dimmed' : ''} ${isCustom ? 'is-custom' : ''}`}
+                          style={{
+                            animationDelay: `${0.1 + index * 0.035}s`,
+                            '--persona-option-bg': option.visual?.background || undefined,
+                          }}
+                          onClick={() => handlePersonaOptionClick(option)}
+                          disabled={personaLoading}
+                        >
+                          <span className="persona-option-text">{option.label}</span>
+                          {isSelected && (
+                            <span className="persona-option-rank" aria-label={`${selectionRank}순위`}>
+                              {selectionRank}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
 
                   {isPersonaCustomInputOpen ? (
                     <div className="persona-custom-editor" style={{ animationDelay: '0.1s' }}>
@@ -965,26 +1010,12 @@ function App() {
                           className="persona-custom-editor-textarea"
                           value={personaInput}
                           onChange={(e) => setPersonaInput(e.target.value)}
-                          placeholder="직접 입력하세요. (3글자 이상)"
+                          placeholder="직접 입력하세요. (2글자 이상)"
                           disabled={personaLoading}
                         />
                       </div>
                     </div>
-                  ) : (
-                    <button
-                      className={`persona-custom-trigger ${selectedOption ? 'is-dimmed' : ''}`}
-                      type="button"
-                      style={{ animationDelay: '0.38s' }}
-                      onClick={() => {
-                        setIsPersonaCustomInputOpen(true)
-                        setSelectedOption(null)
-                        setSelectedAnswerMode('suggested')
-                      }}
-                      disabled={personaLoading}
-                    >
-                      직접 입력하기
-                    </button>
-                  )}
+                  ) : null}
                 </section>
               )}
             </div>
@@ -992,7 +1023,7 @@ function App() {
 
           {!personaResult && displayQuestion && (
             <nav className="persona-bottom-nav">
-              {isViewingHistory || answeredHistory.length > 0 || selectedOption || isPersonaCustomInputOpen || personaInput.trim() ? (
+              {isViewingHistory || answeredHistory.length > 0 || selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim() ? (
                 <button
                   className="nav-btn prev-btn"
                   type="button"
@@ -1004,12 +1035,12 @@ function App() {
               ) : (
                 <div />
               )}
-              {(canSubmitSelection || canSubmitCustomInput || isQuestionTransitionLoading || isViewingHistory) && (
+              {(canSubmitSelection || isQuestionTransitionLoading || isViewingHistory) && (
                 <button
                   className="nav-btn next-btn is-active"
                   type="button"
                   onClick={handleNextClick}
-                  disabled={personaLoading || isQuestionTransitionLoading || (!canSubmitSelection && !canSubmitCustomInput && !isViewingHistory)}
+                  disabled={personaLoading || isQuestionTransitionLoading || (!canSubmitSelection && !isViewingHistory)}
                 >
                   {isQuestionTransitionLoading ? '분석 중...' : '다음으로'}
                 </button>
@@ -1019,6 +1050,68 @@ function App() {
 
         </section>
     </div>
+  )
+}
+
+function AvatarProfileCapturePage() {
+  const [modelUrl, setModelUrl] = useState('')
+  const [status, setStatus] = useState('loading')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const agentId = String(params.get('agentId') || '').trim()
+    const explicitModelUrl = String(params.get('modelUrl') || '').trim()
+    if (explicitModelUrl) {
+      setModelUrl(explicitModelUrl)
+      return
+    }
+    if (!agentId) {
+      setError('agentId is required')
+      setStatus('error')
+      return
+    }
+
+    let cancelled = false
+    fetch(`/api/avatar/recipe/${encodeURIComponent(agentId)}`)
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) {
+          throw new Error(payload?.error || 'avatar recipe not found')
+        }
+        return payload
+      })
+      .then((payload) => {
+        if (!cancelled) setModelUrl(payload?.recipe?.modelUrl || '')
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'failed to load avatar recipe')
+          setStatus('error')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <main className="avatar-profile-capture-page" data-status={status} data-error={error}>
+      {modelUrl ? (
+        <AvatarThreeViewer
+          className="avatar-profile-capture-viewer"
+          src={modelUrl}
+          alt="avatar profile capture"
+          variant="profileCapture"
+          distanceMultiplier={1}
+          onReady={() => {
+            setStatus('ready')
+            window.__TERARIUM_AVATAR_PROFILE_CAPTURE_READY__ = true
+          }}
+        />
+      ) : null}
+      {status !== 'ready' && <span className="avatar-profile-capture-status">{error || status}</span>}
+    </main>
   )
 }
 

@@ -69,7 +69,8 @@ const makeSoftToonMaterial = (sourceMaterial, { role = 'body', variant = 'avatar
 };
 
 const shouldRevealAvatarVariant = (variant) => variant === 'avatarReveal';
-const isStaticAvatarVariant = (variant) => variant === 'staticFront';
+const isProfileCaptureVariant = (variant) => variant === 'profileCapture';
+const isStaticAvatarVariant = (variant) => variant === 'staticFront' || isProfileCaptureVariant(variant);
 const isDragDisabledVariant = (variant) => variant === 'loadingBase' || isStaticAvatarVariant(variant);
 
 const smoothGeometryNormals = (geometry, role = 'body') => {
@@ -212,11 +213,22 @@ const createSoftShadowPlane = (object) => {
   return shadow;
 };
 
-const fitCameraToObject = (camera, object, controlsTarget, distanceMultiplier = 1.82, fitFullBounds = false) => {
+const fitCameraToObject = (camera, object, controlsTarget, distanceMultiplier = 1.82, fitFullBounds = false, profileCapture = false) => {
   const box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
   const maxSize = Math.max(size.x, size.y, size.z) || 1;
+  if (profileCapture) {
+    const targetY = box.min.y + size.y * 0.72;
+    const distance = Math.max(size.y * 0.72, size.z * 1.9, 1.08) * distanceMultiplier;
+    controlsTarget.set(center.x, targetY, center.z);
+    camera.position.set(center.x, targetY + size.y * 0.015, center.z + distance);
+    camera.lookAt(center.x, targetY, center.z);
+    camera.near = Math.max(distance / 100, 0.01);
+    camera.far = distance * 100;
+    camera.updateProjectionMatrix();
+    return;
+  }
   let distance = maxSize * distanceMultiplier;
   if (fitFullBounds) {
     const verticalFov = THREE.MathUtils.degToRad(camera.fov);
@@ -464,11 +476,11 @@ const AvatarThreeViewer = ({
           modelRoot.add(outline);
         }
         modelRoot.add(model);
-        if (variant !== 'staticFront') {
+        if (variant !== 'staticFront' && !isProfileCaptureVariant(variant)) {
           modelRoot.add(createSoftShadowPlane(model));
         }
         scene.add(modelRoot);
-        fitCameraToObject(camera, modelRoot, target, distanceMultiplier, variant === 'staticFront');
+        fitCameraToObject(camera, modelRoot, target, distanceMultiplier, variant === 'staticFront', isProfileCaptureVariant(variant));
         renderer.domElement.style.opacity = '1';
         setLoadState('ready');
         onReadyRef.current?.({
