@@ -47,7 +47,7 @@
 .brand-title {
   margin: clamp(118px, 11.8vh, 156px) 0 0;
   color: var(--white);
-  font-family: 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(130px, 15vw, 246px);
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -62,7 +62,7 @@
   border-radius: 999px;
   background: var(--white);
   color: var(--panel-color);
-  font-family: 'Cafe24Anemone', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(86px, 6.3vw, 108px);
   font-weight: 800;
   line-height: 1;
@@ -82,7 +82,7 @@
 .description {
   margin: clamp(50px, 5.6vh, 74px) 0 0;
   color: var(--text-dark);
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(24px, 1.5cqw + 1cqh, 42px);
   font-weight: 500;
   line-height: 1.2;
@@ -133,7 +133,7 @@
   place-items: center;
   background: #1b1b1b;
   color: #ffffff;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(20px, 1.6vw, 28px);
   font-weight: 500;
   text-align: center;
@@ -206,7 +206,7 @@
   justify-content: center;
   margin: 0;
   color: #464646;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(18px, 1.45vw, 30px);
   font-weight: 600;
   line-height: 1;
@@ -437,7 +437,7 @@
   bottom: clamp(10px, 1vh, 20px);
   margin: 0;
   color: rgba(255, 255, 255, 0.4);
-  font-family: 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(60px, 16vw, 240px);
   font-weight: 900;
   line-height: 0.8;
@@ -521,7 +521,7 @@
   font-size: clamp(25px, 3.3vh, 40px); 
   
   color: #464646;
-  font-family: 'Pretendard', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-weight: 700;
   line-height: 1.5;
   
@@ -590,7 +590,7 @@
 .persona-status-text {
   margin: 0;
   color: #454545;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(18px, 1.3vw, 24px);
   font-weight: 500;
   line-height: 1.4;
@@ -604,7 +604,7 @@
   color: #ffffff;
   min-height: 48px;
   padding: 0 28px;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(22px, 1.5vw, 30px);
   font-weight: 700;
   color: #333;
@@ -613,7 +613,7 @@
 .persona-inline-error {
   margin: 0;
   color: #9a2f2f;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(15px, 1vw, 19px);
   font-weight: 500;
   line-height: 1.3;
@@ -632,7 +632,7 @@
   justify-content: center;
   padding: clamp(12px, 1.2vh, 18px) clamp(28px, 2.1vw, 38px);
   color: #3d3d3d;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(13px, 1.8vw, 24px);
   font-weight: 500;
   text-align: center;
@@ -718,7 +718,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .persona-option-text {
   position: relative;
   z-index: 1;
-  font-family: 'Pretendard', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(16px, 2vh, 22px); 
   
   color: #fff7d6;
@@ -808,7 +808,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .persona-answer-review-label {
   margin: 0;
   color: #454545;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(18px, 1.8vw, 40px);
   font-weight: 700;
   line-height: 1.2;
@@ -821,7 +821,7 @@ transform: scale(1.01) translateY(-2px) !important;
   background: rgba(255, 255, 255, 0.84);
   padding: clamp(24px, 2vw, 34px);
   color: #444;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(20px, 2vw, 52px);
   font-weight: 600;
   line-height: 1.35;
@@ -837,7 +837,7 @@ transform: scale(1.01) translateY(-2px) !important;
   color: #161616;
   min-height: 52px;
   padding: 0 34px;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(24px, 1.8vw, 34px);
   font-weight: 700;
   cursor: pointer;
@@ -912,7 +912,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .nav-btn {
   background: transparent;
   border: none;
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(16px, 1.8vw, 22px);
   font-weight: 700;
   color: #111;
@@ -955,7 +955,7 @@ transform: scale(1.01) translateY(-2px) !important;
   border-radius: clamp(12px, 1.2vw, 16px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   padding: clamp(16px, 1.5vw, 24px);
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(18px, 1.8vw, 28px);
   color: #333;
   resize: vertical;
@@ -977,7 +977,7 @@ transform: scale(1.01) translateY(-2px) !important;
   border-radius: clamp(8px, 0.8vw, 12px);
   min-height: clamp(48px, 4.5vw, 60px);
   padding: 0 clamp(32px, 3vw, 50px);
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(16px, 1.5vw, 26px);
   font-weight: 600;
   cursor: pointer;
@@ -1014,7 +1014,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .persona-result-title {
   margin: 0 0 12px;
   color: #363636;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(30px, 2.2vw, 46px);
   font-weight: 700;
   line-height: 1;
@@ -1045,7 +1045,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .nickname-card-title {
   margin: 0;
   color: #242424;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(20px, 1.3vw, 26px);
   font-weight: 700;
 }
@@ -1053,7 +1053,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .nickname-card-copy {
   margin: 0;
   color: #4f4f4f;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(14px, 1vw, 18px);
   line-height: 1.4;
 }
@@ -1065,7 +1065,7 @@ transform: scale(1.01) translateY(-2px) !important;
   padding: 16px 18px;
   background: #fffef8;
   color: #2d2d2d;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(18px, 1.2vw, 24px);
   font-weight: 600;
   box-sizing: border-box;
@@ -1074,7 +1074,7 @@ transform: scale(1.01) translateY(-2px) !important;
 .nickname-error {
   margin: 0;
   color: #c12b2b;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(14px, 1vw, 18px);
   font-weight: 600;
 }
@@ -1086,7 +1086,7 @@ transform: scale(1.01) translateY(-2px) !important;
   padding: 14px 22px;
   background: #ffec67;
   color: #313131;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(16px, 1vw, 20px);
   font-weight: 800;
   cursor: pointer;
@@ -1190,7 +1190,7 @@ transform: scale(1.01) translateY(-2px) !important;
   z-index: 6;
   margin: 0;
   color: #ffffff;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'NanumSquareNeo', sans-serif;
   font-size: clamp(72px, 6.4vw, 138px);
   font-weight: 800;
   line-height: 1;
@@ -1734,3 +1734,4 @@ transform: scale(1.01) translateY(-2px) !important;
     translate: 0 0;
   }
 }
+
