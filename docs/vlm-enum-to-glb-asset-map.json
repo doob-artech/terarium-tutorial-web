@@ -26,9 +26,6 @@
       "hooded_shadow_eyes": {
         "texture": "model/eyes/hooded_shadow_eyes.png"
       },
-      "sleepy_drooping_eyes": {
-        "texture": "model/eyes/sleepy_drooping_eyes.png"
-      },
       "simple_block_eyes": {
         "texture": "model/eyes/simple_block_eyes.png"
       }
@@ -256,7 +253,6 @@
       "round_open_eyes": "round_open_eyes",
       "almond_upturned_eyes": "almond_upturned_eyes",
       "hooded_shadow_eyes": "hooded_shadow_eyes",
-      "sleepy_drooping_eyes": "sleepy_drooping_eyes",
       "simple_block_eyes": "simple_block_eyes"
     },
     "mouth_type": {

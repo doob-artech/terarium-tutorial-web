@@ -34,7 +34,7 @@ const STEP_BACKGROUNDS = {
 const SKY_BACKGROUND_STEPS = new Set([9, 10, 11, 12]);
 const DEFAULT_CHARACTER_EXCLUDED_STEPS = new Set([10, 12, 15]);
 const SCENE_ONE_SWITCH_MS = 3200;
-const PREVIEW_AVATAR_URL = '/model/basic/basic.glb';
+const PREVIEW_AVATAR_URL = '';
 const DUPLICATE_NAME_ERROR = '그 이름은 이미 누군가 사용하고 있어. 다시 입력해줄래?';
 const DUPLICATE_NAME_NOTICE =
   '이미 다른 친구가 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!';
@@ -733,7 +733,7 @@ const TutorialDesign = ({
                     <img src={cameraButtonImage} alt="" aria-hidden="true" />
                   </button>
                 </div>
-              ) : false && currentId === 12 ? (
+              ) : window.__ENABLE_LEGACY_STACK_LAYOUT__ === true && currentId === 12 ? (
                 <div className="stack-layout">
                   <section className="stack-head-box">
                     <p className="main-desc">

@@ -6,7 +6,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { NodeIO } from '@gltf-transform/core'
-import { copyToDocument, dedup, prune, unpartition } from '@gltf-transform/functions'
+import { dedup, prune, unpartition } from '@gltf-transform/functions'
 import sharp from 'sharp'
 import {
   normalizePersonaProfileResult,
@@ -945,9 +945,6 @@ const normalizeAppearanceResult = (raw = {}) => {
   const normalizedEyeType = /sleepy|drooping|closed|blink/i.test(rawEyeType)
     ? 'round_open_eyes'
     : normalizeEnumValue(raw.eye_type, APPEARANCE_SCHEMA.properties.eye_type.enum, 'round_open_eyes')
-  const normalizedEyeTexture = assetTags.eye_texture === 'sleepy_drooping_eyes'
-    ? 'round_open_eyes'
-    : assetTags.eye_texture
   return {
     hair_style: normalizeEnumValue(raw.hair_style, APPEARANCE_SCHEMA.properties.hair_style.enum, 'long_straight'),
     hair_part_direction: normalizeEnumValue(raw.hair_part_direction, APPEARANCE_SCHEMA.properties.hair_part_direction.enum, 'none'),
@@ -964,7 +961,6 @@ const normalizeAppearanceResult = (raw = {}) => {
     accessories,
     asset_tags: {
       ...assetTags,
-      eye_texture: normalizedEyeTexture,
     },
   }
 }
@@ -2105,154 +2101,10 @@ const findFirstAsset = async (categories, candidates, extensions = ['.glb']) => 
     }
   }
 
-  return findClosestAsset(cleanCategories, candidates, extensions)
+  return null
 }
 
 const uniqueAssetCandidates = (candidates) => Array.from(new Set(candidates.filter(Boolean)))
-
-const ASSET_TOKEN_ALIASES = {
-  short: ['short'],
-  cut: ['cut'],
-  bob: ['bob', 'bobbed'],
-  bobbed: ['bob', 'bobbed'],
-  straight: ['straight'],
-  wave: ['wave', 'wavy', 'permed'],
-  wavy: ['wave', 'wavy', 'permed'],
-  permed: ['wave', 'wavy', 'permed'],
-  ponytail: ['tied'],
-  tied: ['ponytail', 'tied'],
-  high: ['up', 'top'],
-  up: ['high', 'top'],
-  low: ['down'],
-  down: ['low'],
-  half: ['half'],
-  bun: ['bun'],
-  bangs: ['bang', 'bangs'],
-  bang: ['bang', 'bangs'],
-  none: ['without', 'no'],
-  without: ['none', 'no'],
-  round: ['round'],
-  dog: ['round'],
-  eyes: ['eye', 'eyes'],
-  eye: ['eye', 'eyes'],
-  sleepy: ['drooping', 'hooded'],
-  drooping: ['sleepy'],
-  hooded: ['sleepy'],
-  narrow: ['almond'],
-  long: ['long', 'almond'],
-  smile: ['smile', 'smiling', 'gentle', 'broad'],
-  closed: ['gentle', 'curved', 'smile'],
-  big: ['broad'],
-  bored: ['flat', 'straight', 'annoyed', 'unimpressed', 'tired'],
-  toothy: ['teeth', 'tooth'],
-  smirk: ['one-sided', 'asymmetric'],
-  flat: ['bored', 'straight', 'faced'],
-  pout: ['bored', 'frawn', 'frown'],
-  surprised: ['big', 'open', 'parted'],
-  mouth: ['mouth', 'lips'],
-  lip: ['mouth', 'lips'],
-  lips: ['mouth', 'lip'],
-  sleeve: ['sleeve'],
-  tshirt: ['shirt', 'sleeve'],
-  shirt: ['tshirt', 'sleeve'],
-  hoodie: ['sleeve', 'shirt'],
-  pants: ['pants', 'short'],
-  trousers: ['pants'],
-  wide: ['pants'],
-  skirt: ['skirt'],
-}
-
-const normalizeAssetTokens = (value) => {
-  const rawTokens = String(value || '')
-    .replace(/\.[^.]+$/, '')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    .split(/[^a-z0-9가-힣]+/)
-    .filter(Boolean)
-  const expanded = new Set(rawTokens)
-  for (const token of rawTokens) {
-    for (const alias of ASSET_TOKEN_ALIASES[token] || []) {
-      expanded.add(alias)
-    }
-  }
-  return expanded
-}
-
-const scoreAssetName = (fileName, candidates) => {
-  const fileTokens = normalizeAssetTokens(fileName)
-  const candidateTokens = normalizeAssetTokens(candidates.join(' '))
-  if (fileTokens.size === 0 || candidateTokens.size === 0) {
-    return 0
-  }
-
-  let score = 0
-  for (const token of candidateTokens) {
-    if (fileTokens.has(token)) {
-      score += token.length <= 2 ? 0.5 : 1
-    }
-  }
-
-  const fileStem = String(fileName || '').replace(/\.[^.]+$/, '').toLowerCase()
-  for (const candidate of candidates) {
-    const normalizedCandidate = String(candidate || '').replace(/[_-]+/g, ' ').trim().toLowerCase()
-    if (normalizedCandidate && fileStem.includes(normalizedCandidate)) {
-      score += 3
-    }
-  }
-
-  return score
-}
-
-const findClosestAsset = async (categories, candidates, extensions = ['.glb']) => {
-  let best = null
-  const extensionSet = new Set(extensions.map((extension) => extension.toLowerCase()))
-
-  for (const category of categories) {
-    const dir = category ? path.join(AVATAR_MODEL_ROOT, category) : AVATAR_MODEL_ROOT
-    let entries = []
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true })
-    } catch {
-      continue
-    }
-
-    for (const entry of entries) {
-      if (!entry.isFile()) continue
-      const extension = path.extname(entry.name).toLowerCase()
-      if (!extensionSet.has(extension)) continue
-      const score = scoreAssetName(entry.name, candidates)
-      if (score <= 0) continue
-      if (!best || score > best.score || (score === best.score && entry.name.localeCompare(best.fileName) < 0)) {
-        best = {
-          score,
-          category,
-          key: `closest:${candidates.filter(Boolean).join('|')}`,
-          fileName: entry.name,
-          path: path.join(dir, entry.name),
-          publicPath: category ? `/model/${category}/${entry.name}` : `/model/${entry.name}`,
-          match: 'closest',
-        }
-      }
-    }
-  }
-
-  return best
-}
-
-const stableHash = (value) => {
-  const text = String(value || '')
-  let hash = 0
-  for (let index = 0; index < text.length; index += 1) {
-    hash = (hash * 31 + text.charCodeAt(index)) >>> 0
-  }
-  return hash
-}
-
-const pickStableCandidate = (candidates, seed) => {
-  const cleanCandidates = uniqueAssetCandidates(candidates)
-  if (cleanCandidates.length === 0) return null
-  return cleanCandidates[stableHash(seed) % cleanCandidates.length]
-}
 
 const knownAssetTag = (value) => {
   const text = String(value || '').trim()
@@ -2270,90 +2122,6 @@ const resolveSkinCandidates = (appearance) =>
     'soft_peach_skin',
     'light_warm_skin',
   ])
-
-const resolveHairCandidates = (appearance) => {
-  const hasBangs = appearance.bangs_type && !['none', 'unknown'].includes(appearance.bangs_type)
-  const directHair = knownResolvedAssetTag('hair_mesh', appearance?.asset_tags?.hair_mesh)
-  const withBangsHair = {
-    bangs_bobbed_hair: 'bobbed_hair_with_bangs',
-    bangs_long_wave_hair: 'middle_long_hair_with_bangs',
-    bangs_bun_hair: 'bun_hair_with_bangs',
-    bob_straight: 'bobbed_hair_with_bangs',
-    bob_c_curl: 'bobbed_hair_with_bangs',
-    long_straight: 'middle_long_hair_with_bangs',
-    long_wave: 'permed_hair_with_permed_bangs',
-    ponytail_high: 'tied_up_hair_with_bangs',
-    half_up: 'half_up_top_knot_with_bangs',
-    bun: 'bun_hair_with_bangs',
-  }
-  const withoutBangsHair = {
-    long_wave_hair: 'permed_hair_with_permed_bangs',
-    tied_down_hair: 'tied_down_hair_without_bangs',
-    tied_up_hair: 'tied_up_hair_with_bangs',
-    bun_hair: 'bun_hair_with_bangs',
-    half_ponytail: 'half_up_top_knot_with_bangs',
-    permed_hair: 'permed_hair_with_permed_bangs',
-    ponytail_low: 'tied_down_hair_without_bangs',
-  }
-  const mappedDirectHair = withBangsHair[directHair] || withoutBangsHair[directHair]
-  const mappedHair = hasBangs ? withBangsHair[appearance.hair_style] : withoutBangsHair[appearance.hair_style]
-  const fallbackHair = hasBangs
-    ? [
-        'bobbed_hair_with_bangs',
-        'middle_long_hair_with_bangs',
-        'permed_hair_with_permed_bangs',
-        'tied_up_hair_with_bangs',
-        'half_up_top_knot_with_bangs',
-        'bun_hair_with_bangs',
-      ]
-    : ['tied_down_hair_without_bangs']
-  return uniqueAssetCandidates([directHair, mappedDirectHair, mappedHair, ...fallbackHair])
-}
-
-const resolveBottomCandidates = ({ rawAppearance, normalizedAppearance, seed }) => {
-  const directBottom = knownResolvedAssetTag('bottom_mesh', normalizedAppearance?.asset_tags?.bottom_mesh)
-  const avatarGender = String(
-    rawAppearance?.avatar_gender ||
-      rawAppearance?.body_gender ||
-      rawAppearance?.gender ||
-      rawAppearance?.sex ||
-      '',
-  ).trim().toLowerCase()
-  const allBottoms = ['long_pants', 'wide_long_pants', 'short_pants', 'shorts', 'long_skirt', 'short_skirt', 'short_onepiece', 'long_onepiece', 'default']
-  const pantsBottoms = ['long_pants', 'wide_long_pants', 'short_pants', 'shorts', 'pants', 'default']
-  const normalizedBottom =
-    normalizedAppearance.bottom_type && normalizedAppearance.bottom_type !== 'unknown'
-      ? normalizedAppearance.bottom_type
-      : null
-
-  if (['male', 'man', 'boy', 'm'].includes(avatarGender)) {
-    const picked = pickStableCandidate(pantsBottoms, seed)
-    return uniqueAssetCandidates([directBottom, picked, normalizedBottom && pantsBottoms.includes(normalizedBottom) ? normalizedBottom : null, ...pantsBottoms])
-  }
-
-  if (['female', 'woman', 'girl', 'f'].includes(avatarGender)) {
-    const picked = pickStableCandidate(allBottoms, seed)
-    return uniqueAssetCandidates([directBottom, picked, normalizedBottom, ...allBottoms])
-  }
-
-  return uniqueAssetCandidates([directBottom, normalizedBottom, 'long_pants', 'wide_long_pants', 'short_pants', 'short_skirt', 'default'])
-}
-
-const resolveTopCandidates = (appearance) => {
-  const directTop = knownResolvedAssetTag('top_mesh', appearance?.asset_tags?.top_mesh)
-  const mappedTop = {
-    short_Tshirt: 'Short_Sleeve',
-    long_Tshirt: 'long_sleeve',
-    shirts: 'shirt',
-    short_sleeve_tshirt: 'Short_Sleeve',
-    long_sleeve_tshirt: 'long_sleeve',
-    button_shirt: 'shirt',
-    shirt: 'shirt',
-    hoodie: 'hoodie',
-    casual_zip_jacket: 'casual_zip_jacket',
-  }
-  return uniqueAssetCandidates([directTop, mappedTop[directTop], appearance.top_type, mappedTop[appearance.top_type], 'Short_Sleeve', 'hoodie', 'default'])
-}
 
 const resolveEyeCandidates = (appearance) => {
   const directEye = knownResolvedAssetTag('eye_texture', appearance?.asset_tags?.eye_texture)
@@ -2434,24 +2202,6 @@ const buildSelectionDiagnostics = ({ normalized, selected, candidates }) => {
       asset: selected.lip,
     },
     {
-      role: 'hair',
-      analyzedValue: `${normalized.hair_style}, bangs=${normalized.bangs_type}, color=${normalized.hair_color}`,
-      candidates: candidates.hair,
-      asset: selected.hair,
-    },
-    {
-      role: 'top',
-      analyzedValue: `${normalized.top_type}, color=${normalized.top_color}`,
-      candidates: candidates.top,
-      asset: selected.top,
-    },
-    {
-      role: 'bottoms',
-      analyzedValue: `${normalized.bottom_type}, color=${normalized.bottom_color}`,
-      candidates: candidates.bottoms,
-      asset: selected.bottoms,
-    },
-    {
       role: 'outfit',
       analyzedValue: normalized?.asset_tags?.outfit_mesh || 'none',
       candidates: [normalized?.asset_tags?.outfit_mesh || 'none'],
@@ -2476,7 +2226,7 @@ const buildSelectionDiagnostics = ({ normalized, selected, candidates }) => {
       (row.asset?.match === 'closest'
         ? `No exact filename matched "${firstCandidate}", so the closest filename by token similarity was selected.`
         : row.asset
-          ? `Selected from candidate list for "${firstCandidate}".`
+          ? `Selected from exact asset candidates for "${firstCandidate}".`
           : `No matching file was found for candidates: ${(row.candidates || []).join(', ')}.`)
 
     return {
@@ -2516,26 +2266,6 @@ const inferColorHex = (value, fallback) => {
     multicolor: '#8a7bd1',
   }
   return map[value] || fallback
-}
-
-const createEmptyGlbBuffer = () => {
-  const json = JSON.stringify({
-    asset: { version: '2.0', generator: 'terarium-tutorial placeholder' },
-    scene: 0,
-    scenes: [{ nodes: [] }],
-    nodes: [],
-  })
-  const jsonPadding = (4 - (Buffer.byteLength(json) % 4)) % 4
-  const jsonBuffer = Buffer.from(json + ' '.repeat(jsonPadding))
-  const totalLength = 12 + 8 + jsonBuffer.length
-  const header = Buffer.alloc(12)
-  header.writeUInt32LE(0x46546c67, 0)
-  header.writeUInt32LE(2, 4)
-  header.writeUInt32LE(totalLength, 8)
-  const chunkHeader = Buffer.alloc(8)
-  chunkHeader.writeUInt32LE(jsonBuffer.length, 0)
-  chunkHeader.writeUInt32LE(0x4e4f534a, 4)
-  return Buffer.concat([header, chunkHeader, jsonBuffer])
 }
 
 const hexToBaseColorFactor = (hex, alpha = 1) => {
@@ -2701,44 +2431,6 @@ const applySkinTextureToDocument = async (document, selected, targetNodes = null
       selected.lip ? { role: 'lip', publicPath: selected.lip.publicPath, fileName: selected.lip.fileName } : null,
     ].filter(Boolean),
   }
-}
-
-const getNodePivotRecord = (node, role, asset) => ({
-  role,
-  nodeName: node.getName() || '',
-  fileName: asset?.fileName || '',
-  publicPath: asset?.publicPath || '',
-  translation: [...node.getTranslation()],
-  rotation: [...node.getRotation()],
-  scale: [...node.getScale()],
-})
-
-const moveSceneChildrenUnderNode = (scene, parentNode) => {
-  const children = scene.listChildren()
-  for (const child of children) {
-    scene.removeChild(child)
-    parentNode.addChild(child)
-  }
-  scene.addChild(parentNode)
-  return children
-}
-
-const copySceneNodesToDocument = (targetDocument, sourceDocument, targetParentNode) => {
-  const sourceScenes = sourceDocument.getRoot().listScenes()
-  const sourceRootNodes = sourceScenes.length > 0
-    ? sourceScenes.flatMap((scene) => scene.listChildren())
-    : sourceDocument.getRoot().listNodes()
-
-  if (sourceRootNodes.length === 0) {
-    return []
-  }
-
-  const copied = copyToDocument(targetDocument, sourceDocument, sourceRootNodes)
-  const copiedRootNodes = sourceRootNodes.map((node) => copied.get(node)).filter(Boolean)
-  for (const node of copiedRootNodes) {
-    targetParentNode.addChild(node)
-  }
-  return copiedRootNodes
 }
 
 const asNodeNameList = (value) => {
@@ -2926,117 +2618,30 @@ const buildAvatarFromSourceNodes = async ({ outputPath, plan }) => {
 }
 
 const mergeAvatarGlb = async ({ outputPath, plan }) => {
-  if (await fileExists(AVATAR_SOURCE_GLB_PATH)) {
-    return buildAvatarFromSourceNodes({ outputPath, plan })
+  if (!(await fileExists(AVATAR_SOURCE_GLB_PATH))) {
+    throw new Error(`Avatar source GLB is missing: ${AVATAR_SOURCE_GLB_PUBLIC_PATH}`)
   }
-
-  const io = new NodeIO()
-  const sourceAssets = [
-    { role: 'basic', asset: plan.selected.basic, color: null },
-    { role: 'hair', asset: plan.selected.hair, color: plan.colors.hair },
-    { role: 'top', asset: plan.selected.top, color: plan.colors.top },
-    { role: 'bottoms', asset: plan.selected.bottoms, color: plan.colors.bottoms },
-    ...plan.selected.accessories.map((asset) => ({ role: 'accessory', asset, color: null })),
-  ].filter((item) => item.asset?.path)
-
-  if (sourceAssets.length === 0) {
-    await fs.writeFile(outputPath, createEmptyGlbBuffer())
-    return { merged: false, mergedAssets: [], warning: 'No source GLB assets were found.' }
-  }
-
-  const [baseAsset, ...partAssets] = sourceAssets
-  const targetDocument = await io.read(baseAsset.asset.path)
-  const skinTexture = await applySkinTextureToDocument(targetDocument, plan.selected)
-  const targetRoot = targetDocument.getRoot()
-  const targetScene =
-    targetRoot.getDefaultScene() ||
-    targetRoot.listScenes()[0] ||
-    targetDocument.createScene('Avatar')
-  targetRoot.setDefaultScene(targetScene)
-
-  const mergedRootNode = targetDocument.createNode('AvatarMergedRoot')
-  const baseRootNodes = moveSceneChildrenUnderNode(targetScene, mergedRootNode)
-  const mergedAssets = [baseAsset]
-  const pivotTransforms = baseRootNodes.map((node) => getNodePivotRecord(node, baseAsset.role, baseAsset.asset))
-  const materialColors = []
-
-  for (const item of partAssets) {
-    try {
-      const sourceDocument = await io.read(item.asset.path)
-      const copiedRootNodes = copySceneNodesToDocument(targetDocument, sourceDocument, mergedRootNode)
-      makeNodeMaterialsDoubleSided(copiedRootNodes)
-      if (item.color) {
-        materialColors.push({
-          role: item.role,
-          colorHex: item.color,
-          materials: tintNodeMaterials(targetDocument, copiedRootNodes, item.color, item.role),
-        })
-      }
-      pivotTransforms.push(...copiedRootNodes.map((node) => getNodePivotRecord(node, item.role, item.asset)))
-      mergedAssets.push(item)
-    } catch (error) {
-      console.warn(`[avatar/build] Failed to merge ${item.role} asset ${item.asset.path}:`, error)
-    }
-  }
-
-  await targetDocument.transform(dedup(), prune(), unpartition())
-  await io.write(outputPath, targetDocument)
-
-  return {
-    merged: true,
-    skinApplied: skinTexture.applied,
-    bakedTextureLayers: skinTexture.bakedLayers,
-    materialColors,
-    pivotMode: 'source-root-node-transform-preserved-under-AvatarMergedRoot',
-    pivotTransforms,
-    mergedAssets: mergedAssets.map((item) => ({
-      role: item.role,
-      publicPath: item.asset.publicPath,
-      fileName: item.asset.fileName,
-    })),
-  }
+  return buildAvatarFromSourceNodes({ outputPath, plan })
 }
 
-const buildAvatarAssetPlan = async (appearance, seed = '') => {
+const buildAvatarAssetPlan = async (appearance) => {
   const normalized = normalizeAppearancePayload(appearance)
-  const hairCandidates = resolveHairCandidates(normalized)
   const skinCandidates = resolveSkinCandidates(normalized)
   const eyeCandidates = resolveEyeCandidates(normalized)
   const mouthCandidates = resolveMouthCandidates(normalized)
-  const topCandidates = resolveTopCandidates(normalized)
-  const bottomCandidates = resolveBottomCandidates({
-    rawAppearance: appearance,
-    normalizedAppearance: normalized,
-    seed,
-  })
-  const accessories = []
-  if (knownAssetTag(normalized.asset_tags.glasses_mesh)) accessories.push(resolveSemanticAssetTag('glasses_mesh', normalized.asset_tags.glasses_mesh))
-  if (knownAssetTag(normalized.asset_tags.necklace_mesh)) accessories.push(resolveSemanticAssetTag('necklace_mesh', normalized.asset_tags.necklace_mesh))
-  if (knownAssetTag(normalized.asset_tags.earring_mesh)) accessories.push(resolveSemanticAssetTag('earring_mesh', normalized.asset_tags.earring_mesh))
 
   const selected = {
-    basic: await findFirstAsset(['basic', ''], ['basic', 'base', 'body']),
     skin: await findFirstAsset(['skin'], skinCandidates, ['.png', '.webp', '.jpg', '.jpeg']),
     eye: await findFirstAsset(['eyes', 'eye'], eyeCandidates, ['.png', '.webp', '.jpg', '.jpeg']),
     lip: await findFirstAsset(['mouth', 'lip'], mouthCandidates, ['.png', '.webp', '.jpg', '.jpeg']),
-    hair: await findFirstAsset(['hair'], hairCandidates, ['.glb', '.gltf']),
-    bangs: normalized.bangs_type === 'none' ? null : await findFirstAsset(['bangs', 'bang'], [normalized.bangs_type, 'default']),
-    top: await findFirstAsset(['top', 'tops'], topCandidates),
-    bottoms: await findFirstAsset(['bottoms', 'Bottoms', 'bottom'], bottomCandidates),
-    accessories: (
-      await Promise.all(accessories.map((key) => findFirstAsset(['accessories', 'accessory'], [key])))
-    ).filter(Boolean),
   }
 
   return {
     appearance: normalized,
     candidates: {
       skin: skinCandidates,
-      hair: hairCandidates,
       eye: eyeCandidates,
       mouth: mouthCandidates,
-      top: topCandidates,
-      bottoms: bottomCandidates,
     },
     selected,
     selectionDiagnostics: buildSelectionDiagnostics({
@@ -3044,11 +2649,8 @@ const buildAvatarAssetPlan = async (appearance, seed = '') => {
       selected,
       candidates: {
         skin: skinCandidates,
-        hair: hairCandidates,
         eye: eyeCandidates,
         mouth: mouthCandidates,
-        top: topCandidates,
-        bottoms: bottomCandidates,
       },
     }),
     colors: {
@@ -3067,14 +2669,14 @@ const buildAvatarAssetPlan = async (appearance, seed = '') => {
       lip: selected.lip?.publicPath || null,
     },
     note:
-      `The server prefers the source-GLB node pipeline: ${AVATAR_SOURCE_GLB_PUBLIC_PATH} is loaded, selected nodes are kept, and per-asset colors/textures are applied. Split GLB assets remain as fallback when the source GLB is absent.`,
+      `The server uses the source-GLB node pipeline: ${AVATAR_SOURCE_GLB_PUBLIC_PATH} is loaded, selected nodes are kept, and per-asset colors/textures are applied.`,
   }
 }
 
 const buildAvatarOutput = async ({ agentId, appearance }) => {
   const normalizedAgentId = sanitizeFileStem(agentId || randomUUID(), 'avatar')
   await fs.mkdir(AVATAR_OUTPUT_ROOT, { recursive: true })
-  const plan = await buildAvatarAssetPlan(appearance, normalizedAgentId)
+  const plan = await buildAvatarAssetPlan(appearance)
   const outputFileName = `${normalizedAgentId}.glb`
   const outputPath = path.join(AVATAR_OUTPUT_ROOT, outputFileName)
   const manifestFileName = `${normalizedAgentId}.avatar.json`
