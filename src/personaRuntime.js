@@ -53,7 +53,6 @@ const DEFAULT_PERSONA = {
     persona_block: DEFAULT_BLOCK,
     profile_image_direction: DEFAULT_PROFILE_IMAGE_DIRECTION,
     profile_image_prompt: DEFAULT_PROFILE_IMAGE_PROMPT,
-    sns_profile_bio: '',
   },
   runtime: {
     persona_sentence: DEFAULT_BLOCK,
@@ -125,11 +124,6 @@ export const normalizePersonaProfileResult = ({ rawResult, fallbackResult = DEFA
         source.profile_image_prompt ?? source.public_result?.profile_image_prompt,
         PROFILE_IMAGE_PROMPT_LIMIT,
         cleanString(fallbackPublic.profile_image_prompt, PROFILE_IMAGE_PROMPT_LIMIT, DEFAULT_PROFILE_IMAGE_PROMPT),
-      ),
-      sns_profile_bio: cleanString(
-        source.sns_profile_bio ?? source.public_result?.sns_profile_bio,
-        SHORT_LIMIT,
-        cleanString(fallbackPublic.sns_profile_bio, SHORT_LIMIT, ''),
       ),
     },
     runtime: {

@@ -3249,7 +3249,7 @@ const completeTutorialAgent = async ({ agentId, appearance, personaResult, nickn
   const personaBlock = String(profile?.public_result?.persona_block || profile?.persona_block || '').replace(/\s+/g, ' ').trim()
   const profileImageDirection = String(profile?.public_result?.profile_image_direction || '').replace(/\s+/g, ' ').trim()
   const profileImagePrompt = String(profile?.public_result?.profile_image_prompt || '').replace(/\s+/g, ' ').trim()
-  const snsProfileBio = String(profile?.public_result?.sns_profile_bio || '').replace(/\s+/g, ' ').trim()
+  const snsProfileBio = ''
   const normalizedNickname = typeof nickname === 'string' && nickname.trim() ? normalizeNickname(nickname) : ''
   const client = await dbPool.connect()
 
@@ -3398,9 +3398,8 @@ const SNS_PROFILE_SURFACE_SCHEMA = {
   properties: {
     profile_image_direction: { type: 'string', minLength: 20, maxLength: 360 },
     profile_image_prompt: { type: 'string', minLength: 80, maxLength: 900 },
-    sns_profile_bio: { type: 'string', maxLength: 180 },
   },
-  required: ['profile_image_direction', 'profile_image_prompt', 'sns_profile_bio'],
+  required: ['profile_image_direction', 'profile_image_prompt'],
 }
 
 const generateSnsProfileSurface = async ({ personaResult }) => {
@@ -3412,12 +3411,12 @@ const generateSnsProfileSurface = async ({ personaResult }) => {
     input: [
       {
         role: 'system',
-        content: '너는 가상 에이전트의 SNS 프로필 연출 편집자다. 페르소나를 읽고 실제 사람이 고를 법한 프사 방식과 소개란을 만든다. 진단이나 성격 유형 설명은 쓰지 않는다.',
+        content: '너는 가상 에이전트의 SNS 프로필 이미지 연출 편집자다. 페르소나를 읽고 실제 사람이 고를 법한 프사 방식만 만든다. 진단이나 성격 유형 설명은 쓰지 않는다.',
       },
       {
         role: 'user',
         content: [
-          '아래 페르소나를 바탕으로 SNS 프로필 표현을 만들어라.',
+          '아래 페르소나를 바탕으로 SNS 프로필 이미지 표현만 만들어라.',
           '사람마다 프사 선택이 달라야 한다. 정면 셀카만 반복하지 마라.',
           '가능한 방향에는 무표정 셀카, 과장된 표정의 셀카, 친구가 찍어 준 자연스러운 사진, 멀리서 찍힌 전신, 일부만 보이는 사진, 사물이나 풍경처럼 본인이 나오지 않는 프사도 있다.',
           'profile_image_direction은 왜 이 에이전트가 이런 프사를 골랐을지 느껴지는 한국어 연출 설명이다.',
@@ -3425,7 +3424,6 @@ const generateSnsProfileSurface = async ({ personaResult }) => {
           '전신샷, 긴 다리, 늘어난 몸, 과한 체형 변형, 넓은 배경 중심 구도는 피하게 하라. 원본 아바타의 머리와 얼굴 비율을 유지하고 얼굴이 프레임 중앙 대부분을 차지하게 하라.',
           '본인이 나오지 않는 프사를 선택했다면 참고 아바타 대신 사물이나 풍경을 주제로 만들라고 명시하라.',
           '프롬프트에는 텍스트, 워터마크, UI, 테두리, 콜라주를 넣지 말라고 명시하라.',
-          'sns_profile_bio는 실제 SNS 소개란처럼 0-80자 정도로 쓴다. 빈 문자열도 적극적으로 허용한다. 문장, 짧은 드립, 의미 없는 기호, 이모지 여러 개, 한 단어 모두 가능하다. 페르소나 설명문처럼 쓰지 마라.',
           buildUntrustedDataBlock('PERSONA_BLOCK', personaBlock),
         ].join('\n'),
       },
