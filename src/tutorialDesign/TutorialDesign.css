@@ -1141,7 +1141,7 @@ body,
 .character-layer.step-character-12 .character-img {
   left: 50vw !important;
   right: auto !important;
-  top: clamp(12vh, 20vh, 24vh) !important;
+  top: clamp(24vh, 31vh, 36vh) !important;
   bottom: auto !important;
   width: clamp(190px, 22vw, 340px) !important;
   max-height: 34vh !important;
