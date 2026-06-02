@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
 import clickSoundSrc from './tutorialDesign/assets/click1.mp3'
-import avatarPlaceholderSrc from './tutorialDesign/assets/avatar.png'
 import './App.css'
 
+const LOADING_BASE_AVATAR_URL = '/model/source/avatar_v2.glb'
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
 const PERSONA_TOTAL_TURNS = 5
@@ -1373,21 +1373,19 @@ function TutorialApp() {
   }
 
   if (stage === 'avatarLoading') {
+    const loadingAvatarUrl = avatarModelUrl || LOADING_BASE_AVATAR_URL
+
     return (
       <main className={`avatar-loading-screen ${isAvatarHandoffCover ? 'is-covered' : ''}`} aria-label="로딩 중" aria-live="polite">
-        {avatarModelUrl ? (
-          <AvatarThreeViewer
-            className="avatar-loading-preview"
-            src={avatarModelUrl}
-            alt="avatar loading preview"
-            variant="loadingBase"
-            distanceMultiplier={1.66}
-            initialYaw={avatarPreviewRotationRef.current.yaw}
-            onRotationChange={handleAvatarPreviewRotationChange}
-          />
-        ) : (
-          <img className="avatar-loading-placeholder" src={avatarPlaceholderSrc} alt="avatar loading preview" />
-        )}
+        <AvatarThreeViewer
+          className="avatar-loading-preview"
+          src={loadingAvatarUrl}
+          alt="avatar loading preview"
+          variant="loadingBase"
+          distanceMultiplier={1.66}
+          initialYaw={avatarPreviewRotationRef.current.yaw}
+          onRotationChange={handleAvatarPreviewRotationChange}
+        />
       </main>
     )
   }
