@@ -1,4 +1,5 @@
-const configuredApiBase = String(import.meta.env.VITE_TUTORIAL_API_BASE || '').replace(/\/+$/, '')
+const defaultApiBase = import.meta.env.PROD ? 'https://tutorial-api.team-doob.com' : ''
+const configuredApiBase = String(import.meta.env.VITE_TUTORIAL_API_BASE || defaultApiBase).replace(/\/+$/, '')
 
 export const apiUrl = (path) => {
   const normalizedPath = String(path || '')
