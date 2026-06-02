@@ -2,14 +2,43 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
 import clickSoundSrc from './tutorialDesign/assets/click1.mp3'
+import countdownFontUrl from './tutorialDesign/fonts/CHANGWONDANGAMASAC-BOLD.TTF?url'
 import './App.css'
 
 const LOADING_BASE_AVATAR_URL = '/model/source/avatar_v2.glb'
+const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
 const PERSONA_TOTAL_TURNS = 5
 const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
+let countdownFontPreloadPromise = null
+
+const preloadCountdownFont = () => {
+  if (typeof document === 'undefined') {
+    return Promise.resolve()
+  }
+
+  if (!document.querySelector('link[data-terarium-countdown-font="true"]')) {
+    const link = document.createElement('link')
+    link.rel = 'preload'
+    link.as = 'font'
+    link.type = 'font/ttf'
+    link.href = countdownFontUrl
+    link.crossOrigin = 'anonymous'
+    link.dataset.terariumCountdownFont = 'true'
+    document.head.appendChild(link)
+  }
+
+  if (!countdownFontPreloadPromise) {
+    countdownFontPreloadPromise = document.fonts
+      ?.load?.(`700 180px "${COUNTDOWN_FONT_FAMILY}"`)
+      ?.then(() => undefined)
+      ?.catch(() => undefined) ?? Promise.resolve()
+  }
+
+  return countdownFontPreloadPromise
+}
 
 const DEBUG_AVATAR_OPTIONS = {
   hair: [
@@ -582,6 +611,10 @@ function TutorialApp() {
   const avatarTransitionFinishingRef = useRef(false)
   const uploadedProfileImageKeyRef = useRef('')
 
+  useEffect(() => {
+    void preloadCountdownFont()
+  }, [])
+
   const clearTimers = () => {
     timeoutIdsRef.current.forEach((id) => window.clearTimeout(id))
     timeoutIdsRef.current = []
@@ -954,6 +987,7 @@ function TutorialApp() {
       return
     }
 
+    void preloadCountdownFont()
     setAutoCaptureRequested(false)
     setCaptureLocked(true)
     clearTimers()
