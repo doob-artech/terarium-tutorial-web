@@ -2296,6 +2296,7 @@ const tintNodeMaterials = (document, nodes, colorHex, role = 'part') => {
   const colorFactor = hexToBaseColorFactor(colorHex)
   const tintedMaterials = []
   let fallbackMaterialIndex = 0
+  let clonedMaterialIndex = 0
 
   for (const node of nodes) {
     node.traverse((child) => {
@@ -2306,6 +2307,10 @@ const tintNodeMaterials = (document, nodes, colorHex, role = 'part') => {
         if (!material) {
           fallbackMaterialIndex += 1
           material = document.createMaterial(`${role}-color-${fallbackMaterialIndex}`)
+          primitive.setMaterial(material)
+        } else {
+          clonedMaterialIndex += 1
+          material = material.clone().setName(`${material.getName() || role}_${role}_${clonedMaterialIndex}`)
           primitive.setMaterial(material)
         }
         applyAvatarMaterialStyle(material, { role, colorFactor })
