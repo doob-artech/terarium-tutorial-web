@@ -37,7 +37,7 @@ const disposeObject = (object) => {
 const getRenderRole = (mesh) => {
   const name = `${mesh.name || ''} ${mesh.parent?.name || ''}`.toLowerCase();
   if (/hair|bang/.test(name)) return 'hair';
-  if (/cloth|sleeve|shirt|pants|skirt|bottom|top|jacket|hoodie|short|long/.test(name)) return 'cloth';
+  if (/cloth|sleeve|shirt|pants|skirt|onepiece|dress|bottom|top|jacket|hoodie|short|long|shoe|sandal/.test(name)) return 'cloth';
   return 'body';
 };
 
@@ -242,6 +242,7 @@ const AvatarThreeViewer = ({
   style = null,
   variant = 'avatar',
   distanceMultiplier = 1.82,
+  fitFullBounds = false,
   initialYaw = 0,
   onRotationChange = null,
   onReady = null,
@@ -468,7 +469,7 @@ const AvatarThreeViewer = ({
           modelRoot.add(createSoftShadowPlane(model));
         }
         scene.add(modelRoot);
-        fitCameraToObject(camera, modelRoot, target, distanceMultiplier, variant === 'staticFront');
+        fitCameraToObject(camera, modelRoot, target, distanceMultiplier, fitFullBounds || variant === 'staticFront');
         renderer.domElement.style.opacity = '1';
         setLoadState('ready');
         onReadyRef.current?.({
@@ -543,7 +544,7 @@ const AvatarThreeViewer = ({
       renderer?.dispose();
       renderer?.domElement.remove();
     };
-  }, [distanceMultiplier, src, variant]);
+  }, [distanceMultiplier, fitFullBounds, src, variant]);
 
   return (
     <div

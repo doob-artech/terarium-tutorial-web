@@ -208,6 +208,7 @@ function AvatarDebugPageV2() {
     hairColor: 'black',
     topColor: 'white',
     bottomColor: 'black',
+    shoeColor: 'black',
   })
   const [modelUrl, setModelUrl] = useState('')
   const [manifest, setManifest] = useState(null)
@@ -243,6 +244,7 @@ function AvatarDebugPageV2() {
           : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
         bottom_color: hasOutfit ? selection.topColor : selection.bottomColor,
         shoe_type: selection.shoes,
+        shoe_color: selection.shoeColor,
         accessories: {
           glasses_type: 'none',
           has_necklace: false,
@@ -307,7 +309,8 @@ function AvatarDebugPageV2() {
               src={modelUrl}
               alt="Avatar debug preview"
               variant="avatar"
-              distanceMultiplier={1.7}
+              distanceMultiplier={1.96}
+              fitFullBounds
               className="debug-avatar-canvas"
             />
           ) : (
@@ -333,6 +336,7 @@ function AvatarDebugPageV2() {
         <DebugStepper label="Bottom" value={selection.bottom} options={DEBUG_AVATAR_OPTIONS.bottom} disabled={hasOutfit} onChange={(value) => updateSelection('bottom', value)} />
         <DebugStepper label="Bottom color" value={selection.bottomColor} options={DEBUG_COLOR_OPTIONS} disabled={hasOutfit} onChange={(value) => updateSelection('bottomColor', value)} />
         <DebugStepper label="Shoes" value={selection.shoes} options={DEBUG_AVATAR_OPTIONS.shoes} onChange={(value) => updateSelection('shoes', value)} />
+        <DebugStepper label="Shoe color" value={selection.shoeColor} options={DEBUG_COLOR_OPTIONS} onChange={(value) => updateSelection('shoeColor', value)} />
 
         <div className="debug-avatar-nodes">
           <h2>selectedNodes</h2>
@@ -386,6 +390,7 @@ function AvatarDebugPage() {
     hairColor: 'black',
     topColor: 'white',
     bottomColor: 'black',
+    shoeColor: 'black',
   })
   const [modelUrl, setModelUrl] = useState('')
   const [manifest, setManifest] = useState(null)
@@ -421,6 +426,7 @@ function AvatarDebugPage() {
           : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
         bottom_color: hasOutfit ? selection.topColor : selection.bottomColor,
         shoe_type: selection.shoes,
+        shoe_color: selection.shoeColor,
         accessories: {
           glasses_type: 'none',
           has_necklace: false,
@@ -485,7 +491,8 @@ function AvatarDebugPage() {
               src={modelUrl}
               alt="아바타 디버그 미리보기"
               variant="avatar"
-              distanceMultiplier={1.7}
+              distanceMultiplier={1.96}
+              fitFullBounds
               className="debug-avatar-canvas"
             />
           ) : (

@@ -261,16 +261,19 @@
 }
 
 .debug-avatar-page {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 390px;
   background: #f5f7fb;
   color: #20242d;
   font-family: 'NanumSquareNeo', sans-serif;
+  overflow: hidden;
 }
 
 .debug-avatar-view {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   padding: 28px;
@@ -319,6 +322,8 @@
 }
 
 .debug-avatar-panel {
+  min-height: 0;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -493,8 +498,11 @@
 
 @media (max-width: 860px) {
   .debug-avatar-page {
+    height: auto;
+    min-height: 100vh;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(420px, 56vh) auto;
+    overflow: auto;
   }
 
   .debug-avatar-view {
@@ -507,6 +515,7 @@
   }
 
   .debug-avatar-panel {
+    max-height: none;
     border-left: 0;
     border-top: 1px solid #dde3ee;
   }

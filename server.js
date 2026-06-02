@@ -595,6 +595,11 @@ const APPEARANCE_SCHEMA = {
       enum: ['sneakers', 'sandals'],
       description: 'Visible shoe type.',
     },
+    shoe_color: {
+      type: 'string',
+      enum: CLOTHING_COLOR_ENUM,
+      description: 'Main visible shoe color. If unclear, infer the most plausible likely color.',
+    },
     accessories: {
       type: 'object',
       additionalProperties: false,
@@ -631,6 +636,7 @@ const APPEARANCE_SCHEMA = {
     'bottom_type',
     'bottom_color',
     'shoe_type',
+    'shoe_color',
     'accessories',
     'asset_tags',
   ],
@@ -959,6 +965,7 @@ const normalizeAppearanceResult = (raw = {}) => {
     bottom_type: normalizeEnumValue(raw.bottom_type, APPEARANCE_SCHEMA.properties.bottom_type.enum, 'shorts'),
     bottom_color: normalizeClothingColorValue(raw.bottom_color, 'bottom_color', raw),
     shoe_type: normalizeEnumValue(raw.shoe_type, APPEARANCE_SCHEMA.properties.shoe_type.enum, 'sneakers'),
+    shoe_color: normalizeClothingColorValue(raw.shoe_color, 'shoe_color', raw),
     accessories,
     asset_tags: {
       ...assetTags,
@@ -1095,6 +1102,7 @@ const inferAppearanceFromDescription = (description) => {
   let shoe_type = 'unknown'
   if (has(/\bsandals?\b/)) shoe_type = 'sandals'
   else if (has(/\bsneakers\b|\btrainers\b|\btennis shoes\b|\brunning shoes\b/)) shoe_type = 'sneakers'
+  const shoe_color = 'black'
 
   const negGlasses = has(/\bno glasses\b|without glasses|no eyewear/)
   const glasses_type = negGlasses ? 'none' : has(/\bround glasses\b/) ? 'round' : has(/\bsquare glasses\b/) ? 'square' : 'unknown'
@@ -1114,6 +1122,7 @@ const inferAppearanceFromDescription = (description) => {
     bottom_type,
     bottom_color,
     shoe_type,
+    shoe_color,
     accessories: {
       glasses_type,
       has_necklace,
@@ -1259,7 +1268,7 @@ const requestAppearanceJsonViaGptFallback = async ({ imageDataUrl }) => {
               {
                 type: 'text',
                 text:
-                  `Analyze the primary foreground person only. ${PRIMARY_PERSON_APPEARANCE_INSTRUCTION} Return JSON with hair_style, hair_part_direction, bangs_type, hair_color, eye_type, eye_color, mouth_type, top_type, top_color, bottom_type, bottom_color, shoe_type, accessories, and asset_tags.`,
+                  `Analyze the primary foreground person only. ${PRIMARY_PERSON_APPEARANCE_INSTRUCTION} Return JSON with hair_style, hair_part_direction, bangs_type, hair_color, eye_type, eye_color, mouth_type, top_type, top_color, bottom_type, bottom_color, shoe_type, shoe_color, accessories, and asset_tags.`,
               },
               { type: 'image_url', image_url: { url: imageDataUrl } },
             ],
@@ -1329,7 +1338,7 @@ const requestAppearanceJsonViaLlmServer = async ({ imageDataUrl }) => {
             {
               type: 'text',
               text:
-                `Analyze the primary foreground person only. ${PRIMARY_PERSON_APPEARANCE_INSTRUCTION} Analyze visible hair style, bangs, hair color, eye impression, mouth expression, clothing, and accessories. Return JSON with hair_style, hair_part_direction, bangs_type, hair_color, eye_type, eye_color, mouth_type, top_type, top_color, bottom_type, bottom_color, shoe_type, accessories, and asset_tags. For asset_tags, choose only semantic asset keys from the schema. For accessory asset_tags, choose none unless that exact accessory is clearly visible.`,
+                `Analyze the primary foreground person only. ${PRIMARY_PERSON_APPEARANCE_INSTRUCTION} Analyze visible hair style, bangs, hair color, eye impression, mouth expression, clothing, and accessories. Return JSON with hair_style, hair_part_direction, bangs_type, hair_color, eye_type, eye_color, mouth_type, top_type, top_color, bottom_type, bottom_color, shoe_type, shoe_color, accessories, and asset_tags. For asset_tags, choose only semantic asset keys from the schema. For accessory asset_tags, choose none unless that exact accessory is clearly visible.`,
             },
             { type: 'image_url', image_url: { url: imageDataUrl } },
           ],
@@ -1894,6 +1903,24 @@ const APPEARANCE_VALUE_LABELS = {
     sneakers: 'sneakers',
     sandals: 'sandals',
   },
+  shoe_color: {
+    black: 'black shoes',
+    dark_brown: 'dark-brown shoes',
+    brown: 'brown shoes',
+    light_brown: 'light-brown shoes',
+    beige: 'beige shoes',
+    gray: 'gray shoes',
+    white: 'white shoes',
+    red: 'red shoes',
+    orange: 'orange shoes',
+    yellow: 'yellow shoes',
+    green: 'green shoes',
+    blue: 'blue shoes',
+    navy: 'navy shoes',
+    purple: 'purple shoes',
+    pink: 'pink shoes',
+    multicolor: 'multi-color shoes',
+  },
   glasses_type: {
     none: 'no glasses',
     round: 'round glasses',
@@ -1950,6 +1977,9 @@ const buildAppearanceHintText = (appearance) => {
   const shoeType = labelAppearanceValue('shoe_type', appearance.shoe_type)
   if (shoeType) hints.push(shoeType)
 
+  const shoeColor = labelAppearanceValue('shoe_color', appearance.shoe_color)
+  if (shoeColor) hints.push(shoeColor)
+
   const glassesType = labelAppearanceValue('glasses_type', appearance?.accessories?.glasses_type)
   if (glassesType) hints.push(glassesType)
 
@@ -2003,6 +2033,7 @@ const DEFAULT_APPEARANCE_PAYLOAD = {
   bottom_type: 'wide_long_pants',
   bottom_color: 'black',
   shoe_type: 'sneakers',
+  shoe_color: 'black',
   accessories: {
     glasses_type: 'none',
     has_necklace: false,
@@ -2694,7 +2725,7 @@ const buildAvatarAssetPlan = async (appearance) => {
       hair: inferColorHex(normalized.hair_color, '#151515'),
       top: inferColorHex(normalized.top_color, '#777777'),
       bottoms: inferColorHex(normalized.bottom_color, '#151515'),
-      shoes: '#222222',
+      shoes: inferColorHex(normalized.shoe_color, '#222222'),
       glasses: '#171717',
       necklace: '#f0e5c8',
       earrings: '#d7c27a',
