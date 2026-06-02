@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
+import { apiUrl, assetUrl } from './apiBase.js'
 import clickSoundSrc from './tutorialDesign/assets/click1.mp3'
 import countdownFontUrl from './tutorialDesign/fonts/CHANGWONDANGAMASAC-BOLD.TTF?url'
 import './App.css'
 
-const LOADING_BASE_AVATAR_URL = '/model/source/avatar_v2.glb'
+const LOADING_BASE_AVATAR_URL = assetUrl('/model/source/avatar_v2.glb')
 const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
@@ -295,7 +296,7 @@ function AvatarDebugPageV2() {
       }
 
       try {
-        const response = await fetch('/api/avatar/build', {
+        const response = await fetch(apiUrl('/api/avatar/build'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -477,7 +478,7 @@ function AvatarDebugPage() {
       }
 
       try {
-        const response = await fetch('/api/avatar/build', {
+        const response = await fetch(apiUrl('/api/avatar/build'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -710,7 +711,7 @@ function TutorialApp() {
 
   const analyzePhotoWithLlmServer = async (imageDataUrl) => {
     try {
-      const response = await fetch('/api/analyze-appearance', {
+      const response = await fetch(apiUrl('/api/analyze-appearance'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -748,7 +749,7 @@ function TutorialApp() {
       }
 
       try {
-        const response = await fetch('/api/persona/appearance', {
+        const response = await fetch(apiUrl('/api/persona/appearance'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -772,7 +773,7 @@ function TutorialApp() {
     }
 
     try {
-      const response = await fetch('/api/avatar/build', {
+      const response = await fetch(apiUrl('/api/avatar/build'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -810,7 +811,7 @@ function TutorialApp() {
         return
       }
 
-      await fetch('/api/avatar/profile-image', {
+      await fetch(apiUrl('/api/avatar/profile-image'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -840,7 +841,7 @@ function TutorialApp() {
     const appearancePayload = appearanceOverride ?? analysisResult ?? null
 
     try {
-      const response = await fetch('/api/persona/start', {
+      const response = await fetch(apiUrl('/api/persona/start'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1034,7 +1035,7 @@ function TutorialApp() {
             })
             const latestNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
             if (latestNickname) {
-              await fetch('/api/avatar/rename', {
+              await fetch(apiUrl('/api/avatar/rename'), {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -1103,7 +1104,7 @@ function TutorialApp() {
     const submittedQuestion = personaQuestion
 
     try {
-      const response = await fetch('/api/persona/answer', {
+      const response = await fetch(apiUrl('/api/persona/answer'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1329,7 +1330,7 @@ function TutorialApp() {
     }
 
     try {
-      const response = await fetch('/api/nickname/claim', {
+      const response = await fetch(apiUrl('/api/nickname/claim'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1346,7 +1347,7 @@ function TutorialApp() {
         throw new Error(payload?.error ?? '닉네임 저장에 실패했습니다.')
       }
 
-      const avatarResponse = await fetch('/api/avatar/rename', {
+      const avatarResponse = await fetch(apiUrl('/api/avatar/rename'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1615,7 +1616,7 @@ function AvatarProfileCapturePage() {
     }
 
     let cancelled = false
-    fetch(`/api/avatar/recipe/${encodeURIComponent(agentId)}`)
+    fetch(apiUrl(`/api/avatar/recipe/${encodeURIComponent(agentId)}`))
       .then(async (response) => {
         const payload = await response.json().catch(() => null)
         if (!response.ok) {

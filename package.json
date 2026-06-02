@@ -1,26 +1,17 @@
 {
-  "name": "terarium-tutorial",
+  "name": "terarium-tutorial-web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:client": "vite",
-    "dev:server": "node --watch server.js",
-    "start": "NODE_ENV=production node server.js",
+    "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@gltf-transform/core": "^4.3.0",
-    "@gltf-transform/functions": "^4.3.0",
-    "dotenv": "^16.6.1",
-    "express": "^4.22.1",
-    "pg": "^8.16.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "sharp": "^0.34.5",
     "three": "^0.184.0"
   },
   "devDependencies": {
@@ -28,7 +19,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "concurrently": "^9.2.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
