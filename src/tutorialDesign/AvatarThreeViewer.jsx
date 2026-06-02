@@ -80,6 +80,12 @@ const shouldRevealAvatarVariant = (variant) => variant === 'avatarReveal';
 const isStaticAvatarVariant = (variant) => variant === 'staticFront';
 const isDragDisabledVariant = (variant) => variant === 'loadingBase' || isStaticAvatarVariant(variant);
 
+const applyModelRotation = (modelRoot, variant, rotationState) => {
+  if (!modelRoot) return;
+  modelRoot.rotation.y = isStaticAvatarVariant(variant) ? 0 : rotationState.yaw;
+  modelRoot.rotation.x = isStaticAvatarVariant(variant) ? 0 : rotationState.pitch;
+};
+
 const smoothGeometryNormals = (geometry, role = 'body') => {
   if (!geometry?.attributes?.position) return geometry;
   try {
@@ -490,6 +496,7 @@ const AvatarThreeViewer = ({
         }
         scene.add(modelRoot);
         fitCameraToObject(camera, modelRoot, target, distanceMultiplier, fitFullBounds || variant === 'staticFront');
+        applyModelRotation(modelRoot, variant, rotationState);
         renderer.domElement.style.opacity = '1';
         setLoadState('ready');
         onReadyRef.current?.({
@@ -519,8 +526,7 @@ const AvatarThreeViewer = ({
           rotationState.velocityX *= 0.92;
           rotationState.velocityY *= 0.88;
         }
-        modelRoot.rotation.y = isStaticAvatarVariant(variant) ? 0 : rotationState.yaw;
-        modelRoot.rotation.x = isStaticAvatarVariant(variant) ? 0 : rotationState.pitch;
+        applyModelRotation(modelRoot, variant, rotationState);
         if (onRotationChangeRef.current && now - rotationState.lastRotationNotifyAt > 160) {
           rotationState.lastRotationNotifyAt = now;
           onRotationChangeRef.current({

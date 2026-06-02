@@ -14,10 +14,13 @@ import sceneFourteen from './assets/animation/scene14.webp';
 import sceneFifteen from './assets/animation/scene15.webp';
 import avatar from './assets/avatar.png';
 
+const GUIDE_CHARACTER_WIDTH = 'clamp(400px, 30vw, 580px)';
+const GUIDE_CHARACTER_SMALL_WIDTH = 'clamp(320px, 22vw, 430px)';
+
 const answerSceneStyle = {
   bottom: '25vh',
   left: '50%',
-  width: '580px',
+  width: GUIDE_CHARACTER_WIDTH,
   translate: '-50% 0',
   transform: 'none',
 };
@@ -25,7 +28,7 @@ const answerSceneStyle = {
 const bubbleStyle = {
   bottom: '18vh',
   left: '4vw',
-  width: '580px',
+  width: GUIDE_CHARACTER_WIDTH,
   transform: 'none',
 };
 
@@ -37,21 +40,21 @@ const sceneFourteenStyle = {
 const sceneFifteenStyle = {
   right: '4vw',
   bottom: '4vh',
-  width: '580px',
+  width: GUIDE_CHARACTER_WIDTH,
   transform: 'none',
 };
 
 const bottomRightSceneStyle = {
   right: '-3vw',
   bottom: '-2vh',
-  width: '580px',
+  width: GUIDE_CHARACTER_WIDTH,
   transform: 'none',
 };
 
 const sceneNineStyle = {
   right: '1vw',
   bottom: '0vh',
-  width: '430px',
+  width: GUIDE_CHARACTER_SMALL_WIDTH,
   transform: 'none',
 };
 
@@ -77,7 +80,7 @@ export const CHARACTER_PRESETS = {
     style: {
       bottom: '23vh',
       left: '0',
-      width: '580px',
+      width: GUIDE_CHARACTER_WIDTH,
       transform: 'none',
     },
   },
@@ -87,7 +90,7 @@ export const CHARACTER_PRESETS = {
     style: {
       bottom: '1vh',
       left: '50%',
-      width: '580px',
+      width: GUIDE_CHARACTER_WIDTH,
       translate: '-50% 0',
       transform: 'none',
     },
@@ -98,7 +101,7 @@ export const CHARACTER_PRESETS = {
     style: {
       bottom: '23vh',
       left: '0',
-      width: '580px',
+      width: GUIDE_CHARACTER_WIDTH,
       transform: 'none',
     },
   },
@@ -108,7 +111,7 @@ export const CHARACTER_PRESETS = {
     style: {
       bottom: '23vh',
       left: '0',
-      width: '580px',
+      width: GUIDE_CHARACTER_WIDTH,
       transform: 'none',
     },
   },
@@ -118,7 +121,7 @@ export const CHARACTER_PRESETS = {
     style: {
       bottom: '1vh',
       left: '50%',
-      width: '580px',
+      width: GUIDE_CHARACTER_WIDTH,
       translate: '-50% 0',
       transform: 'none',
     },
@@ -140,7 +143,7 @@ export const CHARACTER_PRESETS = {
     style: {
       top: '40%',
       left: '50%',
-      width: '580px',
+      width: GUIDE_CHARACTER_WIDTH,
       translate: '-50% -50%',
       transform: 'none',
     },
