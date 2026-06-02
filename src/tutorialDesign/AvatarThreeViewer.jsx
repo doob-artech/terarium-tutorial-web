@@ -41,6 +41,14 @@ const getRenderRole = (mesh) => {
   return 'body';
 };
 
+const isLoadingBaseBodyMesh = (mesh) => {
+  const name = `${mesh.name || ''} ${mesh.parent?.name || ''}`.toLowerCase();
+  if (/hair|bang|cloth|sleeve|shirt|pants|skirt|onepiece|dress|bottom|top|jacket|hoodie|short|long|shoe|sandal|glass|necklace|earring|accessory/.test(name)) {
+    return false;
+  }
+  return /body|skin|face|head|arm|hand|leg|neck|torso/.test(name);
+};
+
 const makeSoftToonMaterial = (sourceMaterial, { role = 'body', variant = 'avatar' } = {}) => {
   const sourceColor = sourceMaterial?.color?.clone?.() || new THREE.Color(0xffffff);
   const isDarkSource = Math.max(sourceColor.r, sourceColor.g, sourceColor.b) < 0.28;
@@ -416,6 +424,18 @@ const AvatarThreeViewer = ({
         const model = gltf.scene;
         const revealStartAt = performance.now();
         let revealMeshIndex = 0;
+        if (variant === 'loadingBase') {
+          const removeNodes = [];
+          model.traverse((child) => {
+            if (child.isMesh && !isLoadingBaseBodyMesh(child)) {
+              removeNodes.push(child);
+            }
+          });
+          for (const child of removeNodes) {
+            child.parent?.remove(child);
+            disposeObject(child);
+          }
+        }
         model.traverse((child) => {
           if (!child.isMesh) return;
           const renderRole = getRenderRole(child);
