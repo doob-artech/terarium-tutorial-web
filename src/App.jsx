@@ -15,6 +15,11 @@ const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
 let countdownFontPreloadPromise = null
 
+const avatarAssetUrl = (value) => {
+  const raw = String(value || '').trim()
+  return raw ? assetUrl(raw) : ''
+}
+
 const preloadCountdownFont = () => {
   if (typeof document === 'undefined') {
     return Promise.resolve()
@@ -310,7 +315,7 @@ function AvatarDebugPageV2() {
           throw new Error(payload?.error || 'avatar build failed')
         }
         if (requestSeqRef.current !== requestSeq) return
-        setModelUrl(payload.modelUrl || '')
+        setModelUrl(avatarAssetUrl(payload.modelUrl))
         setManifest(payload)
         setStatus('ready')
       } catch (buildError) {
@@ -492,7 +497,7 @@ function AvatarDebugPage() {
           throw new Error(payload?.error || 'avatar build failed')
         }
         if (requestSeqRef.current !== requestSeq) return
-        setModelUrl(payload.modelUrl || '')
+        setModelUrl(avatarAssetUrl(payload.modelUrl))
         setManifest(payload)
         setStatus('ready')
       } catch (buildError) {
@@ -784,7 +789,7 @@ function TutorialApp() {
       if (!response.ok) {
         throw new Error(payload?.error ?? 'Avatar build request failed.')
       }
-      setAvatarModelUrl(payload.modelUrl ?? '')
+      setAvatarModelUrl(avatarAssetUrl(payload.modelUrl))
       return payload
     } catch (error) {
       console.warn(error instanceof Error ? error.message : 'Unknown error while building avatar.')
@@ -1359,7 +1364,7 @@ function TutorialApp() {
       })
       const avatarPayload = await avatarResponse.json().catch(() => null)
       if (avatarResponse.ok && avatarPayload) {
-        setAvatarModelUrl(avatarPayload.modelUrl ?? avatarModelUrl)
+        setAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl) || avatarModelUrl)
       }
       return acceptNickname(payload)
     } catch (error) {
@@ -1606,7 +1611,7 @@ function AvatarProfileCapturePage() {
     const agentId = String(params.get('agentId') || '').trim()
     const explicitModelUrl = String(params.get('modelUrl') || '').trim()
     if (explicitModelUrl) {
-      setModelUrl(explicitModelUrl)
+      setModelUrl(avatarAssetUrl(explicitModelUrl))
       return
     }
     if (!agentId) {
@@ -1625,7 +1630,7 @@ function AvatarProfileCapturePage() {
         return payload
       })
       .then((payload) => {
-        if (!cancelled) setModelUrl(payload?.recipe?.modelUrl || '')
+        if (!cancelled) setModelUrl(avatarAssetUrl(payload?.recipe?.modelUrl))
       })
       .catch((loadError) => {
         if (!cancelled) {
