@@ -262,10 +262,24 @@ function AvatarDebugPageV2() {
   const [manifest, setManifest] = useState(null)
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
+  const [zoom, setZoom] = useState(1)
   const requestSeqRef = useRef(0)
+  const viewerCaptureRef = useRef(null)
 
   const updateSelection = (key, value) => {
     setSelection((current) => ({ ...current, [key]: value }))
+  }
+
+  const downloadPreview = () => {
+    const capturePng = viewerCaptureRef.current
+    if (!capturePng) return
+    const dataUrl = capturePng()
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = `terarium-avatar-debug-${Date.now()}.png`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
 
   useEffect(() => {
@@ -275,6 +289,7 @@ function AvatarDebugPageV2() {
     const build = async () => {
       setStatus('loading')
       setError('')
+      viewerCaptureRef.current = null
       const hairInfo = DEBUG_ASSET_TO_APPEARANCE.hair[selection.hair] || ['long_wave', 'none', 'center']
       const hasOutfit = selection.outfit !== 'none'
       const appearance = {
@@ -343,15 +358,32 @@ function AvatarDebugPageV2() {
   return (
     <main className="debug-avatar-page">
       <section className="debug-avatar-view">
+        <div className="debug-avatar-toolbar" aria-label="Avatar preview controls">
+          <div className="debug-zoom-control">
+            <button type="button" aria-label="Zoom out" onClick={() => setZoom((value) => Math.max(0.7, Number((value - 0.1).toFixed(2))))}>
+              -
+            </button>
+            <span>{Math.round(zoom * 100)}%</span>
+            <button type="button" aria-label="Zoom in" onClick={() => setZoom((value) => Math.min(2.2, Number((value + 0.1).toFixed(2))))}>
+              +
+            </button>
+          </div>
+          <button type="button" className="debug-download-button" disabled={!modelUrl || status !== 'ready'} onClick={downloadPreview}>
+            Download PNG
+          </button>
+        </div>
         <div className="debug-avatar-stage">
           {modelUrl ? (
             <AvatarThreeViewer
               src={modelUrl}
               alt="Avatar debug preview"
               variant="avatar"
-              distanceMultiplier={1.96}
+              distanceMultiplier={1.96 / zoom}
               fitFullBounds
               className="debug-avatar-canvas"
+              onReady={({ capturePng }) => {
+                viewerCaptureRef.current = capturePng
+              }}
             />
           ) : (
             <div className="debug-avatar-empty">Building avatar</div>
