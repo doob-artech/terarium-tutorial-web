@@ -645,7 +645,6 @@ function TutorialApp() {
     setStarredOptionId,
     answeredHistory,
     setAnsweredHistory,
-    historyViewIndex,
     setHistoryViewIndex,
     captureLocked,
     setCaptureLocked,
@@ -1102,10 +1101,6 @@ function TutorialApp() {
   }
 
   const handlePersonaOptionClick = (option) => {
-    if (historyViewIndex !== null) {
-      return
-    }
-
     const optionId = option?.id
     if (!optionId) return
     playPersonaClickSound()
@@ -1138,15 +1133,6 @@ function TutorialApp() {
   }
 
   const handleNextClick = () => {
-    if (historyViewIndex !== null) {
-      if (historyViewIndex < answeredHistory.length - 1) {
-        setHistoryViewIndex((prev) => (prev === null ? null : prev + 1))
-      } else {
-        setHistoryViewIndex(null)
-      }
-      return
-    }
-
     if (canSubmitSelection) {
       setIsQuestionTransitionLoading(true)
       void submitPersonaAnswer(
@@ -1224,18 +1210,10 @@ function TutorialApp() {
       return
     }
 
-    if (historyViewIndex !== null) {
-      if (historyViewIndex > 0) {
-        setHistoryViewIndex((prev) => (prev === null ? null : prev - 1))
-      } else {
-        setHistoryViewIndex(null)
-      }
-      return
-    }
-
     if (answeredHistory.length > 0) {
-      setHistoryViewIndex(answeredHistory.length - 1)
-      setIsPersonaCustomInputOpen(false)
+      const previousEntryIndex = answeredHistory.length - 1
+      const previousEntry = answeredHistory[previousEntryIndex]
+      void editHistoryAnswer(previousEntry, previousEntryIndex)
       return
     }
 
@@ -1244,19 +1222,11 @@ function TutorialApp() {
     }
   }
 
-  const handleEditHistoryClick = () => {
-    const entry = historyViewIndex !== null ? answeredHistory[historyViewIndex] ?? null : null
-    if (!entry) return
-    void editHistoryAnswer(entry, historyViewIndex)
-  }
-
   const currentQuestion = personaQuestion
-  const viewingHistoryEntry = historyViewIndex !== null ? answeredHistory[historyViewIndex] ?? null : null
-  const displayQuestion = viewingHistoryEntry?.question ?? currentQuestion
+  const displayQuestion = currentQuestion
   const personaQuestionText = displayQuestion?.question ?? ''
   const personaTotalTurns = Number(displayQuestion?.total_turns || displayQuestion?.totalTurns || PERSONA_TOTAL_TURNS) || PERSONA_TOTAL_TURNS
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
-  const isViewingHistory = historyViewIndex !== null
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
   const optionLabelMap = new Map(displayOptions.map((option) => [option.id, option]))
   const selectedOptionLabels = selectedOptionIds
@@ -1509,15 +1479,6 @@ function TutorialApp() {
                     />
                   ))}
                 </section>
-              ) : isViewingHistory ? (
-                <section className="persona-options" aria-label="이전 질문 답변 보기">
-                  <article className="persona-answer-review-card">
-                    <p className="persona-answer-review-label">
-                      {viewingHistoryEntry?.answerMode === 'custom' ? '직접 입력한 답변' : '선택한 답변'}
-                    </p>
-                    <p className="persona-answer-review-text">{viewingHistoryEntry?.answerText ?? ''}</p>
-                  </article>
-                </section>
               ) : (
                 <section className="persona-options" aria-label="선택지">
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
@@ -1569,7 +1530,7 @@ function TutorialApp() {
 
           {!personaResult && displayQuestion && (
             <nav className="persona-bottom-nav">
-              {isViewingHistory || answeredHistory.length > 0 || selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim() ? (
+              {answeredHistory.length > 0 || selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim() ? (
                 <button
                   className="nav-btn prev-btn"
                   type="button"
@@ -1581,14 +1542,14 @@ function TutorialApp() {
               ) : (
                 <div />
               )}
-              {(canSubmitSelection || isQuestionTransitionLoading || isViewingHistory) && (
+              {(canSubmitSelection || isQuestionTransitionLoading) && (
                 <button
                   className="nav-btn next-btn is-active"
                   type="button"
-                  onClick={isViewingHistory ? handleEditHistoryClick : handleNextClick}
-                  disabled={personaLoading || isQuestionTransitionLoading || (!canSubmitSelection && !isViewingHistory)}
+                  onClick={handleNextClick}
+                  disabled={personaLoading || isQuestionTransitionLoading || !canSubmitSelection}
                 >
-                  {isQuestionTransitionLoading ? '분석 중...' : isViewingHistory ? '이 답변 수정' : '다음으로'}
+                  {isQuestionTransitionLoading ? '분석 중...' : '다음으로'}
                 </button>
               )}
             </nav>
