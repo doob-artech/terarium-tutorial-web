@@ -94,6 +94,20 @@ export async function answerPersona({ agentId, answer, turn }) {
   return payload
 }
 
+export async function undoPersonaAnswer({ agentId, turn }) {
+  const payload = await requestJson('/api/persona/undo', {
+    method: 'POST',
+    body: { agentId, turn },
+    fallbackError: 'Persona undo request failed.',
+  })
+
+  if (!payload?.question) {
+    throw new Error('Server returned an invalid undo response.')
+  }
+
+  return payload
+}
+
 export function personaSessionAbandonUrl() {
   return apiUrl('/api/persona/session/abandon')
 }

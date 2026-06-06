@@ -13,6 +13,7 @@ import {
   renameAvatar,
   startPersona,
   syncPersonaAppearance,
+  undoPersonaAnswer,
 } from './lib/tutorialApi.js'
 import { useAvatarWorkflow } from './hooks/useAvatarWorkflow.js'
 import { useCameraCapture } from './hooks/useCameraCapture.js'
@@ -1028,6 +1029,11 @@ function TutorialApp() {
     setPersonaLoading(true)
     setPersonaError('')
     const submittedQuestion = personaQuestion
+    const submittedAnswerRecord = {
+      selectedOptionIds: Array.isArray(safePayload.selectedOptionIds) ? safePayload.selectedOptionIds : [],
+      starredOptionId: safePayload.starredOptionId || '',
+      customText: safePayload.customText || '',
+    }
 
     try {
       const payload = await answerPersona({
@@ -1055,6 +1061,7 @@ function TutorialApp() {
               question: submittedQuestion,
               answerText: trimmedAnswerText,
               answerMode: 'taste',
+              answerPayload: submittedAnswerRecord,
             },
           ])
         }
@@ -1076,6 +1083,7 @@ function TutorialApp() {
               question: submittedQuestion,
               answerText: trimmedAnswerText,
               answerMode: 'taste',
+              answerPayload: submittedAnswerRecord,
             },
           ])
         }
@@ -1152,6 +1160,54 @@ function TutorialApp() {
     }
   }
 
+  const restoreAnswerForEditing = (entry, serverAnswer = null) => {
+    const localPayload = entry?.answerPayload && typeof entry.answerPayload === 'object' ? entry.answerPayload : null
+    const selectedIds = Array.isArray(serverAnswer?.selectedOptionIds)
+      ? serverAnswer.selectedOptionIds
+      : Array.isArray(localPayload?.selectedOptionIds)
+        ? localPayload.selectedOptionIds
+        : []
+    const customText = typeof serverAnswer?.customText === 'string'
+      ? serverAnswer.customText
+      : typeof localPayload?.customText === 'string'
+        ? localPayload.customText
+        : ''
+    const starredId = typeof serverAnswer?.starredOptionId === 'string' && serverAnswer.starredOptionId
+      ? serverAnswer.starredOptionId
+      : typeof localPayload?.starredOptionId === 'string' && localPayload.starredOptionId
+        ? localPayload.starredOptionId
+        : selectedIds[0] || ''
+
+    setSelectedOptionIds(selectedIds)
+    setStarredOptionId(starredId)
+    setPersonaInput(customText)
+    setIsPersonaCustomInputOpen(selectedIds.includes('other_custom'))
+  }
+
+  const editHistoryAnswer = async (entry, entryIndex) => {
+    if (!entry?.question || !personaAgentId || personaLoading || isQuestionTransitionLoading) {
+      return
+    }
+
+    setPersonaLoading(true)
+    setPersonaError('')
+    try {
+      const payload = await undoPersonaAnswer({
+        agentId: personaAgentId,
+        turn: entry.question.turn,
+      })
+      setPersonaQuestion(payload.question)
+      setPersonaResult(null)
+      setAnsweredHistory((prev) => prev.slice(0, Math.max(0, entryIndex)))
+      setHistoryViewIndex(null)
+      restoreAnswerForEditing(entry, payload.restoredAnswer)
+    } catch (error) {
+      setPersonaError(error instanceof Error ? error.message : '이전 답변을 다시 불러오지 못했습니다.')
+    } finally {
+      setPersonaLoading(false)
+    }
+  }
+
   const resetCurrentSelection = () => {
     setSelectedOptionIds([])
     setStarredOptionId('')
@@ -1186,6 +1242,12 @@ function TutorialApp() {
     if (selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim()) {
       resetCurrentSelection()
     }
+  }
+
+  const handleEditHistoryClick = () => {
+    const entry = historyViewIndex !== null ? answeredHistory[historyViewIndex] ?? null : null
+    if (!entry) return
+    void editHistoryAnswer(entry, historyViewIndex)
   }
 
   const currentQuestion = personaQuestion
@@ -1523,10 +1585,10 @@ function TutorialApp() {
                 <button
                   className="nav-btn next-btn is-active"
                   type="button"
-                  onClick={handleNextClick}
+                  onClick={isViewingHistory ? handleEditHistoryClick : handleNextClick}
                   disabled={personaLoading || isQuestionTransitionLoading || (!canSubmitSelection && !isViewingHistory)}
                 >
-                  {isQuestionTransitionLoading ? '분석 중...' : '다음으로'}
+                  {isQuestionTransitionLoading ? '분석 중...' : isViewingHistory ? '이 답변 수정' : '다음으로'}
                 </button>
               )}
             </nav>

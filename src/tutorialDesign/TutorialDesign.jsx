@@ -641,6 +641,7 @@ const TutorialDesign = ({
                     variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
                     distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
                     initialYaw={currentId === 9 ? avatarInitialYaw : 0}
+                    idleSway={currentId === 9 || currentId === 11}
                     onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
                     onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
                   />

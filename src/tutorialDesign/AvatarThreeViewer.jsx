@@ -258,6 +258,7 @@ const AvatarThreeViewer = ({
   distanceMultiplier = 1.82,
   fitFullBounds = false,
   initialYaw = 0,
+  idleSway = false,
   onRotationChange = null,
   onReady = null,
 }) => {
@@ -287,6 +288,7 @@ const AvatarThreeViewer = ({
     let disposed = false;
     let frameId = 0;
     let modelRoot = null;
+    let modelBaseX = 0;
     const rotationState = {
       yaw: Number.isFinite(initialYawRef.current) ? initialYawRef.current : 0,
       pitch: 0,
@@ -496,6 +498,7 @@ const AvatarThreeViewer = ({
         }
         scene.add(modelRoot);
         fitCameraToObject(camera, modelRoot, target, distanceMultiplier, fitFullBounds || variant === 'staticFront');
+        modelBaseX = modelRoot.position.x;
         applyModelRotation(modelRoot, variant, rotationState);
         renderer.domElement.style.opacity = '1';
         setLoadState('ready');
@@ -519,6 +522,10 @@ const AvatarThreeViewer = ({
     const render = () => {
       if (modelRoot) {
         const now = performance.now();
+        if (idleSway) {
+          const elapsed = now * 0.001;
+          modelRoot.position.x = modelBaseX + Math.sin(elapsed * 1.55) * 0.035;
+        }
         if (!isStaticAvatarVariant(variant) && !rotationState.isDragging) {
           rotationState.yaw += variant === 'loadingBase' ? 0.006 : 0.0032;
           rotationState.yaw += rotationState.velocityX;
@@ -570,7 +577,7 @@ const AvatarThreeViewer = ({
       renderer?.dispose();
       renderer?.domElement.remove();
     };
-  }, [distanceMultiplier, fitFullBounds, src, variant]);
+  }, [distanceMultiplier, fitFullBounds, idleSway, src, variant]);
 
   return (
     <div
