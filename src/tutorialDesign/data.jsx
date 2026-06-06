@@ -19,8 +19,8 @@ export const TUTORIAL_DATA = [
     type: 'SELECT',
     text: '본격적으로 시작하기 전에 질문할 게 있어.\n AI들도 인간처럼 감정을 느끼거나 자신만의 가치관을 만들어 나갈 수 있을까?',
     options: [
-      { label: 'YES', subText: '응, AI도 지능을 가진 존재니까 가능할 것 같아.', nextId: 3 },
-      { label: 'NO', subText: '아니, 결국 전부 학습된 결과야.', nextId: 4 },
+      { label: 'YES', nextId: 3 },
+      { label: 'NO', nextId: 4 },
     ],
     character: 'curious',
   },

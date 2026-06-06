@@ -18,11 +18,11 @@ const SKY_BACKGROUND = 'linear-gradient(180deg, #9FD1FC 0%, #FFF 100%)';
 
 const ANSWER_BACKGROUNDS = {
   3: {
-    label: '응, AI도 지능을 가진 존재라면 가능할 것 같아.',
+    label: 'YES',
     background: 'linear-gradient(0deg, #FFF 0%, #5D9CEC 73.08%)',
   },
   4: {
-    label: '아니, 결국 미리 학습한 결과야.',
+    label: 'NO',
     background: 'linear-gradient(0deg, #FFF 0%, #FF8C5A 73.08%)',
   },
 };
@@ -916,7 +916,6 @@ const TutorialDesign = ({
                             onClick={() => handleProgressiveNext(opt.nextId)}
                           >
                             <span className="lbl-top">{opt.label}</span>
-                            <span className="lbl-sub">{opt.subText}</span>
                           </button>
                         ))}
                       </div>

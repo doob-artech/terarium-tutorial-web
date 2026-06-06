@@ -20,10 +20,17 @@ async function requestJson(path, { method = 'GET', body, fallbackError = 'Reques
   return payload
 }
 
-export async function analyzeAppearance(imageDataUrl) {
+export async function analyzeAppearance(input) {
+  const body = typeof input === 'string'
+    ? { imageDataUrl: input }
+    : {
+        frontImageDataUrl: input?.frontImageDataUrl || input?.imageDataUrl || '',
+        rearImageDataUrl: input?.rearImageDataUrl || '',
+      }
+
   const payload = await requestJson('/api/analyze-appearance', {
     method: 'POST',
-    body: { imageDataUrl },
+    body,
     fallbackError: 'Analyze request failed.',
   })
 
@@ -85,6 +92,19 @@ export async function answerPersona({ agentId, answer, turn }) {
   }
 
   return payload
+}
+
+export function personaSessionAbandonUrl() {
+  return apiUrl('/api/persona/session/abandon')
+}
+
+export async function abandonPersonaSession(agentId) {
+  if (!agentId) return null
+  return requestJson('/api/persona/session/abandon', {
+    method: 'POST',
+    body: { agentId },
+    fallbackError: 'Persona abandon request failed.',
+  })
 }
 
 export async function claimNickname({ agentId, nickname }) {

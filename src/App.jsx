@@ -3,11 +3,13 @@ import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
 import { assetUrl } from './apiBase.js'
 import {
+  abandonPersonaSession,
   analyzeAppearance,
   answerPersona,
   buildAvatar,
   claimNickname,
   fetchAvatarRecipe,
+  personaSessionAbandonUrl,
   renameAvatar,
   startPersona,
   syncPersonaAppearance,
@@ -668,14 +670,17 @@ function TutorialApp() {
   const syncedAppearanceAgentRef = useRef('')
   const capturePipelineRef = useRef(null)
   const personaAgentIdRef = useRef('')
+  const personaCompletedRef = useRef(false)
   const nicknameValueRef = useRef('')
   const nicknameInputRef = useRef('')
   const avatarPreviewRotationRef = useRef({ yaw: 0, pitch: 0 })
   const avatarTransitionFinishingRef = useRef(false)
   const {
     videoRef,
+    secondaryVideoRef,
     stopCamera,
-    captureCurrentFrame,
+    captureCameraFrames,
+    cameraDevices,
   } = useCameraCapture({ stage, setCameraReady })
   const getActiveAvatarAgentId = useCallback(
     () => personaAgentIdRef.current || personaAgentId,
@@ -701,11 +706,28 @@ function TutorialApp() {
     timeoutIdsRef.current = []
   }
 
+  const abandonActivePersonaSession = useCallback((preferBeacon = false) => {
+    const activeAgentId = personaAgentIdRef.current
+    if (!activeAgentId || personaCompletedRef.current) {
+      return
+    }
+
+    if (preferBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const payload = JSON.stringify({ agentId: activeAgentId })
+      navigator.sendBeacon(personaSessionAbandonUrl(), payload)
+      return
+    }
+
+    void abandonPersonaSession(activeAgentId).catch(() => null)
+  }, [])
+
   const resetPersonaSession = () => {
+    abandonActivePersonaSession()
     startInterviewRequestIdRef.current += 1
     startInterviewInFlightRef.current = false
     capturePipelineRef.current = null
     personaAgentIdRef.current = ''
+    personaCompletedRef.current = false
     nicknameValueRef.current = ''
     nicknameInputRef.current = ''
     syncedAppearanceAgentRef.current = ''
@@ -740,9 +762,9 @@ function TutorialApp() {
     timeoutIdsRef.current.push(cleanupTimer)
   }, [setIsAvatarHandoffCover, setIsAvatarLoadingExit, setIsAvatarPreloading])
 
-  const analyzePhotoWithLlmServer = async (imageDataUrl) => {
+  const analyzePhotoWithLlmServer = async (cameraFrames) => {
     try {
-      const result = await analyzeAppearance(imageDataUrl)
+      const result = await analyzeAppearance(cameraFrames)
       setAnalysisResult(result)
       return result
     } catch {
@@ -778,6 +800,7 @@ function TutorialApp() {
     }
 
     startInterviewInFlightRef.current = true
+    personaCompletedRef.current = false
     const requestId = startInterviewRequestIdRef.current + 1
     startInterviewRequestIdRef.current = requestId
 
@@ -842,9 +865,23 @@ function TutorialApp() {
   useEffect(() => {
     return () => {
       clearTimers()
+      abandonActivePersonaSession()
       stopCamera()
     }
-  }, [stopCamera])
+  }, [abandonActivePersonaSession, stopCamera])
+
+  useEffect(() => {
+    const handlePageExit = () => {
+      abandonActivePersonaSession(true)
+    }
+
+    window.addEventListener('pagehide', handlePageExit)
+    window.addEventListener('beforeunload', handlePageExit)
+    return () => {
+      window.removeEventListener('pagehide', handlePageExit)
+      window.removeEventListener('beforeunload', handlePageExit)
+    }
+  }, [abandonActivePersonaSession])
 
   useEffect(() => {
     if (!['nickname', 'persona'].includes(stage) || personaQuestion || personaAgentId || personaResult || personaLoading || personaError) {
@@ -892,7 +929,8 @@ function TutorialApp() {
     const countOneTimer = window.setTimeout(() => setCountdown(1), 2000)
 
     const flashTimer = window.setTimeout(() => {
-      const imageDataUrl = captureCurrentFrame()
+      const cameraFrames = captureCameraFrames()
+      const imageDataUrl = cameraFrames.frontImageDataUrl
 
       setCountdown(null)
       setIsCaptureProcessing(true)
@@ -911,7 +949,7 @@ function TutorialApp() {
             appearanceResult = MOCK_APPEARANCE_RESULT
           } else {
             if (imageDataUrl) {
-              appearanceResult = await analyzePhotoWithLlmServer(imageDataUrl)
+              appearanceResult = await analyzePhotoWithLlmServer(cameraFrames)
             }
           }
 
@@ -1001,6 +1039,7 @@ function TutorialApp() {
       setPersonaInput('')
 
       if (payload?.done) {
+        personaCompletedRef.current = true
         const finalNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
         const didCommitNickname = await commitNicknameToServer(finalNickname, personaAgentId)
         if (!didCommitNickname) {
@@ -1279,13 +1318,25 @@ function TutorialApp() {
           onBeginCamera={handleCapture}
           hideUi={captureLocked || countdown !== null || isCaptureProcessing}
           backgroundSlot={
-            <video
-              ref={videoRef}
-              className="tutorial-camera-background-video"
-              autoPlay
-              playsInline
-              muted
-            />
+            <>
+              <video
+                ref={videoRef}
+                className="tutorial-camera-background-video"
+                autoPlay
+                playsInline
+                muted
+              />
+              {cameraDevices.length > 1 && (
+                <video
+                  ref={secondaryVideoRef}
+                  className="tutorial-camera-secondary-video"
+                  autoPlay
+                  playsInline
+                  muted
+                  aria-label="서브 카메라"
+                />
+              )}
+            </>
           }
         />
         {countdown !== null && (

@@ -86,3 +86,17 @@ body {
   min-height: 100vh;
   font-family: 'Cafe24Anemone', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
 }
+
+:root {
+  --terarium-tutorial-type-title: clamp(62px, 10vw, 124px);
+  --terarium-tutorial-type-question: clamp(28px, 3.5vh, 44px);
+  --terarium-tutorial-type-body: clamp(22px, 1.48vw, 31px);
+  --terarium-tutorial-type-compact: clamp(20px, 1.35vw, 27px);
+  --terarium-tutorial-type-control: clamp(20px, 1.35vw, 28px);
+  --terarium-tutorial-type-option: clamp(19px, 2.2vh, 25px);
+  --terarium-tutorial-type-label: clamp(18px, 1.12vw, 23px);
+  --terarium-tutorial-type-small: clamp(16px, 1vw, 20px);
+  --terarium-tutorial-type-input: clamp(22px, 1.55vw, 31px);
+  --terarium-tutorial-line-body: 1.68;
+  --terarium-tutorial-line-compact: 1.48;
+}

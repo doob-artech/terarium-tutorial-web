@@ -1,6 +1,6 @@
 import { PERSONA_VERSION } from './personaRuntime.js'
 
-export const TASTE_SURVEY_VERSION = 6
+export const TASTE_SURVEY_VERSION = 7
 
 const MAX_SELECT = 3
 
@@ -81,16 +81,15 @@ export const TASTE_SURVEY_QUESTIONS = [
     domain: '공간',
     question: '좋아하는 공간을 골라주세요. 최대 3개.',
     options: [
-      o('convenience_store', '편의점', { social_energy: 1, structure: 1 }, ['즉흥', '작은 소비', '밤의 생활감'], visual('linear-gradient(135deg, #fff8cf 0%, #4aa3ff 46%, #f45d5d 100%)')),
+      o('cafe', '카페', { social_energy: 1, care: 1, memory: 1 }, ['커피', '창가', '가벼운 대화'], visual('linear-gradient(135deg, #3b2a1e 0%, #91623a 52%, #e7c990 100%)')),
+      o('restaurant', '식당', { social_energy: 2, care: 1, structure: 1 }, ['식사', '테이블', '함께 먹기'], visual('linear-gradient(135deg, #261a10 0%, #8a5424 54%, #f0b55f 100%)')),
+      o('bar', '바', { stimulation: 2, social_energy: 2, darkness: 1 }, ['밤', '잔', '짧은 고백'], visual('linear-gradient(135deg, #0f0d10 0%, #4d2c16 52%, #c28b45 100%)')),
+      o('sea', '바다', { emotional_depth: 1, openness: 2 }, ['파도', '수평선', '떠남'], visual('linear-gradient(135deg, #0c3c5d 0%, #2e9cc9 50%, #e7d6a5 100%)')),
       o('library', '도서관', { memory: 2, structure: 1 }, ['침묵', '기록', '관찰'], visual('linear-gradient(135deg, #37291d 0%, #7b5535 52%, #d8bb78 100%)')),
-      o('abandoned_factory', '폐공장', { darkness: 2, stimulation: 1 }, ['거친 구조', '금지된 장소', '잔향'], visual('linear-gradient(135deg, #1f2524 0%, #626760 54%, #b57947 100%)')),
-      o('club', '클럽', { stimulation: 2, social_energy: 2 }, ['집단 에너지', '소음', '몸의 리듬'], visual('linear-gradient(135deg, #120b24 0%, #ce2dff 48%, #00e0ff 100%)')),
-      o('small_room', '작은 방', { care: 2, emotional_depth: 1 }, ['안전거리', '머무름', '느린 친밀감'], visual('linear-gradient(135deg, #6b4a34 0%, #d1a470 52%, #ffe5b8 100%)')),
-      o('rooftop', '옥상', { future: 1, stimulation: 1, emotional_depth: 1 }, ['높이', '바람', '내려다보기'], visual('linear-gradient(135deg, #17243b 0%, #5676a6 48%, #f1b76e 100%)')),
-      o('sea', '바다', { emotional_depth: 1, openness: 1 }, ['떠남', '수평선', '기다림'], visual('linear-gradient(135deg, #0c3c5d 0%, #2e9cc9 50%, #e7d6a5 100%)')),
-      o('studio', '작업실', { structure: 1, future: 1, social_energy: 1 }, ['공동작업', '도구', '만들기'], visual('linear-gradient(135deg, #2f2b25 0%, #a36f3d 48%, #ded0b2 100%)')),
-      o('hotel', '호텔', { structure: 2 }, ['임시 거처', '정돈', '거리감'], visual('linear-gradient(135deg, #e8ded0 0%, #8e7d72 54%, #242126 100%)')),
-      o('other_custom', '직접입력', { openness: 1 }, ['직접 입력'], { allowsCustom: true, span: 3, ...visual('linear-gradient(135deg, #fff2a1 0%, #ffd75b 100%)') }),
+      o('lake', '호수', { emotional_depth: 1, care: 1, openness: 1 }, ['반사', '고요', '머무름'], visual('linear-gradient(135deg, #173a3f 0%, #4c8f9c 50%, #d9dca8 100%)')),
+      o('church', '교회', { emotional_depth: 2, memory: 1, structure: 1 }, ['기도', '울림', '조용한 약속'], visual('linear-gradient(135deg, #221b18 0%, #7b6040 52%, #f0d7a4 100%)')),
+      o('playground', '놀이터', { social_energy: 2, stimulation: 1, openness: 1 }, ['장난', '놀이기구', '가벼운 접촉'], visual('linear-gradient(135deg, #315d39 0%, #7fb464 52%, #f0b15e 100%)')),
+      o('lawn', '잔디밭', { care: 1, openness: 2, social_energy: 1 }, ['돗자리', '햇빛', '느린 동행'], visual('linear-gradient(135deg, #2d5b38 0%, #76a85c 50%, #d3d879 100%)')),
     ],
   },
   {

@@ -59,9 +59,12 @@ body,
 
 #tutorial-container {
   position: relative;
-  --tutorial-body-font-size: clamp(20px, 1.35vw, 28px);
-  --tutorial-compact-font-size: clamp(18px, 1.22vw, 24px);
-  --tutorial-line-height: 1.8;
+  --tutorial-body-font-size: var(--terarium-tutorial-type-body);
+  --tutorial-compact-font-size: var(--terarium-tutorial-type-compact);
+  --tutorial-control-font-size: var(--terarium-tutorial-type-control);
+  --tutorial-label-font-size: var(--terarium-tutorial-type-label);
+  --tutorial-input-font-size: var(--terarium-tutorial-type-input);
+  --tutorial-line-height: var(--terarium-tutorial-line-body);
   --tutorial-card-width: min(90vw, 1280px);
 }
 
@@ -370,7 +373,7 @@ body,
 .glass-bubble-card.step-12 {
   position: absolute;
   left: 50%;
-  top: clamp(46vh, 52vh, 56vh);
+  top: clamp(56vh, 60vh, 64vh);
   z-index: 12;
   width: min(86vw, 980px);
   height: auto;
@@ -601,7 +604,7 @@ body,
 .glass-bubble-card.step-10 .q-label {
   margin-bottom: 4vh;
   color: #111;
-  font-size: 1.2vw;
+  font-size: var(--tutorial-label-font-size);
   font-weight: 750;
 }
 
@@ -611,7 +614,7 @@ body,
   padding: 1.6vh 1.4vw;
   border-radius: 1.1vw;
   background: #fff;
-  font-size: 1vw;
+  font-size: var(--tutorial-input-font-size);
   text-align: left;
   box-shadow: 0 0.3vh 1vh rgba(0, 0, 0, 0.18) inset;
 }
@@ -714,7 +717,7 @@ body,
 .glass-bubble-card.step-15 .main-desc {
   max-width: 74vw;
   color: #111;
-  font-size: 1.25vw;
+  font-size: var(--tutorial-compact-font-size);
   font-weight: 800;
   line-height: 190%;
 }
@@ -755,7 +758,7 @@ body,
 .stack-head-box .main-desc {
   max-width: 100%;
   color: #111;
-  font-size: 1.28vw;
+  font-size: var(--tutorial-compact-font-size);
   font-weight: 800;
   line-height: 160%;
 }
@@ -785,7 +788,7 @@ body,
   width: 100%;
   color: #111;
   text-align: center;
-  font-size: 1.25vw;
+  font-size: var(--tutorial-compact-font-size);
   font-weight: 800;
   line-height: 185%;
   white-space: pre-line;
@@ -891,23 +894,27 @@ body,
 }
 
 .action-row {
-  margin-top: 2vh;
+  margin-top: clamp(18px, 2.4vh, 34px);
 }
 
 .primary-next-btn {
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 11vw;
-  height: 6vh;
-  border-radius: 5vh;
+  width: auto;
+  min-width: clamp(180px, 14vw, 260px);
+  min-height: clamp(64px, 7vh, 88px);
+  padding: 0 clamp(28px, 2.8vw, 48px);
+  border-radius: 999px;
   background: #63AAEA;
   border: none;
   cursor: pointer;
   box-shadow: 0.4vw 0.5vw 1vw 0 rgba(255, 255, 255, 0.4) inset;
   color: #fff;
-  font-size: 1.1vw;
+  font-size: var(--tutorial-control-font-size);
   font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
@@ -935,7 +942,7 @@ body,
   flex: 1;
   padding: 1.5vh 0;
   border-radius: 2vh;
-  font-size: 1.2vw;
+  font-size: var(--tutorial-control-font-size);
   font-weight: 800;
   border: none;
   cursor: pointer;
@@ -970,7 +977,7 @@ body,
 }
 
 .lbl-top {
-  font-size: 1.15vw;
+  font-size: var(--tutorial-control-font-size);
   font-weight: 900;
 }
 
@@ -989,7 +996,7 @@ body,
 
 .lbl-sub {
   margin-top: 0.6vh;
-  font-size: 0.8vw;
+  font-size: var(--tutorial-label-font-size);
   font-weight: 700;
   opacity: 0.7;
 }
@@ -998,7 +1005,7 @@ body,
   position: relative;
   z-index: 1;
   margin-top: 0;
-  font-size: 1.4vw;
+  font-size: var(--tutorial-body-font-size);
   font-weight: 800;
   opacity: 1;
   color: #fff;
@@ -1013,7 +1020,7 @@ body,
 
 .q-label {
   color: #2d2d2d;
-  font-size: 1vw;
+  font-size: var(--tutorial-label-font-size);
   font-weight: 800;
 }
 
@@ -1023,7 +1030,7 @@ body,
   width: 25vw;
   border-radius: 5vh;
   border: 1px solid rgba(0, 0, 0, 0.1);
-  font-size: 1.2vw;
+  font-size: var(--tutorial-input-font-size);
   text-align: center;
   outline: none;
 }
@@ -1114,10 +1121,10 @@ body,
 }
 
 .character-layer.step-character-12 {
-  --step-character-x: 50vw;
-  --step-character-y: clamp(24vh, 31vh, 36vh);
-  --step-character-width: clamp(190px, 22vw, 340px);
-  --step-character-max-height: 34vh;
+  --step-character-x: clamp(56vw, 60vw, 64vw);
+  --step-character-y: clamp(31vh, 36vh, 40vh);
+  --step-character-width: clamp(210px, 20vw, 330px);
+  --step-character-max-height: 36vh;
 }
 
 .character-layer.name-result-avatar {
