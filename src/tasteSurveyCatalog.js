@@ -1,6 +1,6 @@
 import { PERSONA_VERSION } from './personaRuntime.js'
 
-export const TASTE_SURVEY_VERSION = 7
+export const TASTE_SURVEY_VERSION = 8
 
 const MAX_SELECT = 3
 
@@ -35,7 +35,7 @@ export const TASTE_SURVEY_QUESTIONS = [
       o('nature', '자연', { care: 1, emotional_depth: 1 }, ['숨', '회복', '풍경'], visual('linear-gradient(135deg, #2d5b38 0%, #76a85c 50%, #d3b879 100%)')),
       o('minimal', '미니멀', { structure: 2 }, ['여백', '절제', '정리'], visual('linear-gradient(135deg, #f4f1e7 0%, #d8d6cf 55%, #aaa79d 100%)')),
       o('cyber', '사이버', { future: 2, openness: 1 }, ['네온', '기계감', '미래'], visual('linear-gradient(135deg, #10142f 0%, #2337ff 42%, #00ffd5 100%)')),
-      o('strange', '괴이함', { darkness: 2, openness: 1 }, ['이질감', '불안', '기묘함'], visual('radial-gradient(circle at 30% 20%, #d8ff5f 0 8%, transparent 9%), linear-gradient(135deg, #1b1830 0%, #51316f 52%, #163c34 100%)')),
+      o('strange', '기묘한 분위기', { darkness: 2, openness: 1 }, ['이질감', '불안', '기묘함'], visual('radial-gradient(circle at 30% 20%, #d8ff5f 0 8%, transparent 9%), linear-gradient(135deg, #1b1830 0%, #51316f 52%, #163c34 100%)')),
       o('other_custom', '직접입력', { openness: 1 }, ['직접 입력'], { allowsCustom: true, span: 3, ...visual('linear-gradient(135deg, #fff2a1 0%, #ffd75b 100%)') }),
     ],
   },
@@ -53,7 +53,7 @@ export const TASTE_SURVEY_QUESTIONS = [
       o('techno', '테크노', { stimulation: 2, future: 1 }, ['반복', '몰입', '기계적 리듬'], visual('repeating-linear-gradient(90deg, #0d1426 0 10px, #202bff 11px 13px, #0d1426 14px 24px), linear-gradient(135deg, #00f0ff, #ff2bcb)')),
       o('ballad', '발라드', { emotional_depth: 2, memory: 1 }, ['여운', '상실', '느린 고백'], visual('linear-gradient(135deg, #34415f 0%, #8c6f8e 55%, #ead5d5 100%)')),
       o('ambient', '앰비언트', { emotional_depth: 1, structure: 1 }, ['침잠', '느린 관찰', '공기'], visual('linear-gradient(135deg, #233a4a 0%, #7fa0a1 50%, #dbe8d8 100%)')),
-      o('noise', '노이즈', { stimulation: 2, openness: 1, darkness: 1 }, ['거친 질감', '불협', '실험'], visual('repeating-linear-gradient(45deg, #171717 0 5px, #d8d8d8 6px 7px, #494949 8px 13px)')),
+      o('noise', '실험음악', { stimulation: 2, openness: 1, darkness: 1 }, ['거친 질감', '불협', '실험'], visual('repeating-linear-gradient(45deg, #171717 0 5px, #d8d8d8 6px 7px, #494949 8px 13px)')),
       o('other_custom', '직접입력', { openness: 1 }, ['직접 입력'], { allowsCustom: true, span: 3, ...visual('linear-gradient(135deg, #fff2a1 0%, #ffd75b 100%)') }),
     ],
   },
@@ -71,7 +71,7 @@ export const TASTE_SURVEY_QUESTIONS = [
       o('drama', '드라마', { emotional_depth: 2, memory: 1 }, ['관계', '상처', '변화'], visual('linear-gradient(135deg, #28334a 0%, #80505f 52%, #d9b1a3 100%)')),
       o('sf', 'SF', { future: 2, openness: 1 }, ['시스템', '미래', '가설'], visual('linear-gradient(135deg, #081b2f 0%, #2856ff 48%, #8af7ff 100%)')),
       o('action', '액션', { stimulation: 2, directness: 1 }, ['속도', '위험', '결단'], visual('linear-gradient(135deg, #32140d 0%, #e3481d 48%, #ffd65f 100%)')),
-      o('cult', '컬트', { openness: 2, darkness: 1 }, ['비주류', '기묘한 취향', '집착'], visual('linear-gradient(135deg, #2b1743 0%, #8c2aa2 52%, #c8ff46 100%)')),
+      o('cult', '마니아 취향', { openness: 2, darkness: 1 }, ['비주류', '기묘한 취향', '집착'], visual('linear-gradient(135deg, #2b1743 0%, #8c2aa2 52%, #c8ff46 100%)')),
       o('other_custom', '직접입력', { openness: 1 }, ['직접 입력'], { allowsCustom: true, span: 3, ...visual('linear-gradient(135deg, #fff2a1 0%, #ffd75b 100%)') }),
     ],
   },
@@ -87,7 +87,7 @@ export const TASTE_SURVEY_QUESTIONS = [
       o('sea', '바다', { emotional_depth: 1, openness: 2 }, ['파도', '수평선', '떠남'], visual('linear-gradient(135deg, #0c3c5d 0%, #2e9cc9 50%, #e7d6a5 100%)')),
       o('library', '도서관', { memory: 2, structure: 1 }, ['침묵', '기록', '관찰'], visual('linear-gradient(135deg, #37291d 0%, #7b5535 52%, #d8bb78 100%)')),
       o('lake', '호수', { emotional_depth: 1, care: 1, openness: 1 }, ['반사', '고요', '머무름'], visual('linear-gradient(135deg, #173a3f 0%, #4c8f9c 50%, #d9dca8 100%)')),
-      o('church', '교회', { emotional_depth: 2, memory: 1, structure: 1 }, ['기도', '울림', '조용한 약속'], visual('linear-gradient(135deg, #221b18 0%, #7b6040 52%, #f0d7a4 100%)')),
+      o('church', '고요한 예배당', { emotional_depth: 2, memory: 1, structure: 1 }, ['기도', '울림', '조용한 약속'], visual('linear-gradient(135deg, #221b18 0%, #7b6040 52%, #f0d7a4 100%)')),
       o('playground', '놀이터', { social_energy: 2, stimulation: 1, openness: 1 }, ['장난', '놀이기구', '가벼운 접촉'], visual('linear-gradient(135deg, #315d39 0%, #7fb464 52%, #f0b15e 100%)')),
       o('lawn', '잔디밭', { care: 1, openness: 2, social_energy: 1 }, ['돗자리', '햇빛', '느린 동행'], visual('linear-gradient(135deg, #2d5b38 0%, #76a85c 50%, #d3d879 100%)')),
     ],
