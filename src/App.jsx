@@ -19,6 +19,7 @@ import { useAvatarWorkflow } from './hooks/useAvatarWorkflow.js'
 import { useCameraCapture } from './hooks/useCameraCapture.js'
 import { useTutorialFlowState } from './hooks/useTutorialFlowState.js'
 import clickSoundSrc from './tutorialDesign/assets/click1.mp3'
+import logo1Src from './tutorialDesign/assets/logo1.png'
 import countdownFontUrl from './tutorialDesign/fonts/CHANGWONDANGAMASAC-BOLD.TTF?url'
 import './App.css'
 
@@ -758,7 +759,7 @@ function TutorialApp() {
       setIsAvatarLoadingExit(false)
       setIsAvatarHandoffCover(false)
       avatarTransitionFinishingRef.current = false
-    }, 1980)
+    }, 620)
     timeoutIdsRef.current.push(cleanupTimer)
   }, [setIsAvatarHandoffCover, setIsAvatarLoadingExit, setIsAvatarPreloading])
 
@@ -965,6 +966,9 @@ function TutorialApp() {
               agentId: personaPayload.agentId,
               appearance: avatarAppearance,
             })
+            if (!avatarPayload?.modelUrl) {
+              throw new Error('아바타 생성에 실패했습니다. 다시 촬영해 주세요.')
+            }
             const latestNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
             if (latestNickname) {
               await renameAvatar({
@@ -981,8 +985,6 @@ function TutorialApp() {
               beginAvatarIntroTransition()
             }, 260)
             timeoutIdsRef.current.push(handoffTimer)
-          } else {
-            setStage('avatarIntro')
           }
           return personaPayload
         } catch (error) {
@@ -1381,13 +1383,11 @@ function TutorialApp() {
   }
 
   if (stage === 'avatarLoading') {
-    const loadingAvatarUrl = avatarModelUrl || LOADING_BASE_AVATAR_URL
-
     return (
       <main className={`avatar-loading-screen ${isAvatarHandoffCover ? 'is-covered' : ''}`} aria-label="로딩 중" aria-live="polite">
         <AvatarThreeViewer
           className="avatar-loading-preview"
-          src={loadingAvatarUrl}
+          src={LOADING_BASE_AVATAR_URL}
           alt="avatar loading preview"
           variant="loadingBase"
           distanceMultiplier={1.66}
@@ -1438,9 +1438,11 @@ function TutorialApp() {
       role="application"
       aria-label="페르소나 인터뷰 화면"
     >
-      <section className="persona-stage" aria-label="페르소나 인터뷰 화면">
-        <div className="persona-brand-bg">TERARiUM</div>
-
+      <section
+        className="persona-stage"
+        aria-label="페르소나 인터뷰 화면"
+        style={{ '--persona-logo-bg': `url(${logo1Src})` }}
+      >
         <header className="persona-header">
           <div className="persona-question-meta">
             <span className="persona-meta-label">Question</span>

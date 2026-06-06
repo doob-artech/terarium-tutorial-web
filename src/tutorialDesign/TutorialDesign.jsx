@@ -65,11 +65,11 @@ const STEP_BACKGROUND_VIDEOS = {
 
 let typingAudioPool = [];
 let typingAudioPoolIndex = 0;
-let lastTypingSoundAt = 0;
 let clickAudioPool = [];
 let clickAudioPoolIndex = 0;
 let typingAudioBlockedUntil = 0;
-const TYPING_SOUND_CLIP_MS = 90;
+let typingSoundStopTimer = 0;
+const TYPING_SOUND_CLIP_MS = 74;
 const CLICK_SOUND_FALLBACK_MS = 320;
 const CLICK_SOUND_TAIL_GAP_MS = 40;
 
@@ -100,11 +100,6 @@ const playTypingSound = (char) => {
     return;
   }
 
-  if (now - lastTypingSoundAt < 35) {
-    return;
-  }
-  lastTypingSoundAt = now;
-
   const pool = getTypingAudioPool();
   if (pool.length === 0) {
     return;
@@ -112,15 +107,23 @@ const playTypingSound = (char) => {
 
   const audio = pool[typingAudioPoolIndex];
   typingAudioPoolIndex = (typingAudioPoolIndex + 1) % pool.length;
+  window.clearTimeout(typingSoundStopTimer);
+  typingAudioPool.forEach((item) => {
+    if (item !== audio) {
+      item.pause();
+      item.currentTime = 0;
+    }
+  });
   audio.currentTime = 0;
   void audio.play().catch(() => {});
-  window.setTimeout(() => {
+  typingSoundStopTimer = window.setTimeout(() => {
     audio.pause();
     audio.currentTime = 0;
   }, TYPING_SOUND_CLIP_MS);
 };
 
 const stopTypingSounds = () => {
+  window.clearTimeout(typingSoundStopTimer);
   typingAudioPool.forEach((audio) => {
     audio.pause();
     audio.currentTime = 0;
@@ -169,6 +172,15 @@ const getTypingStartDelay = (baseDelay) => {
   return Math.max(baseDelay, remainingClickMs > 0 ? remainingClickMs : 0);
 };
 
+const getTypingSchedule = (value, speed, pauseTime) => {
+  const chars = Array.from(value);
+  let elapsed = 0;
+  return chars.map((char) => {
+    elapsed += char === '\n' ? pauseTime : speed;
+    return elapsed;
+  });
+};
+
 const Typewriter = ({
   text,
   speed = 150,
@@ -203,37 +215,62 @@ const Typewriter = ({
 
     setDisplayedText('');
 
-    let index = 0;
-    let timer;
+    const chars = Array.from(text);
+    const schedule = getTypingSchedule(text, speed, pauseTime);
+    const startDelay = getTypingStartDelay(speed);
+    let startedAt = performance.now() + startDelay;
+    let timer = 0;
+    let completed = false;
+    let lastDisplayedIndex = 0;
 
-    const nextTick = () => {
-      index += 1;
-      setDisplayedText(text.substring(0, index));
-      playTypingSound(text[index - 1]);
+    const scheduleNextTick = () => {
+      if (completed) return;
+      const now = performance.now();
+      const nextAt = schedule[lastDisplayedIndex] ?? schedule[schedule.length - 1] ?? speed;
+      const delay = Math.max(0, startedAt + nextAt - now);
+      timer = window.setTimeout(updateTick, delay);
+    };
 
-      if (index >= text.length) {
+    const updateTick = () => {
+      const now = performance.now();
+      const elapsed = now - startedAt;
+      let nextIndex = lastDisplayedIndex;
+
+      while (nextIndex < schedule.length && elapsed >= schedule[nextIndex]) {
+        nextIndex += 1;
+      }
+
+      if (nextIndex !== lastDisplayedIndex) {
+        const addedChars = chars.slice(lastDisplayedIndex, nextIndex);
+        setDisplayedText(chars.slice(0, nextIndex).join(''));
+        playTypingSound(addedChars.find((char) => !/\s/.test(char)));
+        lastDisplayedIndex = nextIndex;
+      }
+
+      if (lastDisplayedIndex >= chars.length) {
+        if (completed) return;
+        completed = true;
         stopTypingSounds();
         onCompleteRef.current?.();
         if (repeat) {
-          timer = setTimeout(() => {
-            index = 0;
+          timer = window.setTimeout(() => {
+            completed = false;
+            lastDisplayedIndex = 0;
+            startedAt = performance.now() + speed;
             setDisplayedText('');
-            timer = setTimeout(nextTick, speed);
+            scheduleNextTick();
           }, repeatDelay);
         }
         return;
       }
 
-      const currentChar = text[index - 1];
-      const delay = currentChar === '\n' ? pauseTime : speed;
-
-      timer = setTimeout(nextTick, delay);
+      scheduleNextTick();
     };
 
-    timer = setTimeout(nextTick, getTypingStartDelay(speed));
+    scheduleNextTick();
 
     return () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       stopTypingSounds();
     };
   }, [text, speed, pauseTime, repeat, repeatDelay, forceComplete]);
@@ -293,6 +330,7 @@ const TutorialDesign = ({
   const [isSceneOneLooping, setIsSceneOneLooping] = useState(false);
   const [isIntroBgmPlaying, setIsIntroBgmPlaying] = useState(false);
   const cameraSkipClickRef = useRef({ count: 0, startedAt: 0 });
+  const cameraStepEnterNotifiedRef = useRef(false);
   const introBgmRef = useRef(null);
 
   const step =
@@ -350,6 +388,7 @@ const TutorialDesign = ({
     setNameError('');
     setForceCompleteText(false);
     setIsSceneOneLooping(false);
+    cameraStepEnterNotifiedRef.current = false;
   }, [currentId]);
 
   useEffect(() => {
@@ -398,7 +437,8 @@ const TutorialDesign = ({
   }, [currentId]);
 
   useEffect(() => {
-    if (step.type === 'CAMERA') {
+    if (step.type === 'CAMERA' && !cameraStepEnterNotifiedRef.current) {
+      cameraStepEnterNotifiedRef.current = true;
       onCameraStepEnter?.();
     }
   }, [step.type, onCameraStepEnter]);
@@ -406,7 +446,11 @@ const TutorialDesign = ({
   const handleNext = async (nextId) => {
     if (step.type === 'CAMERA') {
       playClickSound();
-      onBeginCamera?.();
+      if (onBeginCamera) {
+        onBeginCamera();
+        return;
+      }
+      setCurrentId(nextId);
       return;
     }
 
@@ -569,6 +613,7 @@ const TutorialDesign = ({
             className="background-video"
             autoPlay
             muted
+            preload="auto"
             loop={stepBackgroundVideo.loop}
             playsInline
             aria-hidden="true"
@@ -614,8 +659,9 @@ const TutorialDesign = ({
               </p>
 
               <button
-                className="start-btn"
+                className={`start-btn ${isTextDone ? 'show' : ''}`}
                 onClick={() => handleProgressiveNext(step.nextId)}
+                disabled={!isTextDone}
               >
                 {step.buttonText}
               </button>
@@ -724,12 +770,13 @@ const TutorialDesign = ({
                   </div>
 
                   <button
-                    className="camera-step-button"
+                    className={`camera-step-button ${isTextDone ? 'show' : ''}`}
                     type="button"
                     aria-label={step.buttonText}
                     onClick={() => {
                       void handleNext(step.nextId);
                     }}
+                    disabled={!isTextDone}
                   >
                     <img src={cameraButtonImage} alt="" aria-hidden="true" />
                   </button>
@@ -839,10 +886,11 @@ const TutorialDesign = ({
                         })}
                       </p>
 
-                      <div className="action-row show">
+                      <div className={`action-row ${isTextDone ? 'show' : ''}`}>
                         <button
                           className="primary-next-btn"
                           onClick={() => handleProgressiveNext(step.nextId)}
+                          disabled={!isTextDone}
                         >
                           {step.buttonText}
                         </button>
@@ -866,10 +914,11 @@ const TutorialDesign = ({
                     <img src={qrCodeSrc} alt="QR code" className="qr-image" />
                   )}
 
-                  <div className="action-row show">
+                  <div className={`action-row ${isTextDone ? 'show' : ''}`}>
                     <button
                       className="primary-next-btn"
                       onClick={() => handleProgressiveNext(step.nextId)}
+                      disabled={!isTextDone}
                     >
                       {step.buttonText}
                     </button>
@@ -909,14 +958,16 @@ const TutorialDesign = ({
                     </div>
 
                     {step.type === 'SELECT' && (
-                      <div className="selection-row show">
+                      <div className={`selection-row ${isTextDone ? 'show' : ''}`}>
                         {step.options.map((opt, i) => (
                           <button
                             key={i}
-                            className={`opt-btn ${opt.label}`}
+                            className={`opt-btn ${opt.className || opt.backgroundLabel || opt.label}`}
                             onClick={() => handleProgressiveNext(opt.nextId)}
+                            disabled={!isTextDone}
                           >
-                            <span className="lbl-top">{opt.label}</span>
+                            <span className="lbl-top">{opt.backgroundLabel || opt.label}</span>
+                            <span className="lbl-sub">{opt.label}</span>
                           </button>
                         ))}
                       </div>
@@ -938,10 +989,11 @@ const TutorialDesign = ({
                   </div>
 
                   {step.type !== 'SELECT' && (
-                    <div className="action-row show">
+                    <div className={`action-row ${isTextDone ? 'show' : ''}`}>
                       <button
                         className="primary-next-btn"
                         onClick={() => handleProgressiveNext(step.nextId)}
+                        disabled={!isTextDone}
                       >
                         {step.buttonText}
                       </button>

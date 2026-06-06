@@ -630,32 +630,17 @@
 }
 
 .avatar-transition-overlay {
-  --avatar-wipe-radius: 0%;
   position: fixed;
   inset: 0;
   z-index: 100;
-  background:
-    radial-gradient(
-      circle at 50% 50%,
-      transparent 0 var(--avatar-wipe-radius),
-      #000 calc(var(--avatar-wipe-radius) + 0.5%)
-    );
+  background: #000;
   opacity: 1;
   pointer-events: none;
-  transition:
-    --avatar-wipe-radius 1800ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 160ms linear 1800ms;
+  transition: opacity 520ms ease;
 }
 
 .avatar-transition-overlay.is-exiting {
-  --avatar-wipe-radius: 145%;
   opacity: 0;
-}
-
-@property --avatar-wipe-radius {
-  syntax: '<percentage>';
-  inherits: false;
-  initial-value: 0%;
 }
 
 .avatar-loading-preview {
@@ -781,6 +766,23 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.persona-stage::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: min(96vw, 1520px);
+  aspect-ratio: 16 / 7;
+  background-image: var(--persona-logo-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.28;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .persona-brand-bg {

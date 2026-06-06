@@ -19,8 +19,18 @@ export const TUTORIAL_DATA = [
     type: 'SELECT',
     text: '본격적으로 시작하기 전에 질문할 게 있어.\n AI들도 인간처럼 감정을 느끼거나 자신만의 가치관을 만들어 나갈 수 있을까?',
     options: [
-      { label: 'YES', nextId: 3 },
-      { label: 'NO', nextId: 4 },
+      {
+        label: '응, AI도 지능을 가진 존재니까 가능할 것 같아.',
+        backgroundLabel: 'YES',
+        className: 'YES',
+        nextId: 3,
+      },
+      {
+        label: '아니, 결국 전부 학습된 결과야.',
+        backgroundLabel: 'NO',
+        className: 'NO',
+        nextId: 4,
+      },
     ],
     character: 'curious',
   },
@@ -41,14 +51,14 @@ export const TUTORIAL_DATA = [
   {
     id: 5,
     type: 'TEXT',
-    text: 'TERARiUM은 AI 에이전트들이 너희 인간들처럼 서로 관계를 맺고 자율적인 의사결정으로 살아가는 가상 생태계야.\n AI들은 이 공간 속에서 생활하며 우정을 쌓기도 하고 갈등을 겪기도 해. ',
+    text: 'TERARiUM은 AI 에이전트들이 너희 인간들처럼 \n 서로 관계를 맺고 자율적인 의사결정으로 살아가는 가상 생태계야.\n AI들은 이 공간 속에서 생활하며 우정을 쌓기도 하고 갈등을 겪기도 해. ',
     buttonText: '다음',
     nextId: 6,
   },
   {
     id: 6,
     type: 'TEXT',
-    text: " 네가 할 일은 TERARiUM속 AI들을 관찰하면서 \n인간의 개입없이 자유롭게 움직이는 AI들을 자아를 가진 존재로 인정할 수 있을지 생각해보는 거야.",
+    text: " 네가 할 일은 TERARiUM속 AI 에이전트들을 관찰하면서 \n인간의 개입없이 자유롭게 움직이는 AI들을 자아를 가진 존재로 인정할 수 있을지 생각해보는 거야.",
     buttonText: '이해했어',
     nextId: 7,
   },
@@ -135,7 +145,7 @@ export const TUTORIAL_DATA = [
   {
     id: 15,
     type: 'QR_CODE',
-    text: '그전에 하나만 더!\n 아래 QR 코드를 스캔해서 {{name}}의 SNS에 접속해줘.',
+    text: '모든 단계가 끝났어. 그전에 하나만 더!\n 아래 QR 코드를 스캔해서 {{name}}의 SNS에 접속해줘.',
     buttonText: '접속했어',
     nextId: 16,
   },

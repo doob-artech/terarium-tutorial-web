@@ -142,14 +142,14 @@ body,
   left: 50%;
   top: 40%;
   transform: translate(-50%, -50%);
-  width: min(86vw, 1280px);
+  width: 100vw;
   color: rgba(255, 255, 255, 0.3);
   text-align: center;
   font-family: 'ChangwonDangamAsac', 'NanumSquareNeo', sans-serif !important;
-  font-size: clamp(52px, 7vw, 128px);
+  font-size: clamp(220px, 34vw, 660px);
   font-style: normal;
   font-weight: 700;
-  line-height: 112%;
+  line-height: 0.82;
   word-break: keep-all;
   pointer-events: none;
   user-select: none;
@@ -278,9 +278,17 @@ body,
     transform 0.25s ease,
     background 0.25s ease,
     color 0.25s ease,
-    box-shadow 0.25s ease;
+    box-shadow 0.25s ease,
+    opacity 0.34s ease;
   opacity: 0;
-  animation: introTextFadeIn 0.85s ease-out 0.62s both;
+  pointer-events: none;
+  transform: translateY(10px);
+}
+
+.start-btn.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .start-btn:hover {
@@ -370,18 +378,6 @@ body,
   z-index: 13;
 }
 
-.glass-bubble-card.step-12 {
-  position: absolute;
-  left: 50%;
-  top: clamp(56vh, 60vh, 64vh);
-  z-index: 12;
-  width: min(86vw, 980px);
-  height: auto;
-  min-height: clamp(24vh, 28vh, 34vh);
-  padding: clamp(3vh, 4vh, 5vh) clamp(6vw, 7vw, 8vw);
-  transform: translateX(-50%);
-}
-
 .glass-bubble-card.step-8 {
   position: absolute;
   inset: 0;
@@ -417,7 +413,7 @@ body,
 
 .camera-step-bubble-wrap {
   position: absolute;
-  left: 58%;
+  left: 55%;
   top: 73%;
   z-index: 2;
   width: min(72vw, 720px);
@@ -461,6 +457,19 @@ body,
   cursor: pointer;
   pointer-events: auto;
   box-shadow: none;
+  opacity: 0;
+  transition:
+    opacity 0.34s ease,
+    transform 0.34s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.camera-step-button.show {
+  opacity: 1;
+  transform: translate(-50%, 50%) scale(1);
+}
+
+.camera-step-button:disabled {
+  pointer-events: none;
 }
 
 .camera-step-button img {
@@ -944,7 +953,7 @@ body,
   border-radius: 2vh;
   font-size: var(--tutorial-control-font-size);
   font-weight: 800;
-  border: none;
+  border: 0;
   cursor: pointer;
   background: #fff;
   color: #2d2d2d;
@@ -952,15 +961,48 @@ body,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition:
+    transform 0.16s cubic-bezier(0.2, 0.9, 0.2, 1),
+    box-shadow 0.16s cubic-bezier(0.2, 0.9, 0.2, 1);
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .glass-bubble-card.type-SELECT .opt-btn {
   position: relative;
   height: clamp(11vh, 15vh, 17vh);
   border-radius: 2.5vw;
+  padding: clamp(14px, 1.8vh, 24px) clamp(20px, 2.6vw, 44px);
   overflow: hidden;
   color: #fff;
+  box-shadow:
+    0 0 0 0.08vw rgba(255, 255, 255, 0.32) inset,
+    0 0.8vh 1.8vh rgba(31, 54, 78, 0.12);
+}
+
+.glass-bubble-card.type-SELECT .opt-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: clamp(4px, 0.3vw, 7px) solid #FFEE69;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s linear;
+}
+
+.glass-bubble-card.type-SELECT .opt-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 58%),
+    rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s linear;
 }
 
 .glass-bubble-card.type-SELECT .opt-btn.YES {
@@ -972,8 +1014,28 @@ body,
 }
 
 .opt-btn:hover {
-  filter: brightness(1.04);
-  box-shadow: 0 0 0 0.3vw #FFEE69;
+  transform: translateY(-0.34vh) scale(1.014) translateZ(0);
+  box-shadow:
+    0 0 0 0.14vw rgba(255, 255, 255, 0.88) inset,
+    0 0 0 clamp(2px, 0.18vw, 4px) rgba(255, 238, 105, 0.72),
+    0 1.1vh 2.4vh rgba(31, 54, 78, 0.2);
+}
+
+.opt-btn:focus-visible {
+  box-shadow:
+    0 0 0 0.14vw rgba(255, 255, 255, 0.88) inset,
+    0 0 0 clamp(2px, 0.18vw, 4px) rgba(255, 238, 105, 0.72),
+    0 1.1vh 2.4vh rgba(31, 54, 78, 0.2);
+}
+
+.glass-bubble-card.type-SELECT .opt-btn:hover::after,
+.glass-bubble-card.type-SELECT .opt-btn:focus-visible::after {
+  opacity: 1;
+}
+
+.glass-bubble-card.type-SELECT .opt-btn:hover::before,
+.glass-bubble-card.type-SELECT .opt-btn:focus-visible::before {
+  opacity: 1;
 }
 
 .lbl-top {
@@ -1005,10 +1067,25 @@ body,
   position: relative;
   z-index: 1;
   margin-top: 0;
-  font-size: var(--tutorial-body-font-size);
+  max-width: 100%;
+  font-size: clamp(20px, 1.62vw, 34px);
   font-weight: 800;
+  line-height: 1.36;
   opacity: 1;
   color: #fff;
+  text-align: center;
+  white-space: pre-line;
+  word-break: keep-all;
+  transition:
+    transform 0.16s cubic-bezier(0.2, 0.9, 0.2, 1),
+    text-shadow 0.14s linear;
+  will-change: transform;
+}
+
+.glass-bubble-card.type-SELECT .opt-btn:hover .lbl-sub,
+.glass-bubble-card.type-SELECT .opt-btn:focus-visible .lbl-sub {
+  transform: scale(1.025);
+  text-shadow: 0 0.22vh 0.9vh rgba(0, 0, 0, 0.22);
 }
 
 .input-row {
@@ -1120,13 +1197,6 @@ body,
   z-index: 12;
 }
 
-.character-layer.step-character-12 {
-  --step-character-x: clamp(56vw, 60vw, 64vw);
-  --step-character-y: clamp(31vh, 36vh, 40vh);
-  --step-character-width: clamp(210px, 20vw, 330px);
-  --step-character-max-height: 36vh;
-}
-
 .character-layer.name-result-avatar {
   animation: nameResultAvatarRise 0.62s cubic-bezier(0.2, 1, 0.28, 1) both;
 }
@@ -1157,12 +1227,11 @@ body,
 }
 
 .character-layer.step-character-12 .character-img {
-  left: var(--step-character-x) !important;
+  top: 40% !important;
+  left: 50% !important;
   right: auto !important;
-  top: var(--step-character-y) !important;
   bottom: auto !important;
-  width: var(--step-character-width) !important;
-  max-height: var(--step-character-max-height) !important;
+  width: min(38vw, 660px) !important;
   translate: -50% -50% !important;
   transform: none !important;
 }
@@ -1282,5 +1351,7 @@ body,
   transform: translateY(0);
   pointer-events: auto;
 
-  transition: all 0.4s ease;
+  transition:
+    opacity 0.34s ease,
+    transform 0.34s cubic-bezier(0.2, 0.9, 0.2, 1);
 }
