@@ -80,9 +80,9 @@ const shouldRevealAvatarVariant = (variant) => variant === 'avatarReveal';
 const isStaticAvatarVariant = (variant) => variant === 'staticFront';
 const isDragDisabledVariant = (variant) => variant === 'loadingBase' || isStaticAvatarVariant(variant);
 
-const applyModelRotation = (modelRoot, variant, rotationState) => {
+const applyModelRotation = (modelRoot, variant, rotationState, idleYawOffset = 0) => {
   if (!modelRoot) return;
-  modelRoot.rotation.y = isStaticAvatarVariant(variant) ? 0 : rotationState.yaw;
+  modelRoot.rotation.y = isStaticAvatarVariant(variant) ? idleYawOffset : rotationState.yaw + idleYawOffset;
   modelRoot.rotation.x = isStaticAvatarVariant(variant) ? 0 : rotationState.pitch;
 };
 
@@ -288,7 +288,6 @@ const AvatarThreeViewer = ({
     let disposed = false;
     let frameId = 0;
     let modelRoot = null;
-    let modelBaseX = 0;
     const rotationState = {
       yaw: Number.isFinite(initialYawRef.current) ? initialYawRef.current : 0,
       pitch: 0,
@@ -498,7 +497,6 @@ const AvatarThreeViewer = ({
         }
         scene.add(modelRoot);
         fitCameraToObject(camera, modelRoot, target, distanceMultiplier, fitFullBounds || variant === 'staticFront');
-        modelBaseX = modelRoot.position.x;
         applyModelRotation(modelRoot, variant, rotationState);
         renderer.domElement.style.opacity = '1';
         setLoadState('ready');
@@ -522,18 +520,17 @@ const AvatarThreeViewer = ({
     const render = () => {
       if (modelRoot) {
         const now = performance.now();
-        if (idleSway) {
-          const elapsed = now * 0.001;
-          modelRoot.position.x = modelBaseX + Math.sin(elapsed * 1.55) * 0.035;
-        }
-        if (!isStaticAvatarVariant(variant) && !rotationState.isDragging) {
+        const idleYawOffset = idleSway && !rotationState.isDragging
+          ? Math.sin(now * 0.00145) * 0.085
+          : 0;
+        if (!idleSway && !isStaticAvatarVariant(variant) && !rotationState.isDragging) {
           rotationState.yaw += variant === 'loadingBase' ? 0.006 : 0.0032;
           rotationState.yaw += rotationState.velocityX;
           rotationState.pitch = THREE.MathUtils.clamp(rotationState.pitch + rotationState.velocityY, -0.42, 0.32);
           rotationState.velocityX *= 0.92;
           rotationState.velocityY *= 0.88;
         }
-        applyModelRotation(modelRoot, variant, rotationState);
+        applyModelRotation(modelRoot, variant, rotationState, idleYawOffset);
         if (onRotationChangeRef.current && now - rotationState.lastRotationNotifyAt > 160) {
           rotationState.lastRotationNotifyAt = now;
           onRotationChangeRef.current({
