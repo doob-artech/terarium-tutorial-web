@@ -29,6 +29,7 @@ const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_A
 const PERSONA_TOTAL_TURNS = 5
 const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
+const LOADING_BASE_AVATAR_URL = assetUrl('/model/source/avatar_v2.glb')
 let countdownFontPreloadPromise = null
 
 const avatarAssetUrl = (value) => {
@@ -750,25 +751,27 @@ function TutorialApp() {
   }, [setStage])
 
   const handleAvatarBackgroundPreloadReady = useCallback(() => {
-    if (avatarPreloadReadyRef.current || stage !== 'cameraDesignCapture') {
+    if (avatarPreloadReadyRef.current || stage !== 'avatarLoading') {
       return
     }
 
     avatarPreloadReadyRef.current = true
     setIsAvatarPreloading(false)
-    setIsAvatarLoadingExit(false)
-    setIsAvatarHandoffCover(false)
-    setIsCaptureProcessing(false)
+    setIsAvatarLoadingExit(true)
+    const coverTimer = window.setTimeout(() => {
+      setIsAvatarHandoffCover(true)
+    }, 260)
     const handoffTimer = window.setTimeout(() => {
+      setIsAvatarLoadingExit(false)
+      setIsAvatarHandoffCover(false)
       beginAvatarIntroTransition()
-    }, 40)
-    timeoutIdsRef.current.push(handoffTimer)
+    }, 560)
+    timeoutIdsRef.current.push(coverTimer, handoffTimer)
   }, [
     beginAvatarIntroTransition,
     setIsAvatarHandoffCover,
     setIsAvatarLoadingExit,
     setIsAvatarPreloading,
-    setIsCaptureProcessing,
     stage,
   ])
 
@@ -958,7 +961,8 @@ function TutorialApp() {
       const imageDataUrl = cameraFrames.frontImageDataUrl
 
       setCountdown(null)
-      setIsCaptureProcessing(true)
+      setIsCaptureProcessing(false)
+      setStage('avatarLoading')
       avatarPreviewRotationRef.current = { yaw: 0, pitch: 0 }
       setIsAvatarPreloading(false)
       setIsAvatarLoadingExit(false)
@@ -1403,6 +1407,25 @@ function TutorialApp() {
             </div>
           </section>
         )}
+        {countdown !== null && (
+          <section className="countdown-overlay" aria-live="polite">
+            <p className="countdown-text">{countdown}</p>
+          </section>
+        )}
+      </>
+    )
+  }
+
+  if (stage === 'avatarLoading') {
+    return (
+      <main className={`avatar-loading-screen${isAvatarHandoffCover ? ' is-covered' : ''}`}>
+        <AvatarThreeViewer
+          className="avatar-loading-preview"
+          src={LOADING_BASE_AVATAR_URL}
+          alt="avatar base loading"
+          variant="loadingBase"
+          distanceMultiplier={2.8}
+        />
         {isAvatarPreloading && avatarModelUrl && (
           <div className="avatar-background-preloader" aria-hidden="true">
             <AvatarThreeViewer
@@ -1416,12 +1439,8 @@ function TutorialApp() {
             />
           </div>
         )}
-        {countdown !== null && (
-          <section className="countdown-overlay" aria-live="polite">
-            <p className="countdown-text">{countdown}</p>
-          </section>
-        )}
-      </>
+        {isAvatarLoadingExit && <div className="avatar-transition-overlay is-exiting" aria-hidden="true" />}
+      </main>
     )
   }
 
