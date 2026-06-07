@@ -671,6 +671,23 @@
   animation: avatarLoadingModelIn 920ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
 }
 
+.avatar-background-preloader {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  z-index: -1;
+  width: 2px;
+  height: 2px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.avatar-background-preloader-viewer {
+  width: 2px;
+  height: 2px;
+}
+
 @keyframes avatarLoadingBackgroundIn {
   from {
     opacity: 0;

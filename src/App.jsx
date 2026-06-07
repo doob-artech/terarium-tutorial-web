@@ -676,6 +676,7 @@ function TutorialApp() {
   const nicknameInputRef = useRef('')
   const avatarPreviewRotationRef = useRef({ yaw: 0, pitch: 0 })
   const avatarTransitionFinishingRef = useRef(false)
+  const avatarPreloadReadyRef = useRef(false)
   const {
     videoRef,
     secondaryVideoRef,
@@ -733,6 +734,7 @@ function TutorialApp() {
     nicknameInputRef.current = ''
     syncedAppearanceAgentRef.current = ''
     avatarTransitionFinishingRef.current = false
+    avatarPreloadReadyRef.current = false
     resetProfileImageUpload()
     resetFlowState()
   }
@@ -747,6 +749,21 @@ function TutorialApp() {
   const beginAvatarIntroTransition = useCallback(() => {
     setStage('avatarIntro')
   }, [setStage])
+
+  const handleAvatarBackgroundPreloadReady = useCallback(() => {
+    if (avatarPreloadReadyRef.current || stage !== 'cameraDesignCapture') {
+      return
+    }
+
+    avatarPreloadReadyRef.current = true
+    setIsAvatarHandoffCover(true)
+    const handoffTimer = window.setTimeout(() => {
+      setIsAvatarHandoffCover(false)
+      setIsCaptureProcessing(false)
+      beginAvatarIntroTransition()
+    }, 120)
+    timeoutIdsRef.current.push(handoffTimer)
+  }, [beginAvatarIntroTransition, setIsAvatarHandoffCover, setIsCaptureProcessing, stage])
 
   const finishAvatarLoadingTransition = useCallback(() => {
     if (avatarTransitionFinishingRef.current) {
@@ -940,7 +957,7 @@ function TutorialApp() {
       setIsAvatarLoadingExit(false)
       setIsAvatarHandoffCover(false)
       avatarTransitionFinishingRef.current = false
-      setStage('avatarLoading')
+      avatarPreloadReadyRef.current = false
 
       const capturePipeline = (async () => {
         try {
@@ -978,23 +995,21 @@ function TutorialApp() {
             }
           }
           if (avatarPayload?.modelUrl) {
-            setIsAvatarHandoffCover(true)
-            const handoffTimer = window.setTimeout(() => {
-              setIsAvatarPreloading(true)
-              setIsAvatarHandoffCover(false)
-              beginAvatarIntroTransition()
-            }, 260)
-            timeoutIdsRef.current.push(handoffTimer)
+            setIsAvatarPreloading(true)
+          } else {
+            setIsCaptureProcessing(false)
+            setStage('avatarIntro')
           }
           return personaPayload
         } catch (error) {
           setAnalysisResult(null)
           setPersonaError(error instanceof Error ? error.message : '외형 분석 또는 페르소나 시작에 실패했습니다.')
           setCaptureLocked(false)
+          setIsCaptureProcessing(false)
+          setIsAvatarPreloading(false)
+          avatarPreloadReadyRef.current = false
           setStage('cameraDesignCapture')
           return null
-        } finally {
-          setIsCaptureProcessing(false)
         }
       })()
       capturePipelineRef.current = capturePipeline
@@ -1350,7 +1365,7 @@ function TutorialApp() {
         <TutorialDesign
           initialId={8}
           onBeginCamera={handleCapture}
-          hideUi={captureLocked || countdown !== null || isCaptureProcessing}
+          hideUi={captureLocked || countdown !== null}
           backgroundSlot={
             <>
               <video
@@ -1373,6 +1388,27 @@ function TutorialApp() {
             </>
           }
         />
+        {isCaptureProcessing && (
+          <section className="capture-processing-overlay" aria-live="polite">
+            <div className="capture-processing-pill">
+              <span className="capture-processing-dot" aria-hidden="true" />
+              <p className="capture-processing-text">아바타를 준비하는 중</p>
+            </div>
+          </section>
+        )}
+        {isAvatarPreloading && avatarModelUrl && (
+          <div className="avatar-background-preloader" aria-hidden="true">
+            <AvatarThreeViewer
+              className="avatar-background-preloader-viewer"
+              src={avatarModelUrl}
+              alt="avatar preload"
+              variant="avatar"
+              distanceMultiplier={1.82}
+              initialYaw={0}
+              onReady={handleAvatarBackgroundPreloadReady}
+            />
+          </div>
+        )}
         {countdown !== null && (
           <section className="countdown-overlay" aria-live="polite">
             <p className="countdown-text">{countdown}</p>
