@@ -23,7 +23,6 @@ import logo1Src from './tutorialDesign/assets/logo1.png'
 import countdownFontUrl from './tutorialDesign/fonts/CHANGWONDANGAMASAC-BOLD.TTF?url'
 import './App.css'
 
-const LOADING_BASE_AVATAR_URL = assetUrl('/model/source/avatar_v2.glb')
 const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
@@ -756,14 +755,22 @@ function TutorialApp() {
     }
 
     avatarPreloadReadyRef.current = true
-    setIsAvatarHandoffCover(true)
+    setIsAvatarPreloading(false)
+    setIsAvatarLoadingExit(false)
+    setIsAvatarHandoffCover(false)
+    setIsCaptureProcessing(false)
     const handoffTimer = window.setTimeout(() => {
-      setIsAvatarHandoffCover(false)
-      setIsCaptureProcessing(false)
       beginAvatarIntroTransition()
-    }, 120)
+    }, 40)
     timeoutIdsRef.current.push(handoffTimer)
-  }, [beginAvatarIntroTransition, setIsAvatarHandoffCover, setIsCaptureProcessing, stage])
+  }, [
+    beginAvatarIntroTransition,
+    setIsAvatarHandoffCover,
+    setIsAvatarLoadingExit,
+    setIsAvatarPreloading,
+    setIsCaptureProcessing,
+    stage,
+  ])
 
   const finishAvatarLoadingTransition = useCallback(() => {
     if (avatarTransitionFinishingRef.current) {
@@ -1418,22 +1425,6 @@ function TutorialApp() {
     )
   }
 
-  if (stage === 'avatarLoading') {
-    return (
-      <main className={`avatar-loading-screen ${isAvatarHandoffCover ? 'is-covered' : ''}`} aria-label="로딩 중" aria-live="polite">
-        <AvatarThreeViewer
-          className="avatar-loading-preview"
-          src={LOADING_BASE_AVATAR_URL}
-          alt="avatar loading preview"
-          variant="loadingBase"
-          distanceMultiplier={1.66}
-          initialYaw={0}
-          onRotationChange={handleAvatarPreviewRotationChange}
-        />
-      </main>
-    )
-  }
-
   if (stage === 'avatarIntro') {
     return (
       <>
@@ -1443,14 +1434,11 @@ function TutorialApp() {
           avatarInitialYaw={0}
           externalName={nicknameValue}
           onAvatarRotationChange={handleAvatarPreviewRotationChange}
-          onAvatarReady={isAvatarPreloading ? finishAvatarLoadingTransition : null}
+          onAvatarReady={null}
           onAvatarProfileImageReady={handleAvatarProfileImageReady}
           onNameSubmit={(name) => handleNicknameClaim(name, null)}
           onStartQuestions={() => setStage('persona')}
         />
-        {isAvatarPreloading && (
-          <main className={`avatar-transition-overlay ${isAvatarLoadingExit ? 'is-exiting' : ''}`} aria-hidden="true" />
-        )}
       </>
     )
   }
