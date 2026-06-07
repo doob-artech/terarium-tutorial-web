@@ -119,6 +119,20 @@ const DEBUG_AVATAR_OPTIONS = {
     ['sneakers', '운동화'],
     ['sandals', '샌달'],
   ],
+  glasses: [
+    ['none', '안경 없음'],
+    ['round_glasses', '둥근 안경'],
+    ['square_glasses', '사각 안경'],
+  ],
+  necklace: [
+    ['none', '목걸이 없음'],
+    ['pearl_necklace', '진주 목걸이'],
+  ],
+  earrings: [
+    ['none', '귀걸이 없음'],
+    ['hoop_earrings', '후프 귀걸이'],
+    ['simple_earrings', '심플 귀걸이'],
+  ],
 }
 
 const DEBUG_ASSET_TO_APPEARANCE = {
@@ -261,6 +275,9 @@ function AvatarDebugPageV2() {
     topColor: 'white',
     bottomColor: 'black',
     shoeColor: 'black',
+    glasses: 'none',
+    necklace: 'none',
+    earrings: 'none',
   })
   const [modelUrl, setModelUrl] = useState('')
   const [manifest, setManifest] = useState(null)
@@ -313,9 +330,13 @@ function AvatarDebugPageV2() {
         shoe_type: selection.shoes,
         shoe_color: selection.shoeColor,
         accessories: {
-          glasses_type: 'none',
-          has_necklace: false,
-          has_earrings: false,
+          glasses_type: selection.glasses === 'round_glasses'
+            ? 'round'
+            : selection.glasses === 'square_glasses'
+              ? 'square'
+              : 'none',
+          has_necklace: selection.necklace !== 'none',
+          has_earrings: selection.earrings !== 'none',
         },
         asset_tags: {
           skin_texture: selection.skin,
@@ -326,9 +347,9 @@ function AvatarDebugPageV2() {
           bottom_mesh: selection.bottom,
           outfit_mesh: selection.outfit,
           shoe_mesh: selection.shoes,
-          glasses_mesh: 'none',
-          necklace_mesh: 'none',
-          earring_mesh: 'none',
+          glasses_mesh: selection.glasses,
+          necklace_mesh: selection.necklace,
+          earring_mesh: selection.earrings,
         },
       }
 
@@ -413,6 +434,9 @@ function AvatarDebugPageV2() {
         <DebugStepper label="Bottom color" value={selection.bottomColor} options={DEBUG_COLOR_OPTIONS} disabled={hasOutfit} onChange={(value) => updateSelection('bottomColor', value)} />
         <DebugStepper label="Shoes" value={selection.shoes} options={DEBUG_AVATAR_OPTIONS.shoes} onChange={(value) => updateSelection('shoes', value)} />
         <DebugStepper label="Shoe color" value={selection.shoeColor} options={DEBUG_COLOR_OPTIONS} onChange={(value) => updateSelection('shoeColor', value)} />
+        <DebugStepper label="Glasses" value={selection.glasses} options={DEBUG_AVATAR_OPTIONS.glasses} onChange={(value) => updateSelection('glasses', value)} />
+        <DebugStepper label="Necklace" value={selection.necklace} options={DEBUG_AVATAR_OPTIONS.necklace} onChange={(value) => updateSelection('necklace', value)} />
+        <DebugStepper label="Earrings" value={selection.earrings} options={DEBUG_AVATAR_OPTIONS.earrings} onChange={(value) => updateSelection('earrings', value)} />
 
         <div className="debug-avatar-nodes">
           <h2>selectedNodes</h2>
