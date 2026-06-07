@@ -1452,6 +1452,7 @@ function TutorialApp() {
           avatarUrl={avatarModelUrl}
           avatarInitialYaw={0}
           externalName={nicknameValue}
+          avatarIntroTextStartDelay={650}
           onAvatarRotationChange={handleAvatarPreviewRotationChange}
           onAvatarReady={null}
           onAvatarProfileImageReady={handleAvatarProfileImageReady}

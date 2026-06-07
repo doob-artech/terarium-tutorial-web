@@ -190,6 +190,7 @@ const Typewriter = ({
   highlightText = '',
   highlightClassName = '',
   forceComplete = false,
+  startDelay = 0,
   onComplete,
 }) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -217,8 +218,8 @@ const Typewriter = ({
 
     const chars = Array.from(text);
     const schedule = getTypingSchedule(text, speed, pauseTime);
-    const startDelay = getTypingStartDelay(speed);
-    let startedAt = performance.now() + startDelay;
+    const startDelayMs = getTypingStartDelay(Math.max(speed, startDelay));
+    let startedAt = performance.now() + startDelayMs;
     let timer = 0;
     let completed = false;
     let lastDisplayedIndex = 0;
@@ -273,7 +274,7 @@ const Typewriter = ({
       window.clearTimeout(timer);
       stopTypingSounds();
     };
-  }, [text, speed, pauseTime, repeat, repeatDelay, forceComplete]);
+  }, [text, speed, pauseTime, repeat, repeatDelay, forceComplete, startDelay]);
 
   if (!highlightText) {
     return <>{displayedText}</>;
@@ -318,6 +319,7 @@ const TutorialDesign = ({
   onAvatarProfileImageReady,
   onStartQuestions,
   onFinish,
+  avatarIntroTextStartDelay = 0,
 }) => {
   const [currentId, setCurrentId] = useState(initialId);
   const [userName, setUserName] = useState(externalName);
@@ -530,6 +532,7 @@ const TutorialDesign = ({
       key={key}
       text={formatText(text)}
       speed={speed}
+      startDelay={typewriterProps.startDelay ?? (currentId === 9 ? avatarIntroTextStartDelay : 0)}
       forceComplete={forceCompleteText}
       {...nameHighlightProps}
       {...typewriterProps}
