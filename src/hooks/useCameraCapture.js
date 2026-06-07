@@ -5,6 +5,11 @@ const CAMERA_LOG_PREFIX = '[tutorial-camera]'
 const SECONDARY_CAMERA_PROBE_DELAYS_MS = [800, 1800, 3600, 6500]
 const ANALYSIS_CAPTURE_MAX_EDGE = 720
 const ANALYSIS_CAPTURE_JPEG_QUALITY = 0.68
+const CAMERA_VIDEO_QUALITY = {
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  frameRate: { ideal: 24, max: 30 },
+}
 
 const captureVideoFrame = (
   video,
@@ -142,7 +147,7 @@ export function useCameraCapture({ stage, setCameraReady }) {
 
       try {
         const secondaryStream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: secondaryDevice.deviceId } },
+          video: { ...CAMERA_VIDEO_QUALITY, deviceId: { exact: secondaryDevice.deviceId } },
           audio: false,
         })
         if (canceled) {
@@ -198,8 +203,8 @@ export function useCameraCapture({ stage, setCameraReady }) {
         let stream = null
         try {
           const videoConstraint = preferredCameraId
-            ? { deviceId: { exact: preferredCameraId } }
-            : { facingMode: 'user' }
+            ? { ...CAMERA_VIDEO_QUALITY, deviceId: { exact: preferredCameraId } }
+            : { ...CAMERA_VIDEO_QUALITY, facingMode: 'user' }
           stream = await navigator.mediaDevices.getUserMedia({
             video: videoConstraint,
             audio: false,
@@ -207,7 +212,7 @@ export function useCameraCapture({ stage, setCameraReady }) {
         } catch (preferredError) {
           console.warn(CAMERA_LOG_PREFIX, 'main camera preferred constraint failed; retrying default camera:', preferredError)
           stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: CAMERA_VIDEO_QUALITY,
             audio: false,
           })
         }

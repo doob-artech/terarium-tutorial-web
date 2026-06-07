@@ -20,7 +20,7 @@ export const TUTORIAL_DATA = [
     text: '본격적으로 시작하기 전에 질문할 게 있어.\n AI들도 인간처럼 감정을 느끼거나 자신만의 가치관을 만들어 나갈 수 있을까?',
     options: [
       {
-        label: '응, AI도 지능을 가진 존재니까 가능할 것 같아.',
+        label: '응, AI도 지능을 가진 존재니까\n가능할 것 같아.',
         backgroundLabel: 'YES',
         className: 'YES',
         nextId: 3,
@@ -37,7 +37,7 @@ export const TUTORIAL_DATA = [
   {
     id: 3,
     type: 'TEXT',
-    text: '오, 정말 열린 마음을 가졌구나! 그럼 이곳에서 벌어지는 일들이 더 실제처럼 느껴질 거야.',
+    text: '오, 정말 열린 마음을 가졌구나! \n 그럼 이곳에서 벌어지는 일들이 더 실제처럼 느껴질 거야.',
     buttonText: '다음',
     nextId: 5,
   },
@@ -51,21 +51,21 @@ export const TUTORIAL_DATA = [
   {
     id: 5,
     type: 'TEXT',
-    text: 'TERARiUM은 AI 에이전트들이 너희 인간들처럼 \n 서로 관계를 맺고 자율적인 의사결정으로 살아가는 가상 생태계야.\n AI들은 이 공간 속에서 생활하며 우정을 쌓기도 하고 갈등을 겪기도 해. ',
+    text: 'TERARiUM은 AI 에이전트들이 인간들처럼 \n 자율적인 의사결정으로 살아가는 가상 생태계야.\n 에이전트들은 이 공간 속에서 생활하며 우정을 쌓거나 갈등을 겪기도 해. ',
     buttonText: '다음',
     nextId: 6,
   },
   {
     id: 6,
     type: 'TEXT',
-    text: " 네가 할 일은 TERARiUM속 AI 에이전트들을 관찰하면서 \n인간의 개입없이 자유롭게 움직이는 AI들을 자아를 가진 존재로 인정할 수 있을지 생각해보는 거야.",
+    text: " 네가 할 일은 TERARiUM속 AI 에이전트들을 관찰하면서 \n인간의 개입없이 자유롭게 움직이는 AI를 주체성을 가진 존재로 인정할 수 있을지 생각해보는 거야.",
     buttonText: '이해했어',
     nextId: 7,
   },
   {
     id: 7,
     type: 'TEXT',
-    text: '이제 실험에 참여할 너만의 아바타를 만들어보자.\n 지금 네 모습을 촬영해서, 너를 꼭 닮은 아바타로 재탄생시킬 거야.',
+    text: '이제 실험에 참여할 너만의 AI 에이전트를 만들어보자.\n 지금 네 모습을 촬영해서, 너를 꼭 닮은 에이전트로 재탄생시킬 거야.',
     buttonText: '다음',
     nextId: 8,
   },
@@ -79,14 +79,14 @@ export const TUTORIAL_DATA = [
   {
     id: 9,
     type: 'TEXT',
-    text: '오! 너를 쏙 빼닮은 아바타가 탄생했어. \n 마음에 들어?',
+    text: '오! 너를 쏙 빼닮은 에이전트가 탄생했어. \n 마음에 들어?',
     buttonText: '응, 마음에 들어!',
     nextId: 10,
   },
   {
     id: 10,
     type: 'INPUT',
-    textList: '너만의 아바타의 이름을 지어주자. \n 이곳 TERARiUM에선 모두 각자 고유한 이름을 가져야 해. \n 이미 다른 친구가 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!',
+    textList: '너만의 에이전트의 이름을 지어주자. \n 이곳 TERARiUM에선 모두 다른 이름을 가져야 해. \n 다른 친구가 이미 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!',
     questionText: '만나서 반가워. 내 이름은...',
     placeholder: '이름을 입력하세요',
     buttonText: '정했어',
@@ -105,14 +105,14 @@ export const TUTORIAL_DATA = [
   {
     id: 12,
     type: 'TEXT',
-    text: '{{name}}의 성향은 너의 취향을 기반으로 만들어질거야. \n 주어지는 질문들에 네가 답을 하면, 그 답변들을 분석해서 생성될거야. \n 참고로 답변은 총 3개까지 선택할 수 있어. 시작한다!',
+    text: '{{name}}의 성향은 너의 취향을 기반으로 만들어질거야. \n 주어지는 질문들에 네가 답을 하면, 그 답변들을 분석해서 {{name}}의 성격에 반영될거야. \n 답변은 좋아하는 순서대로 3개까지 선택할 수 있어. 시작한다!',
     buttonText: '질문 시작하기',
     nextId: 'START_QUESTION',
   },
   {
     id: 14,
     type: 'RESULT_DISPLAY',
-    text: '드디어 {{name}}의 아바타가 완성되었어.\n이제 이 아이를 TERARIUM 생태계로 보내줄 시간이야.',
+    text: '드디어 {{name}}의 에이전트가 완성되었어.\n이제 이 아이를 TERARIUM 생태계로 보내줄 시간이야.',
     keywordSlots: [
       {
         id: 1,
@@ -152,7 +152,7 @@ export const TUTORIAL_DATA = [
   {
     id: 16,
     type: 'FINAL_GUIDE',
-    text: '자, 이제 스마트폰을 챙겨서 앞으로 가봐. \n 전시장의 대형 스크린에 너의 아바타가 곧 등장할 거야! \n 그럼, TERARIUM에서 기다릴게! ',
+    text: '자, 이제 스마트폰을 챙겨서 앞으로 가봐. \n 전시장의 대형 스크린에 너의 AI에이전트가 곧 등장할 거야! \n 그럼, TERARIUM에서 기다릴게! ',
     buttonText: '튜토리얼 종료',
     nextId: 'FINISH_ALL',
   },

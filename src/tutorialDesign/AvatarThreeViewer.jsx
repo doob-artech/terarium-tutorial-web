@@ -79,6 +79,7 @@ const makeSoftToonMaterial = (sourceMaterial, { role = 'body', variant = 'avatar
 const shouldRevealAvatarVariant = (variant) => variant === 'avatarReveal';
 const isStaticAvatarVariant = (variant) => variant === 'staticFront';
 const isDragDisabledVariant = (variant) => variant === 'loadingBase' || isStaticAvatarVariant(variant);
+const RENDER_INTERVAL_MS = 1000 / 30;
 
 const applyModelRotation = (modelRoot, variant, rotationState, idleYawOffset = 0) => {
   if (!modelRoot) return;
@@ -287,6 +288,7 @@ const AvatarThreeViewer = ({
 
     let disposed = false;
     let frameId = 0;
+    let lastRenderAt = 0;
     let modelRoot = null;
     const rotationState = {
       yaw: Number.isFinite(initialYawRef.current) ? initialYawRef.current : 0,
@@ -324,11 +326,11 @@ const AvatarThreeViewer = ({
       return undefined;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = variant === 'staticFront' ? 1.28 : 1.12;
-    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = false;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.style.opacity = '0';
     renderer.domElement.style.transition = 'opacity 180ms ease';
@@ -518,8 +520,16 @@ const AvatarThreeViewer = ({
     );
 
     const render = () => {
+      const now = performance.now();
+      const isRevealing = shouldRevealAvatarVariant(variant);
+      const shouldThrottle = !rotationState.isDragging && !isRevealing;
+      if (shouldThrottle && now - lastRenderAt < RENDER_INTERVAL_MS) {
+        frameId = window.requestAnimationFrame(render);
+        return;
+      }
+      lastRenderAt = now;
+
       if (modelRoot) {
-        const now = performance.now();
         const idleYawOffset = idleSway && !rotationState.isDragging
           ? Math.sin(now * 0.00145) * 0.085
           : 0;

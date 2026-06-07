@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
-import AvatarThreeViewer from './tutorialDesign/AvatarThreeViewer.jsx'
 import { assetUrl } from './apiBase.js'
 import {
   abandonPersonaSession,
@@ -24,6 +23,7 @@ import countdownFontUrl from './tutorialDesign/fonts/CHANGWONDANGAMASAC-BOLD.TTF
 import './App.css'
 
 const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
+const AvatarThreeViewer = lazy(() => import('./tutorialDesign/AvatarThreeViewer.jsx'))
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
 const PERSONA_TOTAL_TURNS = 5
@@ -399,17 +399,19 @@ function AvatarDebugPageV2() {
         </div>
         <div className="debug-avatar-stage">
           {modelUrl ? (
-            <AvatarThreeViewer
-              src={modelUrl}
-              alt="Avatar debug preview"
-              variant="avatar"
-              distanceMultiplier={1.96 / zoom}
-              fitFullBounds
-              className="debug-avatar-canvas"
-              onReady={({ capturePng }) => {
-                viewerCaptureRef.current = capturePng
-              }}
-            />
+            <Suspense fallback={<div className="debug-avatar-canvas" />}>
+              <AvatarThreeViewer
+                src={modelUrl}
+                alt="Avatar debug preview"
+                variant="avatar"
+                distanceMultiplier={1.96 / zoom}
+                fitFullBounds
+                className="debug-avatar-canvas"
+                onReady={({ capturePng }) => {
+                  viewerCaptureRef.current = capturePng
+                }}
+              />
+            </Suspense>
           ) : (
             <div className="debug-avatar-empty">Building avatar</div>
           )}
@@ -586,14 +588,16 @@ function AvatarDebugPage() {
       <section className="debug-avatar-view">
         <div className="debug-avatar-stage">
           {modelUrl ? (
-            <AvatarThreeViewer
-              src={modelUrl}
-              alt="아바타 디버그 미리보기"
-              variant="avatar"
-              distanceMultiplier={1.96}
-              fitFullBounds
-              className="debug-avatar-canvas"
-            />
+            <Suspense fallback={<div className="debug-avatar-canvas" />}>
+              <AvatarThreeViewer
+                src={modelUrl}
+                alt="아바타 디버그 미리보기"
+                variant="avatar"
+                distanceMultiplier={1.96}
+                fitFullBounds
+                className="debug-avatar-canvas"
+              />
+            </Suspense>
           ) : (
             <div className="debug-avatar-empty">아바타 생성 중</div>
           )}
@@ -1288,6 +1292,8 @@ function TutorialApp() {
   const displayQuestion = currentQuestion
   const personaQuestionText = displayQuestion?.question ?? ''
   const personaTotalTurns = Number(displayQuestion?.total_turns || displayQuestion?.totalTurns || PERSONA_TOTAL_TURNS) || PERSONA_TOTAL_TURNS
+  const personaCurrentTurn = Number(displayQuestion?.turn || 0) || 0
+  const isFinalPersonaQuestion = Boolean(displayQuestion && personaCurrentTurn >= personaTotalTurns)
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
   const optionLabelMap = new Map(displayOptions.map((option) => [option.id, option]))
@@ -1452,14 +1458,25 @@ function TutorialApp() {
 
   if (stage === 'avatarLoading') {
     return (
-      <main className={`avatar-loading-screen${isAvatarHandoffCover ? ' is-covered' : ''}`}>
-        <AvatarThreeViewer
-          className="avatar-loading-preview"
-          src={LOADING_BASE_AVATAR_URL}
-          alt="avatar base loading"
-          variant="loadingBase"
-          distanceMultiplier={2.8}
-        />
+      <main
+        className={`avatar-loading-screen${isAvatarHandoffCover ? ' is-covered' : ''}`}
+        aria-label="로딩 중"
+        aria-live="polite"
+      >
+        <Suspense fallback={<div className="avatar-loading-preview" />}>
+          <AvatarThreeViewer
+            className="avatar-loading-preview"
+            src={LOADING_BASE_AVATAR_URL}
+            alt="avatar loading preview"
+            variant="loadingBase"
+            distanceMultiplier={1.66}
+            initialYaw={0}
+            onRotationChange={handleAvatarPreviewRotationChange}
+          />
+        </Suspense>
+        <div className="avatar-loading-status-layer">
+          <p className="avatar-loading-status-text">AI 에이전트 생성중</p>
+        </div>
         {isAvatarPreloading && avatarModelUrl && (
           <div className="avatar-background-preloader" aria-hidden="true">
             <AvatarThreeViewer
@@ -1635,6 +1652,12 @@ function TutorialApp() {
             </nav>
           )}
 
+          {isQuestionTransitionLoading && isFinalPersonaQuestion && (
+            <div className="persona-analysis-status-layer" aria-live="polite">
+              <p className="persona-analysis-status-text">답변 분석중</p>
+            </div>
+          )}
+
         </section>
     </div>
   )
@@ -1678,17 +1701,19 @@ function AvatarProfileCapturePage() {
   return (
     <main className="avatar-profile-capture-page" data-status={status} data-error={error}>
       {modelUrl ? (
-        <AvatarThreeViewer
-          className="avatar-profile-capture-viewer"
-          src={modelUrl}
-          alt="avatar profile capture"
-          variant="profileCapture"
-          distanceMultiplier={1}
-          onReady={() => {
-            setStatus('ready')
-            window.__TERARIUM_AVATAR_PROFILE_CAPTURE_READY__ = true
-          }}
-        />
+        <Suspense fallback={<div className="avatar-profile-capture-viewer" />}>
+          <AvatarThreeViewer
+            className="avatar-profile-capture-viewer"
+            src={modelUrl}
+            alt="avatar profile capture"
+            variant="profileCapture"
+            distanceMultiplier={1}
+            onReady={() => {
+              setStatus('ready')
+              window.__TERARIUM_AVATAR_PROFILE_CAPTURE_READY__ = true
+            }}
+          />
+        </Suspense>
       ) : null}
       {status !== 'ready' && <span className="avatar-profile-capture-status">{error || status}</span>}
     </main>

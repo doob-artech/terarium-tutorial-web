@@ -59,9 +59,9 @@ const sceneNineStyle = {
 };
 
 const defaultStyle = {
-  top: '57%',
+  top: '60%',
   left: '50%',
-  width: 'min(44vw, 760px)',
+  width: 'min(32vw, 560px)',
   translate: '-50% -50%',
   transform: 'none',
 };

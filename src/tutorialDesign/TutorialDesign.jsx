@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { TUTORIAL_DATA } from './data';
 import { CHARACTER_PRESETS } from './tutorialAssets';
 import sceneDayVideo from './assets/SceneDAY.mp4';
 import viewAllVideo from './assets/viewAll.mp4';
+import picnicVideo from './assets/picnic.mp4';
 import characterBackground from './assets/character.jpg';
 import qrImage from './assets/qr.png';
 import cameraBubbleImage from './assets/bubble.png';
@@ -11,10 +12,10 @@ import questionImage from './assets/question.png';
 import typingSoundSrc from './assets/talking.ogg';
 import introBgmSrc from './assets/bgm1.wav';
 import clickSoundSrc from './assets/click1.mp3';
-import AvatarThreeViewer from './AvatarThreeViewer';
 import './TutorialDesign.css';
 
 const SKY_BACKGROUND = 'linear-gradient(180deg, #9FD1FC 0%, #FFF 100%)';
+const AvatarThreeViewer = lazy(() => import('./AvatarThreeViewer'));
 
 const ANSWER_BACKGROUNDS = {
   3: {
@@ -38,6 +39,7 @@ const PREVIEW_AVATAR_URL = '';
 const DUPLICATE_NAME_ERROR = '그 이름은 이미 누군가 사용하고 있어. 다시 입력해줄래?';
 const DUPLICATE_NAME_NOTICE =
   '이미 다른 친구가 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!';
+const ANSWER_SELECTION_NOTICE = '답변은 좋아하는 순서대로 3개까지 선택할 수 있어.';
 
 const STEP_SCENE_CHARACTERS = {
   2: 'scene2',
@@ -61,6 +63,7 @@ const STEP_BACKGROUND_VIDEOS = {
   1: { src: sceneDayVideo, loop: true },
   2: { src: sceneDayVideo, loop: true },
   5: { src: viewAllVideo, loop: false },
+  6: { src: picnicVideo, loop: true },
 };
 
 let typingAudioPool = [];
@@ -69,7 +72,9 @@ let clickAudioPool = [];
 let clickAudioPoolIndex = 0;
 let typingAudioBlockedUntil = 0;
 let typingSoundStopTimer = 0;
+let lastTypingSoundAt = 0;
 const TYPING_SOUND_CLIP_MS = 74;
+const TYPING_SOUND_MIN_GAP_MS = 58;
 const CLICK_SOUND_FALLBACK_MS = 320;
 const CLICK_SOUND_TAIL_GAP_MS = 40;
 
@@ -99,6 +104,10 @@ const playTypingSound = (char) => {
   if (now < typingAudioBlockedUntil) {
     return;
   }
+  if (now - lastTypingSoundAt < TYPING_SOUND_MIN_GAP_MS) {
+    return;
+  }
+  lastTypingSoundAt = now;
 
   const pool = getTypingAudioPool();
   if (pool.length === 0) {
@@ -523,6 +532,13 @@ const TutorialDesign = ({
         highlightClassName: 'name-highlight',
       }
     : {};
+  const answerSelectionHighlightProps =
+    currentId === 12
+      ? {
+          highlightText: ANSWER_SELECTION_NOTICE,
+          highlightClassName: 'answer-selection-highlight',
+        }
+      : {};
 
   const renderTypewriter = (
     text,
@@ -616,7 +632,7 @@ const TutorialDesign = ({
             className="background-video"
             autoPlay
             muted
-            preload="auto"
+            preload="metadata"
             loop={stepBackgroundVideo.loop}
             playsInline
             aria-hidden="true"
@@ -642,6 +658,7 @@ const TutorialDesign = ({
           alt=""
           className="question-background-image"
           aria-hidden="true"
+          decoding="async"
         />
       )}
 
@@ -680,20 +697,22 @@ const TutorialDesign = ({
                 } ${character.layerClass || ''} step-character-${currentId}`}
               >
                 {shouldRenderAvatarModel ? (
-                  <AvatarThreeViewer
-                    className={`character-img tutorial-avatar-model ${
-                      currentId === 11 ? 'is-name-input-avatar' : ''
-                    }`}
-                    src={avatarPreviewUrl}
-                    alt={character.alt || 'avatar'}
-                    style={currentId === 11 ? null : character.style}
-                    variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
-                    distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
-                    initialYaw={currentId === 9 ? avatarInitialYaw : 0}
-                    idleSway={currentId === 9 || currentId === 11}
-                    onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
-                    onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
-                  />
+                  <Suspense fallback={<div className="character-img tutorial-avatar-model" />}>
+                    <AvatarThreeViewer
+                      className={`character-img tutorial-avatar-model ${
+                        currentId === 11 ? 'is-name-input-avatar' : ''
+                      }`}
+                      src={avatarPreviewUrl}
+                      alt={character.alt || 'avatar'}
+                      style={currentId === 11 ? null : character.style}
+                      variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
+                      distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
+                      initialYaw={currentId === 9 ? avatarInitialYaw : 0}
+                      idleSway={currentId === 9 || currentId === 11}
+                      onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
+                      onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
+                    />
+                  </Suspense>
                 ) : (
                   <img
                     src={character.src}
@@ -702,6 +721,7 @@ const TutorialDesign = ({
                       currentId === 1 ? 'scene-one-img' : ''
                     }`}
                     style={character.style}
+                    decoding="async"
                   />
                 )}
               </div>
@@ -718,6 +738,7 @@ const TutorialDesign = ({
                   alt={supplementalCharacter.alt || 'character'}
                   className="character-img"
                   style={supplementalCharacter.style}
+                  decoding="async"
                 />
               </div>
             )}
@@ -764,6 +785,7 @@ const TutorialDesign = ({
                       alt=""
                       className="camera-step-bubble-img"
                       aria-hidden="true"
+                      decoding="async"
                     />
                     <p className="camera-step-bubble-text">
                       {renderTypewriter(step.text, {
@@ -781,7 +803,7 @@ const TutorialDesign = ({
                     }}
                     disabled={!isTextDone}
                   >
-                    <img src={cameraButtonImage} alt="" aria-hidden="true" />
+                    <img src={cameraButtonImage} alt="" aria-hidden="true" decoding="async" />
                   </button>
                 </div>
               ) : window.__ENABLE_LEGACY_STACK_LAYOUT__ === true && currentId === 12 ? (
@@ -789,6 +811,7 @@ const TutorialDesign = ({
                   <section className="stack-head-box">
                     <p className="main-desc">
                       {renderTypewriter(step.text, {
+                        ...answerSelectionHighlightProps,
                         onComplete: handleTextComplete,
                       })}
                     </p>
@@ -911,10 +934,10 @@ const TutorialDesign = ({
 
                   {enterUrl ? (
                     <a href={enterUrl} target="_blank" rel="noreferrer">
-                      <img src={qrCodeSrc} alt="QR code" className="qr-image" />
+                      <img src={qrCodeSrc} alt="QR code" className="qr-image" decoding="async" />
                     </a>
                   ) : (
-                    <img src={qrCodeSrc} alt="QR code" className="qr-image" />
+                    <img src={qrCodeSrc} alt="QR code" className="qr-image" decoding="async" />
                   )}
 
                   <div className={`action-row ${isTextDone ? 'show' : ''}`}>
@@ -934,6 +957,7 @@ const TutorialDesign = ({
                       {step.text && (
                         <p className="main-desc">
                           {renderTypewriter(step.text, {
+                            ...answerSelectionHighlightProps,
                             onComplete: handleTextComplete,
                           })}
                         </p>
