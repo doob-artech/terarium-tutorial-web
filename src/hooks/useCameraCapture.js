@@ -3,15 +3,28 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const CAMERA_STAGES = new Set(['webcam', 'cameraDesignCapture'])
 const CAMERA_LOG_PREFIX = '[tutorial-camera]'
 const SECONDARY_CAMERA_PROBE_DELAYS_MS = [800, 1800, 3600, 6500]
+const ANALYSIS_CAPTURE_MAX_EDGE = 720
+const ANALYSIS_CAPTURE_JPEG_QUALITY = 0.68
 
-const captureVideoFrame = (video) => {
+const captureVideoFrame = (
+  video,
+  {
+    maxEdge = ANALYSIS_CAPTURE_MAX_EDGE,
+    quality = ANALYSIS_CAPTURE_JPEG_QUALITY,
+  } = {},
+) => {
   if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
     return null
   }
 
+  const sourceWidth = video.videoWidth
+  const sourceHeight = video.videoHeight
+  const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight))
+  const width = Math.max(1, Math.round(sourceWidth * scale))
+  const height = Math.max(1, Math.round(sourceHeight * scale))
   const canvas = document.createElement('canvas')
-  canvas.width = video.videoWidth
-  canvas.height = video.videoHeight
+  canvas.width = width
+  canvas.height = height
 
   const ctx = canvas.getContext('2d')
   if (!ctx) {
@@ -19,7 +32,13 @@ const captureVideoFrame = (video) => {
   }
 
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL('image/jpeg', 0.92)
+  const dataUrl = canvas.toDataURL('image/jpeg', quality)
+  console.info(CAMERA_LOG_PREFIX, 'captured analysis frame:', {
+    source: `${sourceWidth}x${sourceHeight}`,
+    sent: `${width}x${height}`,
+    bytes: Math.round((dataUrl.length * 3) / 4),
+  })
+  return dataUrl
 }
 
 export function useCameraCapture({ stage, setCameraReady }) {
