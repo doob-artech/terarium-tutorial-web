@@ -491,6 +491,9 @@ function AvatarDebugPage() {
     topColor: 'white',
     bottomColor: 'black',
     shoeColor: 'black',
+    glasses: 'none',
+    necklace: 'none',
+    earrings: 'none',
   })
   const [modelUrl, setModelUrl] = useState('')
   const [manifest, setManifest] = useState(null)
@@ -528,9 +531,13 @@ function AvatarDebugPage() {
         shoe_type: selection.shoes,
         shoe_color: selection.shoeColor,
         accessories: {
-          glasses_type: 'none',
-          has_necklace: false,
-          has_earrings: false,
+          glasses_type: selection.glasses === 'round_glasses'
+            ? 'round'
+            : selection.glasses === 'square_glasses'
+              ? 'square'
+              : 'none',
+          has_necklace: selection.necklace !== 'none',
+          has_earrings: selection.earrings !== 'none',
         },
         asset_tags: {
           skin_texture: selection.skin,
@@ -541,9 +548,9 @@ function AvatarDebugPage() {
           bottom_mesh: selection.bottom,
           outfit_mesh: selection.outfit,
           shoe_mesh: selection.shoes,
-          glasses_mesh: 'none',
-          necklace_mesh: 'none',
-          earring_mesh: 'none',
+          glasses_mesh: selection.glasses,
+          necklace_mesh: selection.necklace,
+          earring_mesh: selection.earrings,
         },
       }
 
@@ -607,6 +614,9 @@ function AvatarDebugPage() {
         <DebugSelect label="상의" value={selection.top} options={DEBUG_AVATAR_OPTIONS.top} disabled={hasOutfit} onChange={(value) => updateSelection('top', value)} />
         <DebugSelect label="하의" value={selection.bottom} options={DEBUG_AVATAR_OPTIONS.bottom} disabled={hasOutfit} onChange={(value) => updateSelection('bottom', value)} />
         <DebugSelect label="신발" value={selection.shoes} options={DEBUG_AVATAR_OPTIONS.shoes} onChange={(value) => updateSelection('shoes', value)} />
+        <DebugSelect label="안경" value={selection.glasses} options={DEBUG_AVATAR_OPTIONS.glasses} onChange={(value) => updateSelection('glasses', value)} />
+        <DebugSelect label="목걸이" value={selection.necklace} options={DEBUG_AVATAR_OPTIONS.necklace} onChange={(value) => updateSelection('necklace', value)} />
+        <DebugSelect label="귀걸이" value={selection.earrings} options={DEBUG_AVATAR_OPTIONS.earrings} onChange={(value) => updateSelection('earrings', value)} />
 
         <div className="debug-avatar-nodes">
           <h2>selectedNodes</h2>
