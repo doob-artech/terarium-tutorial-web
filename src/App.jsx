@@ -89,6 +89,9 @@ const DEBUG_AVATAR_OPTIONS = {
     ['round_open_eyes', '동그란 눈'],
     ['almond_upturned_eyes', '올라간 눈'],
     ['hooded_shadow_eyes', '그늘진 눈'],
+    ['sleepy_drooping_eyes', '졸린 눈'],
+    ['bright_round_eyes', '반짝 눈'],
+    ['smiling_crescent_eyes', '웃는 눈'],
     ['simple_block_eyes', '심플 눈'],
   ],
   mouth: [
