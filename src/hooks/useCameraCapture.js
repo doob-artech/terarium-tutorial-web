@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const CAMERA_STAGES = new Set(['webcam', 'cameraDesignCapture'])
 const CAMERA_LOG_PREFIX = '[tutorial-camera]'
 const PREFERRED_CAMERA_LABEL_PATTERN = /(orbbec|femto|bolt)/i
+const PREFERRED_COLOR_CAMERA_LABEL_PATTERN = /(color|colour|rgb|webcam|video)/i
+const NON_COLOR_CAMERA_LABEL_PATTERN = /(depth|ir|infrared|tof|stereo)/i
 const ANALYSIS_CAPTURE_MAX_EDGE = 720
 const ANALYSIS_CAPTURE_JPEG_QUALITY = 0.68
 const ANALYSIS_CAPTURE_GAMMA = 1.14
@@ -119,20 +121,31 @@ export function useCameraCapture({ stage, setCameraReady }) {
   }, [])
 
   const choosePreferredCameraId = useCallback((devices) => {
-    const preferredDevice = devices.find((device) => PREFERRED_CAMERA_LABEL_PATTERN.test(device.label || ''))
+    const preferredDevices = devices.filter((device) => PREFERRED_CAMERA_LABEL_PATTERN.test(device.label || ''))
+    const preferredDevice =
+      preferredDevices.find((device) => {
+        const label = device.label || ''
+        return PREFERRED_COLOR_CAMERA_LABEL_PATTERN.test(label) && !NON_COLOR_CAMERA_LABEL_PATTERN.test(label)
+      }) ||
+      preferredDevices.find((device) => !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || '')) ||
+      preferredDevices[0]
     if (preferredDevice?.deviceId) {
       console.info(CAMERA_LOG_PREFIX, 'preferred camera selected:', {
         label: preferredDevice.label,
-        reason: 'orbbec-femto-bolt',
+        reason: NON_COLOR_CAMERA_LABEL_PATTERN.test(preferredDevice.label || '')
+          ? 'orbbec-femto-bolt-fallback'
+          : 'orbbec-femto-bolt-color',
       })
       return preferredDevice.deviceId
     }
 
-    if (selectedCameraId && devices.some((device) => device.deviceId === selectedCameraId)) {
+    if (selectedCameraId && devices.some((device) => (
+      device.deviceId === selectedCameraId && !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || '')
+    ))) {
       return selectedCameraId
     }
 
-    return devices[0]?.deviceId || ''
+    return devices.find((device) => !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || ''))?.deviceId || devices[0]?.deviceId || ''
   }, [selectedCameraId])
 
   useEffect(() => {

@@ -834,7 +834,8 @@ function TutorialApp() {
       const result = await analyzeAppearance(cameraFrames)
       setAnalysisResult(result)
       return result
-    } catch {
+    } catch (error) {
+      console.error('[tutorial-appearance] analyze failed:', error)
       setAnalysisResult(null)
       return null
     }
