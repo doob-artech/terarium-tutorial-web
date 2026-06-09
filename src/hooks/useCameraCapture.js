@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const CAMERA_STAGES = new Set(['webcam', 'cameraDesignCapture'])
 const CAMERA_LOG_PREFIX = '[tutorial-camera]'
-const SECONDARY_CAMERA_PROBE_DELAYS_MS = [800, 1800, 3600, 6500]
+const PREFERRED_CAMERA_LABEL_PATTERN = /(orbbec|femto|bolt)/i
 const ANALYSIS_CAPTURE_MAX_EDGE = 720
 const ANALYSIS_CAPTURE_JPEG_QUALITY = 0.68
+const ANALYSIS_CAPTURE_GAMMA = 1.14
 const CAMERA_VIDEO_QUALITY = {
   width: { ideal: 1280 },
   height: { ideal: 720 },
@@ -16,6 +17,7 @@ const captureVideoFrame = (
   {
     maxEdge = ANALYSIS_CAPTURE_MAX_EDGE,
     quality = ANALYSIS_CAPTURE_JPEG_QUALITY,
+    gamma = ANALYSIS_CAPTURE_GAMMA,
   } = {},
 ) => {
   if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
@@ -37,10 +39,21 @@ const captureVideoFrame = (
   }
 
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+  if (gamma && Math.abs(gamma - 1) > 0.01) {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const inverseGamma = 1 / gamma
+    for (let index = 0; index < imageData.data.length; index += 4) {
+      imageData.data[index] = Math.round(255 * ((imageData.data[index] / 255) ** inverseGamma))
+      imageData.data[index + 1] = Math.round(255 * ((imageData.data[index + 1] / 255) ** inverseGamma))
+      imageData.data[index + 2] = Math.round(255 * ((imageData.data[index + 2] / 255) ** inverseGamma))
+    }
+    ctx.putImageData(imageData, 0, 0)
+  }
   const dataUrl = canvas.toDataURL('image/jpeg', quality)
   console.info(CAMERA_LOG_PREFIX, 'captured analysis frame:', {
     source: `${sourceWidth}x${sourceHeight}`,
     sent: `${width}x${height}`,
+    gamma,
     bytes: Math.round((dataUrl.length * 3) / 4),
   })
   return dataUrl
@@ -48,9 +61,7 @@ const captureVideoFrame = (
 
 export function useCameraCapture({ stage, setCameraReady }) {
   const videoRef = useRef(null)
-  const secondaryVideoRef = useRef(null)
   const streamRef = useRef(null)
-  const secondaryStreamRef = useRef(null)
   const [cameraDevices, setCameraDevices] = useState([])
   const [selectedCameraId, setSelectedCameraId] = useState('')
 
@@ -60,17 +71,8 @@ export function useCameraCapture({ stage, setCameraReady }) {
       streamRef.current = null
     }
 
-    if (secondaryStreamRef.current) {
-      secondaryStreamRef.current.getTracks().forEach((track) => track.stop())
-      secondaryStreamRef.current = null
-    }
-
     if (videoRef.current) {
       videoRef.current.srcObject = null
-    }
-
-    if (secondaryVideoRef.current) {
-      secondaryVideoRef.current.srcObject = null
     }
   }, [])
 
@@ -80,7 +82,7 @@ export function useCameraCapture({ stage, setCameraReady }) {
 
   const captureCameraFrames = useCallback(() => ({
     frontImageDataUrl: captureVideoFrame(videoRef.current),
-    rearImageDataUrl: captureVideoFrame(secondaryVideoRef.current),
+    rearImageDataUrl: '',
   }), [])
 
   const refreshCameraDevices = useCallback(async () => {
@@ -116,77 +118,38 @@ export function useCameraCapture({ stage, setCameraReady }) {
     }
   }, [])
 
+  const choosePreferredCameraId = useCallback((devices) => {
+    const preferredDevice = devices.find((device) => PREFERRED_CAMERA_LABEL_PATTERN.test(device.label || ''))
+    if (preferredDevice?.deviceId) {
+      console.info(CAMERA_LOG_PREFIX, 'preferred camera selected:', {
+        label: preferredDevice.label,
+        reason: 'orbbec-femto-bolt',
+      })
+      return preferredDevice.deviceId
+    }
+
+    if (selectedCameraId && devices.some((device) => device.deviceId === selectedCameraId)) {
+      return selectedCameraId
+    }
+
+    return devices[0]?.deviceId || ''
+  }, [selectedCameraId])
+
   useEffect(() => {
     if (!CAMERA_STAGES.has(stage)) {
       return undefined
     }
 
     let canceled = false
-    let primaryCameraIdForEffect = ''
-    const probeTimeouts = []
 
-    const clearProbeTimeouts = () => {
-      probeTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId))
-      probeTimeouts.length = 0
-    }
-
-    const startSecondaryCameraIfAvailable = async (devices, primaryCameraId, reason = 'scan') => {
-      if (canceled || secondaryStreamRef.current) {
-        return false
-      }
-
-      const secondaryDevice = devices.find((device) => device.deviceId && device.deviceId !== primaryCameraId)
-      if (!secondaryDevice) {
-        console.info(CAMERA_LOG_PREFIX, 'secondary camera not available:', {
-          reason,
-          deviceCount: devices.length,
-          hasPrimaryDeviceId: Boolean(primaryCameraId),
-        })
-        return false
-      }
-
-      try {
-        const secondaryStream = await navigator.mediaDevices.getUserMedia({
-          video: { ...CAMERA_VIDEO_QUALITY, deviceId: { exact: secondaryDevice.deviceId } },
-          audio: false,
-        })
-        if (canceled) {
-          secondaryStream.getTracks().forEach((track) => track.stop())
-          return false
-        }
-
-        secondaryStreamRef.current = secondaryStream
-        console.info(CAMERA_LOG_PREFIX, 'secondary camera opened:', {
-          reason,
-          label: secondaryStream.getVideoTracks()[0]?.label || secondaryDevice.label,
-          hasDeviceId: Boolean(secondaryDevice.deviceId),
-        })
-        if (secondaryVideoRef.current) {
-          secondaryVideoRef.current.srcObject = secondaryStream
-        }
-        return true
-      } catch (secondaryError) {
-        console.warn(CAMERA_LOG_PREFIX, 'secondary camera failed:', {
-          reason,
-          label: secondaryDevice.label,
-          error: secondaryError,
-        })
-        if (secondaryVideoRef.current) {
-          secondaryVideoRef.current.srcObject = null
-        }
-        return false
-      }
-    }
-
-    const probeSecondaryCamera = (reason) => {
-      if (!navigator.mediaDevices?.enumerateDevices || !primaryCameraIdForEffect || secondaryStreamRef.current) {
-        return
-      }
-
-      void (async () => {
-        const devices = await refreshCameraDevices()
-        await startSecondaryCameraIfAvailable(devices, primaryCameraIdForEffect, reason)
-      })()
+    const openCameraStream = async (cameraId) => {
+      const videoConstraint = cameraId
+        ? { ...CAMERA_VIDEO_QUALITY, deviceId: { exact: cameraId } }
+        : { ...CAMERA_VIDEO_QUALITY, facingMode: 'user' }
+      return navigator.mediaDevices.getUserMedia({
+        video: videoConstraint,
+        audio: false,
+      })
     }
 
     const startCamera = async () => {
@@ -199,16 +162,10 @@ export function useCameraCapture({ stage, setCameraReady }) {
         stopCamera()
 
         const initialDevices = await refreshCameraDevices()
-        const preferredCameraId = selectedCameraId || initialDevices[0]?.deviceId || ''
+        const preferredCameraId = choosePreferredCameraId(initialDevices)
         let stream = null
         try {
-          const videoConstraint = preferredCameraId
-            ? { ...CAMERA_VIDEO_QUALITY, deviceId: { exact: preferredCameraId } }
-            : { ...CAMERA_VIDEO_QUALITY, facingMode: 'user' }
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: videoConstraint,
-            audio: false,
-          })
+          stream = await openCameraStream(preferredCameraId)
         } catch (preferredError) {
           console.warn(CAMERA_LOG_PREFIX, 'main camera preferred constraint failed; retrying default camera:', preferredError)
           stream = await navigator.mediaDevices.getUserMedia({
@@ -222,26 +179,38 @@ export function useCameraCapture({ stage, setCameraReady }) {
           return
         }
 
-        streamRef.current = stream
-        const activeTrack = stream.getVideoTracks()[0]
-        const activeDeviceId = activeTrack?.getSettings?.().deviceId || ''
+        let activeTrack = stream.getVideoTracks()[0]
+        let activeDeviceId = activeTrack?.getSettings?.().deviceId || ''
         console.info(CAMERA_LOG_PREFIX, 'main camera opened:', {
           label: activeTrack?.label || '',
           hasDeviceId: Boolean(activeDeviceId),
         })
+
         const devices = await refreshCameraDevices()
-        const primaryCameraId = activeDeviceId || preferredCameraId || devices[0]?.deviceId || ''
-        primaryCameraIdForEffect = primaryCameraId
-        if (primaryCameraId && primaryCameraId !== selectedCameraId) {
-          setSelectedCameraId(primaryCameraId)
+        const preferredAfterPermissionId = choosePreferredCameraId(devices)
+        const currentCameraId = activeDeviceId || preferredCameraId
+        if (preferredAfterPermissionId && preferredAfterPermissionId !== currentCameraId) {
+          console.info(CAMERA_LOG_PREFIX, 'switching to preferred camera after permission labels resolved')
+          stream.getTracks().forEach((track) => track.stop())
+          stream = await openCameraStream(preferredAfterPermissionId)
+          if (canceled) {
+            stream.getTracks().forEach((track) => track.stop())
+            return
+          }
+          activeTrack = stream.getVideoTracks()[0]
+          activeDeviceId = activeTrack?.getSettings?.().deviceId || preferredAfterPermissionId
+          console.info(CAMERA_LOG_PREFIX, 'main camera opened:', {
+            label: activeTrack?.label || '',
+            hasDeviceId: Boolean(activeDeviceId),
+          })
         }
-        await startSecondaryCameraIfAvailable(devices, primaryCameraId, 'initial')
-        SECONDARY_CAMERA_PROBE_DELAYS_MS.forEach((delayMs, index) => {
-          const timeoutId = window.setTimeout(() => {
-            probeSecondaryCamera(`continuity-probe-${index + 1}`)
-          }, delayMs)
-          probeTimeouts.push(timeoutId)
-        })
+
+        streamRef.current = stream
+        const activeCameraId = activeDeviceId || preferredAfterPermissionId || preferredCameraId || devices[0]?.deviceId || ''
+        if (activeCameraId && activeCameraId !== selectedCameraId) {
+          setSelectedCameraId(activeCameraId)
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           videoRef.current.onloadedmetadata = () => {
@@ -258,22 +227,20 @@ export function useCameraCapture({ stage, setCameraReady }) {
     startCamera()
 
     const handleDeviceChange = () => {
-      probeSecondaryCamera('devicechange')
+      void refreshCameraDevices()
     }
     navigator.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange)
 
     return () => {
       canceled = true
-      clearProbeTimeouts()
       navigator.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange)
       setCameraReady(false)
       stopCamera()
     }
-  }, [stage, selectedCameraId, setCameraReady, stopCamera, refreshCameraDevices])
+  }, [stage, selectedCameraId, setCameraReady, stopCamera, refreshCameraDevices, choosePreferredCameraId])
 
   return {
     videoRef,
-    secondaryVideoRef,
     stopCamera,
     captureCurrentFrame,
     captureCameraFrames,

@@ -720,10 +720,8 @@ function TutorialApp() {
   const avatarPreloadReadyRef = useRef(false)
   const {
     videoRef,
-    secondaryVideoRef,
     stopCamera,
     captureCameraFrames,
-    cameraDevices,
   } = useCameraCapture({ stage, setCameraReady })
   const getActiveAvatarAgentId = useCallback(
     () => personaAgentIdRef.current || personaAgentId,
@@ -1429,16 +1427,6 @@ function TutorialApp() {
                 playsInline
                 muted
               />
-              {cameraDevices.length > 1 && (
-                <video
-                  ref={secondaryVideoRef}
-                  className="tutorial-camera-secondary-video"
-                  autoPlay
-                  playsInline
-                  muted
-                  aria-label="서브 카메라"
-                />
-              )}
             </>
           }
         />

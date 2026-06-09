@@ -806,22 +806,6 @@
   background: #000;
 }
 
-.tutorial-camera-secondary-video {
-  position: fixed;
-  top: max(22px, env(safe-area-inset-top));
-  right: max(22px, env(safe-area-inset-right));
-  z-index: 22;
-  width: clamp(148px, 16vw, 230px);
-  aspect-ratio: 1;
-  border: 5px solid rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
-  background: #000;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.26);
-  object-fit: cover;
-  transform: scaleX(-1);
-  pointer-events: none;
-}
-
 .persona-stage {
   position: absolute;
   inset: 0;
