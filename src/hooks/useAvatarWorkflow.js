@@ -18,14 +18,9 @@ export function useAvatarWorkflow({
       return null
     }
 
-    try {
-      const payload = await buildAvatar({ agentId, appearance })
-      setAvatarModelUrl(normalizeAssetUrl(payload.modelUrl))
-      return payload
-    } catch (error) {
-      console.warn(error instanceof Error ? error.message : 'Unknown error while building avatar.')
-      return null
-    }
+    const payload = await buildAvatar({ agentId, appearance })
+    setAvatarModelUrl(normalizeAssetUrl(payload.modelUrl))
+    return payload
   }, [normalizeAssetUrl, setAvatarModelUrl])
 
   const handleAvatarProfileImageReady = useCallback(async (viewerApi) => {

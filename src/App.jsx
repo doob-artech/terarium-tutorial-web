@@ -7,6 +7,7 @@ import {
   answerPersona,
   buildAvatar,
   claimNickname,
+  createRandomAgent,
   fetchAvatarRecipe,
   personaSessionAbandonUrl,
   renameAvatar,
@@ -66,20 +67,27 @@ const preloadCountdownFont = () => {
 const DEBUG_AVATAR_OPTIONS = {
   hair: [
     ['bun_hair', '번 헤어'],
-    ['bun_hair_with_bangs', '앞머리 번'],
-    ['bob_hair_with_bangs', '단발 앞머리'],
-    ['permed_short_hair', '펌 숏헤어'],
-    ['half_ponytail_hair', '하프 포니테일'],
-    ['long_wave_hair_with_bangs', '긴 웨이브 앞머리'],
+    ['bangs_bun_hair', '앞머리 번'],
+    ['bangs_bobbed_hair', '앞머리 단발'],
+    ['bobbed_hair', '단발'],
+    ['permed_hair', '펌 헤어'],
+    ['half_ponytail', '하프 포니테일'],
+    ['bangs_long_wave_hair', '앞머리 긴 웨이브'],
     ['long_wave_hair', '긴 웨이브'],
-    ['low_tied_hair', '낮게 묶은 머리'],
-    ['high_tied_hair', '높게 묶은 머리'],
-    ['bowl_cut_hair', '바가지 컷'],
-    ['gael_cut_left_hair', '가엘컷 왼쪽'],
-    ['gael_cut_right_hair', '가엘컷 오른쪽'],
-    ['wolf_cut_hair', '울프컷'],
-    ['pompadour_hair', '포마드'],
-    ['dandy_cut_hair', '댄디컷'],
+    ['bangs_straight_hair', '앞머리 긴 생머리'],
+    ['straight_hair', '긴 생머리'],
+    ['twin_braids', '양갈래 땋은 머리'],
+    ['high_ponytail', '높은 포니테일'],
+    ['bangs_high_ponytail', '앞머리 높은 포니테일'],
+    ['low_ponytail', '낮은 포니테일'],
+    ['bangs_low_ponytail', '앞머리 낮은 포니테일'],
+    ['bowl_cut', '바가지 컷'],
+    ['gael_cut_1', '가엘컷 1'],
+    ['gael_cut_2', '가엘컷 2'],
+    ['wolf_cut', '울프컷'],
+    ['crop_cut', '크롭컷'],
+    ['pompadour_cut', '포마드'],
+    ['dandy_cut', '댄디컷'],
   ],
   skin: [
     ['soft_peach_skin', '피치 피부'],
@@ -103,9 +111,9 @@ const DEBUG_AVATAR_OPTIONS = {
     ['toothy_smile_mouth', '치아 미소'],
   ],
   top: [
-    ['short_sleeve_tshirt', '반팔 티셔츠'],
-    ['long_sleeve_tshirt', '긴팔 티셔츠'],
-    ['button_shirt', '단추 셔츠'],
+    ['short_Tshirt', '반팔 티셔츠'],
+    ['long_Tshirt', '긴팔 티셔츠'],
+    ['shirts', '셔츠'],
   ],
   bottom: [
     ['short_pants', '짧은 바지'],
@@ -115,11 +123,11 @@ const DEBUG_AVATAR_OPTIONS = {
   ],
   outfit: [
     ['none', '원피스 없음'],
-    ['short_onepiece', '짧은 원피스'],
-    ['long_onepiece', '긴 원피스'],
+    ['onepiece_1', '짧은 원피스'],
+    ['onepiece_2', '긴 원피스'],
   ],
   shoes: [
-    ['sneakers', '운동화'],
+    ['shoes', '운동화'],
     ['sandals', '샌달'],
   ],
   glasses: [
@@ -133,45 +141,31 @@ const DEBUG_AVATAR_OPTIONS = {
   ],
   earrings: [
     ['none', '귀걸이 없음'],
-    ['hoop_earrings', '후프 귀걸이'],
-    ['simple_earrings', '심플 귀걸이'],
+    ['Earring01', '후프 귀걸이'],
+    ['Earring02', '심플 귀걸이'],
   ],
 }
 
-const DEBUG_ASSET_TO_APPEARANCE = {
-  hair: {
-    bun_hair: ['bun', 'none', 'center'],
-    bun_hair_with_bangs: ['bun', 'full_bang', 'center'],
-    bob_hair_with_bangs: ['bob_straight', 'full_bang', 'center'],
-    permed_short_hair: ['short_cut', 'none', 'center'],
-    half_ponytail_hair: ['half_up', 'none', 'center'],
-    long_wave_hair_with_bangs: ['long_wave', 'full_bang', 'center'],
-    long_wave_hair: ['long_wave', 'none', 'center'],
-    low_tied_hair: ['ponytail_low', 'none', 'center'],
-    high_tied_hair: ['ponytail_high', 'none', 'center'],
-    bowl_cut_hair: ['bowl_cut', 'full_bang', 'center'],
-    gael_cut_left_hair: ['gael_cut_left', 'none', 'left'],
-    gael_cut_right_hair: ['gael_cut_right', 'none', 'right'],
-    wolf_cut_hair: ['wolf_cut', 'none', 'center'],
-    pompadour_hair: ['pomade', 'none', 'center'],
-    dandy_cut_hair: ['dandy_cut', 'none', 'center'],
+const buildDebugAppearance = (selection) => ({
+  hair_color: selection.hairColor,
+  eye_color: 'dark_brown',
+  top_color: selection.topColor,
+  bottom_color: selection.outfit !== 'none' ? selection.topColor : selection.bottomColor,
+  shoe_color: selection.shoeColor,
+  asset_tags: {
+    skin_texture: selection.skin,
+    eye_texture: selection.eye,
+    mouth_texture: selection.mouth,
+    hair_mesh: selection.hair,
+    top_mesh: selection.top,
+    bottom_mesh: selection.bottom,
+    outfit_mesh: selection.outfit,
+    shoe_mesh: selection.shoes,
+    glasses_mesh: selection.glasses,
+    necklace_mesh: selection.necklace,
+    earring_mesh: selection.earrings,
   },
-  top: {
-    short_sleeve_tshirt: 'short_sleeve_tshirt',
-    long_sleeve_tshirt: 'long_sleeve_tshirt',
-    button_shirt: 'button_shirt',
-  },
-  bottom: {
-    short_pants: 'shorts',
-    long_pants: 'long_pants',
-    short_skirt: 'short_skirt',
-    long_skirt: 'long_skirt',
-  },
-  outfit: {
-    short_onepiece: 'short_onepiece',
-    long_onepiece: 'long_onepiece',
-  },
-}
+})
 
 const DEBUG_COLOR_OPTIONS = [
   ['black', 'Black', '#101010'],
@@ -234,19 +228,23 @@ const playPersonaClickSound = () => {
 }
 
 const MOCK_APPEARANCE_RESULT = {
-  hair_style: 'short_cut',
-  hair_part_direction: 'center',
-  bangs_type: 'none',
   hair_color: 'black',
-  eye_type: 'puppy_eyes',
   eye_color: 'dark_brown',
-  mouth_type: 'closed_smile',
-  top_type: 'hoodie',
-  bottom_type: 'wide_long_pants',
-  accessories: {
-    glasses_type: 'none',
-    has_necklace: false,
-    has_earrings: false,
+  top_color: 'black',
+  bottom_color: 'black',
+  shoe_color: 'black',
+  asset_tags: {
+    skin_texture: 'soft_peach_skin',
+    eye_texture: 'puppy_eyes',
+    mouth_texture: 'closed_smile_mouth',
+    hair_mesh: 'dandy_cut',
+    top_mesh: 'short_Tshirt',
+    bottom_mesh: 'long_pants',
+    outfit_mesh: 'none',
+    shoe_mesh: 'shoes',
+    glasses_mesh: 'none',
+    necklace_mesh: 'none',
+    earring_mesh: 'none',
   },
 }
 
@@ -260,6 +258,9 @@ function App() {
   if (isProfileCaptureRoute) {
     return <AvatarProfileCapturePage />
   }
+  if (window.location.pathname === '/random-agent') {
+    return <RandomAgentPage />
+  }
 
   return <TutorialApp />
 }
@@ -270,10 +271,10 @@ function AvatarDebugPageV2() {
     skin: 'soft_peach_skin',
     eye: 'puppy_eyes',
     mouth: 'closed_smile_mouth',
-    top: 'short_sleeve_tshirt',
+    top: 'short_Tshirt',
     bottom: 'short_pants',
     outfit: 'none',
-    shoes: 'sneakers',
+    shoes: 'shoes',
     hairColor: 'black',
     topColor: 'white',
     bottomColor: 'black',
@@ -314,47 +315,7 @@ function AvatarDebugPageV2() {
       setStatus('loading')
       setError('')
       viewerCaptureRef.current = null
-      const hairInfo = DEBUG_ASSET_TO_APPEARANCE.hair[selection.hair] || ['long_wave', 'none', 'center']
-      const hasOutfit = selection.outfit !== 'none'
-      const appearance = {
-        hair_style: hairInfo[0],
-        hair_part_direction: hairInfo[2],
-        bangs_type: hairInfo[1],
-        hair_color: selection.hairColor,
-        eye_type: selection.eye,
-        eye_color: 'dark_brown',
-        mouth_type: selection.mouth.replace(/_mouth$/, '').replace('broad_smile', 'big_smile'),
-        top_type: DEBUG_ASSET_TO_APPEARANCE.top[selection.top],
-        top_color: selection.topColor,
-        bottom_type: hasOutfit
-          ? DEBUG_ASSET_TO_APPEARANCE.outfit[selection.outfit]
-          : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
-        bottom_color: hasOutfit ? selection.topColor : selection.bottomColor,
-        shoe_type: selection.shoes,
-        shoe_color: selection.shoeColor,
-        accessories: {
-          glasses_type: selection.glasses === 'round_glasses'
-            ? 'round'
-            : selection.glasses === 'square_glasses'
-              ? 'square'
-              : 'none',
-          has_necklace: selection.necklace !== 'none',
-          has_earrings: selection.earrings !== 'none',
-        },
-        asset_tags: {
-          skin_texture: selection.skin,
-          eye_texture: selection.eye,
-          mouth_texture: selection.mouth,
-          hair_mesh: selection.hair,
-          top_mesh: selection.top,
-          bottom_mesh: selection.bottom,
-          outfit_mesh: selection.outfit,
-          shoe_mesh: selection.shoes,
-          glasses_mesh: selection.glasses,
-          necklace_mesh: selection.necklace,
-          earring_mesh: selection.earrings,
-        },
-      }
+      const appearance = buildDebugAppearance(selection)
 
       try {
         const payload = await buildAvatar({
@@ -488,10 +449,10 @@ function AvatarDebugPage() {
     skin: 'soft_peach_skin',
     eye: 'puppy_eyes',
     mouth: 'closed_smile_mouth',
-    top: 'short_sleeve_tshirt',
+    top: 'short_Tshirt',
     bottom: 'short_pants',
     outfit: 'none',
-    shoes: 'sneakers',
+    shoes: 'shoes',
     hairColor: 'black',
     topColor: 'white',
     bottomColor: 'black',
@@ -517,47 +478,7 @@ function AvatarDebugPage() {
     const build = async () => {
       setStatus('loading')
       setError('')
-      const hairInfo = DEBUG_ASSET_TO_APPEARANCE.hair[selection.hair] || ['long_wave', 'none', 'center']
-      const hasOutfit = selection.outfit !== 'none'
-      const appearance = {
-        hair_style: hairInfo[0],
-        hair_part_direction: hairInfo[2],
-        bangs_type: hairInfo[1],
-        hair_color: selection.hairColor,
-        eye_type: selection.eye,
-        eye_color: 'dark_brown',
-        mouth_type: selection.mouth.replace(/_mouth$/, '').replace('broad_smile', 'big_smile'),
-        top_type: DEBUG_ASSET_TO_APPEARANCE.top[selection.top],
-        top_color: selection.topColor,
-        bottom_type: hasOutfit
-          ? DEBUG_ASSET_TO_APPEARANCE.outfit[selection.outfit]
-          : DEBUG_ASSET_TO_APPEARANCE.bottom[selection.bottom],
-        bottom_color: hasOutfit ? selection.topColor : selection.bottomColor,
-        shoe_type: selection.shoes,
-        shoe_color: selection.shoeColor,
-        accessories: {
-          glasses_type: selection.glasses === 'round_glasses'
-            ? 'round'
-            : selection.glasses === 'square_glasses'
-              ? 'square'
-              : 'none',
-          has_necklace: selection.necklace !== 'none',
-          has_earrings: selection.earrings !== 'none',
-        },
-        asset_tags: {
-          skin_texture: selection.skin,
-          eye_texture: selection.eye,
-          mouth_texture: selection.mouth,
-          hair_mesh: selection.hair,
-          top_mesh: selection.top,
-          bottom_mesh: selection.bottom,
-          outfit_mesh: selection.outfit,
-          shoe_mesh: selection.shoes,
-          glasses_mesh: selection.glasses,
-          necklace_mesh: selection.necklace,
-          earring_mesh: selection.earrings,
-        },
-      }
+      const appearance = buildDebugAppearance(selection)
 
       try {
         const payload = await buildAvatar({
@@ -709,6 +630,7 @@ function TutorialApp() {
   const timeoutIdsRef = useRef([])
   const startInterviewInFlightRef = useRef(false)
   const startInterviewRequestIdRef = useRef(0)
+  const captureSessionIdRef = useRef(0)
   const syncedAppearanceAgentRef = useRef('')
   const capturePipelineRef = useRef(null)
   const personaAgentIdRef = useRef('')
@@ -718,6 +640,8 @@ function TutorialApp() {
   const avatarPreviewRotationRef = useRef({ yaw: 0, pitch: 0 })
   const avatarTransitionFinishingRef = useRef(false)
   const avatarPreloadReadyRef = useRef(false)
+  const frontCaptureDataUrlRef = useRef('')
+  const [rearCapturePromptVisible, setRearCapturePromptVisible] = useState(false)
   const {
     videoRef,
     stopCamera,
@@ -765,8 +689,10 @@ function TutorialApp() {
   const resetPersonaSession = () => {
     abandonActivePersonaSession()
     startInterviewRequestIdRef.current += 1
+    captureSessionIdRef.current += 1
     startInterviewInFlightRef.current = false
     capturePipelineRef.current = null
+    frontCaptureDataUrlRef.current = ''
     personaAgentIdRef.current = ''
     personaCompletedRef.current = false
     nicknameValueRef.current = ''
@@ -829,14 +755,19 @@ function TutorialApp() {
     timeoutIdsRef.current.push(cleanupTimer)
   }, [setIsAvatarHandoffCover, setIsAvatarLoadingExit, setIsAvatarPreloading])
 
-  const analyzePhotoWithLlmServer = async (cameraFrames) => {
+  const analyzePhotoWithLlmServer = async (cameraFrames, captureSessionId) => {
     try {
       const result = await analyzeAppearance(cameraFrames)
+      if (captureSessionId !== captureSessionIdRef.current) {
+        return null
+      }
       setAnalysisResult(result)
       return result
     } catch (error) {
       console.error('[tutorial-appearance] analyze failed:', error)
-      setAnalysisResult(null)
+      if (captureSessionId === captureSessionIdRef.current) {
+        setAnalysisResult(null)
+      }
       return null
     }
   }
@@ -855,11 +786,11 @@ function TutorialApp() {
       try {
         await syncPersonaAppearance(agentId, appearance)
         syncedAppearanceAgentRef.current = syncKey
-      } catch {
-        // best-effort sync only
+      } catch (error) {
+        setPersonaError(error instanceof Error ? error.message : 'Appearance sync request failed.')
       }
     },
-    [],
+    [setPersonaError],
   )
 
   const startPersonaInterview = useCallback(async (appearanceOverride = null) => {
@@ -979,6 +910,8 @@ function TutorialApp() {
     setCameraReady(false)
     setIsCaptureProcessing(false)
     setAnalysisResult(null)
+    frontCaptureDataUrlRef.current = ''
+    setRearCapturePromptVisible(false)
     setStage('cameraDesignCapture')
   }
 
@@ -991,17 +924,52 @@ function TutorialApp() {
     setAutoCaptureRequested(false)
     setCaptureLocked(true)
     clearTimers()
+    setRearCapturePromptVisible(false)
     setCountdown(3)
+    const captureSessionId = captureSessionIdRef.current
 
-    const countTwoTimer = window.setTimeout(() => setCountdown(2), 1000)
-    const countOneTimer = window.setTimeout(() => setCountdown(1), 2000)
+    const countTwoTimer = window.setTimeout(() => {
+      if (captureSessionId === captureSessionIdRef.current) {
+        setCountdown(2)
+      }
+    }, 1000)
+    const countOneTimer = window.setTimeout(() => {
+      if (captureSessionId === captureSessionIdRef.current) {
+        setCountdown(1)
+      }
+    }, 2000)
 
     const flashTimer = window.setTimeout(() => {
+      if (captureSessionId !== captureSessionIdRef.current) {
+        return
+      }
       const cameraFrames = captureCameraFrames()
-      const imageDataUrl = cameraFrames.frontImageDataUrl
+      const capturedImageDataUrl = cameraFrames.frontImageDataUrl
 
       setCountdown(null)
-      setIsCaptureProcessing(false)
+      if (!frontCaptureDataUrlRef.current) {
+        if (!capturedImageDataUrl) {
+          setPersonaError('촬영에 실패했습니다. 다시 촬영해 주세요.')
+          setCaptureLocked(false)
+          return
+        }
+        frontCaptureDataUrlRef.current = capturedImageDataUrl
+        setCaptureLocked(false)
+        setRearCapturePromptVisible(true)
+        return
+      }
+
+      const analysisFrames = {
+        frontImageDataUrl: frontCaptureDataUrlRef.current,
+        rearImageDataUrl: capturedImageDataUrl || '',
+      }
+      if (!analysisFrames.rearImageDataUrl) {
+        setPersonaError('옆모습 촬영에 실패했습니다. 다시 촬영해 주세요.')
+        setCaptureLocked(false)
+        setRearCapturePromptVisible(true)
+        return
+      }
+      setIsCaptureProcessing(true)
       setStage('avatarLoading')
       avatarPreviewRotationRef.current = { yaw: 0, pitch: 0 }
       setIsAvatarPreloading(false)
@@ -1017,9 +985,13 @@ function TutorialApp() {
             setAnalysisResult(MOCK_APPEARANCE_RESULT)
             appearanceResult = MOCK_APPEARANCE_RESULT
           } else {
-            if (imageDataUrl) {
-              appearanceResult = await analyzePhotoWithLlmServer(cameraFrames)
+            if (analysisFrames.frontImageDataUrl) {
+              appearanceResult = await analyzePhotoWithLlmServer(analysisFrames, captureSessionId)
             }
+          }
+
+          if (captureSessionId !== captureSessionIdRef.current) {
+            return null
           }
 
           if (!appearanceResult) {
@@ -1028,12 +1000,18 @@ function TutorialApp() {
 
           const avatarAppearance = appearanceResult
           const personaPayload = await startPersonaInterview(avatarAppearance)
+          if (captureSessionId !== captureSessionIdRef.current) {
+            return null
+          }
           let avatarPayload = null
           if (personaPayload?.agentId) {
             avatarPayload = await buildAvatarModel({
               agentId: personaPayload.agentId,
               appearance: avatarAppearance,
             })
+            if (captureSessionId !== captureSessionIdRef.current) {
+              return null
+            }
             if (!avatarPayload?.modelUrl) {
               throw new Error('아바타 생성에 실패했습니다. 다시 촬영해 주세요.')
             }
@@ -1053,8 +1031,13 @@ function TutorialApp() {
           }
           return personaPayload
         } catch (error) {
+          if (captureSessionId !== captureSessionIdRef.current) {
+            return null
+          }
           setAnalysisResult(null)
           setPersonaError(error instanceof Error ? error.message : '외형 분석 또는 페르소나 시작에 실패했습니다.')
+          frontCaptureDataUrlRef.current = ''
+          setRearCapturePromptVisible(false)
           setCaptureLocked(false)
           setIsCaptureProcessing(false)
           setIsAvatarPreloading(false)
@@ -1318,7 +1301,7 @@ function TutorialApp() {
   const isNicknameValid = (value) => (
     TEST_MODE_RELAXED_NICKNAME
       ? value.length > 0
-      : /^[A-Za-z0-9가-힣 ]{2,12}$/.test(value)
+      : /^[A-Za-z가-힣 ]{2,12}$/.test(value)
   )
 
   const acceptNicknameDraft = (targetNickname) => {
@@ -1418,7 +1401,7 @@ function TutorialApp() {
         <TutorialDesign
           initialId={8}
           onBeginCamera={handleCapture}
-          hideUi={captureLocked || countdown !== null}
+          hideUi={captureLocked || countdown !== null || rearCapturePromptVisible}
           backgroundSlot={
             <>
               <video
@@ -1431,6 +1414,21 @@ function TutorialApp() {
             </>
           }
         />
+        {rearCapturePromptVisible && (
+          <section className="rear-capture-overlay" aria-live="polite">
+            <div className="rear-capture-panel">
+              <p className="rear-capture-title">이제 옆으로 돌아 주세요</p>
+              <p className="rear-capture-copy">머리 길이와 묶음 위치를 정확히 보기 위해 옆모습을 한 번 더 촬영할게요.</p>
+              <button
+                type="button"
+                className="rear-capture-button"
+                onClick={handleCapture}
+              >
+                옆모습 촬영
+              </button>
+            </div>
+          </section>
+        )}
         {isCaptureProcessing && (
           <section className="capture-processing-overlay" aria-live="polite">
             <div className="capture-processing-pill">
@@ -1652,6 +1650,78 @@ function TutorialApp() {
 
         </section>
     </div>
+  )
+}
+
+function RandomAgentPage() {
+  const [payload, setPayload] = useState(null)
+  const [status, setStatus] = useState('creating')
+  const [error, setError] = useState('')
+
+  const create = useCallback(async () => {
+    setStatus('creating')
+    setError('')
+    try {
+      const nextPayload = await createRandomAgent()
+      setPayload(nextPayload)
+      setStatus('rendering')
+    } catch (createError) {
+      setStatus('error')
+      setError(createError instanceof Error ? createError.message : 'random agent failed')
+    }
+  }, [])
+
+  useEffect(() => {
+    void create()
+  }, [create])
+
+  const handleAvatarReady = useCallback(() => {
+    setStatus('ready')
+  }, [])
+
+  const modelUrl = avatarAssetUrl(payload?.avatar?.modelUrl || '')
+  const statusText = status === 'creating'
+    ? '랜덤 에이전트 생성 중'
+    : status === 'rendering'
+      ? '아바타 렌더링 중'
+      : status === 'ready'
+        ? '랜덤 에이전트 생성 완료'
+        : error || '문제가 발생했습니다'
+
+  return (
+    <main className="random-agent-page" data-status={status}>
+      <section className="random-agent-view">
+        {modelUrl ? (
+          <Suspense fallback={<div className="random-agent-viewer" />}>
+            <AvatarThreeViewer
+              className="random-agent-viewer"
+              src={modelUrl}
+              alt="랜덤 에이전트 아바타"
+              variant="avatar"
+              distanceMultiplier={1.45}
+              fitFullBounds
+              onReady={handleAvatarReady}
+            />
+          </Suspense>
+        ) : (
+          <div className="random-agent-viewer" />
+        )}
+      </section>
+      <aside className="random-agent-panel">
+        <img src={logo1Src} alt="TERARiUM" />
+        <p>{statusText}</p>
+        {payload ? (
+          <>
+            <strong>{payload.nickname}</strong>
+            <small>{payload.agentId}</small>
+            <a href={payload.enterUrl}>입장</a>
+          </>
+        ) : null}
+        <button type="button" onClick={() => void create()} disabled={status === 'creating'}>
+          다시 랜덤 생성
+        </button>
+      </aside>
+    </main>
   )
 }
 

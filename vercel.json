@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!assets/|taste-backgrounds/|favicon.svg|icons.svg).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

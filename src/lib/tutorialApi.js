@@ -8,6 +8,7 @@ async function requestJson(path, { method = 'GET', body, fallbackError = 'Reques
   const response = await fetch(apiUrl(path), {
     method,
     headers: jsonHeaders,
+    cache: 'no-store',
     signal,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
@@ -64,6 +65,20 @@ export async function saveAvatarProfileImage({ agentId, imageDataUrl }) {
     body: { agentId, imageDataUrl },
     fallbackError: 'Avatar profile image request failed.',
   })
+}
+
+export async function createRandomAgent() {
+  const payload = await requestJson('/api/random-agent', {
+    method: 'POST',
+    body: {},
+    fallbackError: 'Random agent request failed.',
+  })
+
+  if (!payload?.agentId || !payload?.avatar?.modelUrl) {
+    throw new Error('Server returned an invalid random-agent response.')
+  }
+
+  return payload
 }
 
 export async function startPersona({ appearance }) {
