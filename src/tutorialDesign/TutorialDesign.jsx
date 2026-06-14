@@ -30,6 +30,7 @@ const ANSWER_BACKGROUNDS = {
 
 const STEP_BACKGROUNDS = {
   7: 'radial-gradient(50% 50% at 50% 50%, #FFF 0.48%, #9FD1FC 60.1%)',
+  12: 'linear-gradient(180deg, #b9ddfb 0%, #dff1ff 56%, #fff 100%)',
 };
 
 const SKY_BACKGROUND_STEPS = new Set([9, 10, 11, 12]);

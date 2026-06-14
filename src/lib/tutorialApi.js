@@ -21,33 +21,28 @@ async function requestJson(path, { method = 'GET', body, fallbackError = 'Reques
   return payload
 }
 
-export async function analyzeAppearance(input) {
-  const body = typeof input === 'string'
-    ? { imageDataUrl: input }
-    : {
-        frontImageDataUrl: input?.frontImageDataUrl || input?.imageDataUrl || '',
-        rearImageDataUrl: input?.rearImageDataUrl || '',
-      }
-
-  const payload = await requestJson('/api/analyze-appearance', {
+export async function runAppearancePipeline({
+  agentId,
+  frontImageDataUrl,
+  rearImageDataUrl,
+  signal,
+}) {
+  const payload = await requestJson('/api/pipeline/appearance', {
     method: 'POST',
-    body,
-    fallbackError: 'Analyze request failed.',
+    body: {
+      agentId,
+      frontImageDataUrl,
+      rearImageDataUrl,
+    },
+    fallbackError: 'Appearance pipeline request failed.',
+    signal,
   })
 
-  if (!payload?.result || typeof payload.result !== 'object') {
-    throw new Error('Server returned an invalid analyze response.')
+  if (!payload?.agentId || !payload?.result || typeof payload.result !== 'object' || !payload?.avatar?.modelUrl) {
+    throw new Error('Server returned an invalid appearance pipeline response.')
   }
 
-  return payload.result
-}
-
-export async function syncPersonaAppearance(agentId, appearance) {
-  await requestJson('/api/persona/appearance', {
-    method: 'POST',
-    body: { agentId, appearance },
-    fallbackError: 'Appearance sync request failed.',
-  })
+  return payload
 }
 
 export async function buildAvatar({ agentId, appearance, signal }) {
@@ -81,10 +76,10 @@ export async function createRandomAgent() {
   return payload
 }
 
-export async function startPersona({ appearance }) {
+export async function startPersona({ agentId, appearance }) {
   const payload = await requestJson('/api/persona/start', {
     method: 'POST',
-    body: { appearance },
+    body: { agentId, appearance },
     fallbackError: 'Persona start request failed.',
   })
 
@@ -95,29 +90,34 @@ export async function startPersona({ appearance }) {
   return payload
 }
 
-export async function answerPersona({ agentId, answer, turn }) {
-  const payload = await requestJson('/api/persona/answer', {
+export async function synthesizePersona({
+  agentId,
+  appearance,
+  positiveKeywords,
+  negativeKeywords,
+  unusualKeywords,
+  terariumWish,
+}) {
+  const payload = await requestJson('/api/persona/synthesize', {
     method: 'POST',
-    body: { agentId, answer, turn },
-    fallbackError: 'Persona answer request failed.',
+    body: {
+      agentId,
+      appearance,
+      positive_keywords: positiveKeywords,
+      negative_keywords: negativeKeywords,
+      unusual_keywords: unusualKeywords,
+      terarium_wish: terariumWish,
+    },
+    fallbackError: 'Persona synthesis request failed.',
   })
 
-  if (!payload?.done && !payload?.question) {
-    throw new Error('Server returned an invalid next-question response.')
-  }
-
-  return payload
-}
-
-export async function undoPersonaAnswer({ agentId, turn }) {
-  const payload = await requestJson('/api/persona/undo', {
-    method: 'POST',
-    body: { agentId, turn },
-    fallbackError: 'Persona undo request failed.',
-  })
-
-  if (!payload?.question) {
-    throw new Error('Server returned an invalid undo response.')
+  if (
+    !payload?.done
+    || !payload?.result
+    || !payload?.persona_json
+    || !payload?.enterUrl
+  ) {
+    throw new Error('Server returned an invalid persona synthesis response.')
   }
 
   return payload

@@ -3,17 +3,15 @@ import TutorialDesign from './tutorialDesign/TutorialDesign.jsx'
 import { assetUrl } from './apiBase.js'
 import {
   abandonPersonaSession,
-  analyzeAppearance,
-  answerPersona,
   buildAvatar,
   claimNickname,
   createRandomAgent,
   fetchAvatarRecipe,
   personaSessionAbandonUrl,
   renameAvatar,
+  runAppearancePipeline,
   startPersona,
-  syncPersonaAppearance,
-  undoPersonaAnswer,
+  synthesizePersona,
 } from './lib/tutorialApi.js'
 import { useAvatarWorkflow } from './hooks/useAvatarWorkflow.js'
 import { useCameraCapture } from './hooks/useCameraCapture.js'
@@ -27,10 +25,127 @@ const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
 const AvatarThreeViewer = lazy(() => import('./tutorialDesign/AvatarThreeViewer.jsx'))
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
-const PERSONA_TOTAL_TURNS = 5
+const PERSONA_TOTAL_TURNS = 4
 const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
 const LOADING_BASE_AVATAR_URL = assetUrl('/model/source/avatar_v2.glb')
+const keywordOptions = (category, categoryLabel, labels) => labels.map((label) => ({
+  id: `${category}:${label}`,
+  label,
+  category,
+  categoryLabel,
+}))
+const PERSONA_KEYWORD_QUESTIONS = [
+  {
+    turn: 1,
+    total_turns: PERSONA_TOTAL_TURNS,
+    category: 'negative',
+    categoryLabel: '부정',
+    question: '스스로에게 있을 법한 불편한 면을 골라주세요.',
+    maxSelections: 6,
+    options: keywordOptions('negative', '부정', [
+      '이기적인',
+      '방어적인',
+      '의존적인',
+      '계산적인',
+      '배타적인',
+      '지배적인',
+      '무책임한',
+      '우유부단한',
+      '고집스러운',
+      '충동적인',
+      '변덕스러운',
+      '산만한',
+      '수동적인',
+      '비관적인',
+      '예민한',
+      '소심한',
+      '자격지심이 있는',
+      '강박적인',
+      '무기력한',
+      '냉소적인',
+      '다혈질인',
+      '가식적인',
+      '위압적인',
+    ]),
+  },
+  {
+    turn: 2,
+    total_turns: PERSONA_TOTAL_TURNS,
+    category: 'positive',
+    categoryLabel: '긍정',
+    question: '사람들에게 보여주고 싶은 좋은 면을 골라주세요.',
+    maxSelections: 6,
+    options: keywordOptions('positive', '긍정', [
+      '다정다감한',
+      '배려심 깊은',
+      '친화력 있는',
+      '공감 능력이 좋은',
+      '포용력 넓은',
+      '솔직 담백한',
+      '협동적인',
+      '경청하는',
+      '책임감 강한',
+      '성실한',
+      '주도적인',
+      '꼼꼼한',
+      '계획적인',
+      '융통성 있는',
+      '끈기 있는',
+      '결단력 있는',
+      '센스 있는',
+      '회복 탄력성이 좋은',
+      '차분한',
+      '겸손한',
+      '독립적인',
+      '적응력 빠른',
+      '여유로운',
+      '신중한',
+      '활기찬',
+      '열정적인',
+      '명랑한',
+      '유머러스한',
+      '호기심 많은',
+      '진취적인',
+    ]),
+  },
+  {
+    turn: 3,
+    total_turns: PERSONA_TOTAL_TURNS,
+    category: 'unusual',
+    categoryLabel: '특이',
+    question: '조금 독특하거나 쉽게 설명되지 않는 면을 골라주세요.',
+    maxSelections: 6,
+    options: keywordOptions('unusual', '특이', [
+      '관찰자적인',
+      '마이웨이인',
+      '예측 불허한',
+      '고립을 즐기는',
+      '직관적인',
+      '선택적 완벽주의인',
+      '몽상가적인',
+      '비정형적인',
+      '철학적인',
+      '초연한',
+      '양면적인',
+      '자기 객관화가 뚜렷한',
+      '자유영혼인',
+      '신비로운',
+      '반항적인',
+      '너드미가 있는',
+    ]),
+  },
+  {
+    turn: 4,
+    total_turns: PERSONA_TOTAL_TURNS,
+    category: 'wish',
+    categoryLabel: '목표',
+    question: '당신이 TERARiUM에 간다면 무엇을 하고 싶은가요?',
+    maxSelections: 0,
+    options: [],
+  },
+]
+const PERSONA_KEYWORD_OPTIONS = PERSONA_KEYWORD_QUESTIONS.flatMap((question) => question.options)
 let countdownFontPreloadPromise = null
 
 const avatarAssetUrl = (value) => {
@@ -156,16 +271,69 @@ const buildDebugAppearance = (selection) => ({
     skin_texture: selection.skin,
     eye_texture: selection.eye,
     mouth_texture: selection.mouth,
-    hair_mesh: selection.hair,
-    top_mesh: selection.top,
-    bottom_mesh: selection.bottom,
-    outfit_mesh: selection.outfit,
-    shoe_mesh: selection.shoes,
+    hair_mesh: debugAssetToSemantic.hair_mesh[selection.hair] || selection.hair,
+    top_mesh: debugAssetToSemantic.top_mesh[selection.top] || selection.top,
+    bottom_mesh: debugAssetToSemantic.bottom_mesh[selection.bottom] || selection.bottom,
+    outfit_mesh: debugAssetToSemantic.outfit_mesh[selection.outfit] || selection.outfit,
+    shoe_mesh: debugAssetToSemantic.shoe_mesh[selection.shoes] || selection.shoes,
     glasses_mesh: selection.glasses,
     necklace_mesh: selection.necklace,
-    earring_mesh: selection.earrings,
+    earring_mesh: debugAssetToSemantic.earring_mesh[selection.earrings] || selection.earrings,
   },
 })
+
+const debugAssetToSemantic = {
+  hair_mesh: {
+    bun_hair: 'bun_without_bangs',
+    bangs_bun_hair: 'bun_with_bangs',
+    bangs_bobbed_hair: 'bob_with_bangs',
+    bobbed_hair: 'bob_without_bangs',
+    permed_hair: 'short_permed_hair',
+    half_ponytail: 'half_up_hair',
+    bangs_long_wave_hair: 'long_wave_with_bangs',
+    long_wave_hair: 'long_wave_without_bangs',
+    bangs_straight_hair: 'long_straight_with_bangs',
+    straight_hair: 'long_straight_without_bangs',
+    twin_braids: 'twin_braids',
+    high_ponytail: 'high_ponytail_without_bangs',
+    bangs_high_ponytail: 'high_ponytail_with_bangs',
+    low_ponytail: 'low_ponytail_without_bangs',
+    bangs_low_ponytail: 'low_ponytail_with_bangs',
+    bowl_cut: 'bowl_cut',
+    gael_cut_1: 'short_side_part_swept_left',
+    gael_cut_2: 'short_side_part_swept_right',
+    wolf_cut: 'wolf_cut',
+    crop_cut: 'crop_cut',
+    pompadour_cut: 'slicked_back_pompadour',
+    dandy_cut: 'soft_dandy_cut',
+  },
+  top_mesh: {
+    long_Tshirt: 'long_sleeve_tshirt',
+    short_Tshirt: 'short_sleeve_tshirt',
+    shirts: 'collared_button_shirt',
+    leather_jacket: 'leather_jacket',
+  },
+  bottom_mesh: {
+    short_pants: 'shorts',
+    long_pants: 'long_pants',
+    short_skirt: 'short_skirt',
+    long_skirt: 'long_skirt',
+  },
+  outfit_mesh: {
+    none: 'none',
+    onepiece_1: 'short_dress',
+    onepiece_2: 'long_dress',
+  },
+  shoe_mesh: {
+    shoes: 'sneakers',
+    sandals: 'sandals',
+  },
+  earring_mesh: {
+    none: 'none',
+    Earring01: 'hoop_earrings',
+    Earring02: 'small_stud_earrings',
+  },
+}
 
 const DEBUG_COLOR_OPTIONS = [
   ['black', 'Black', '#101010'],
@@ -237,11 +405,11 @@ const MOCK_APPEARANCE_RESULT = {
     skin_texture: 'soft_peach_skin',
     eye_texture: 'puppy_eyes',
     mouth_texture: 'closed_smile_mouth',
-    hair_mesh: 'dandy_cut',
-    top_mesh: 'short_Tshirt',
+    hair_mesh: 'soft_dandy_cut',
+    top_mesh: 'short_sleeve_tshirt',
     bottom_mesh: 'long_pants',
     outfit_mesh: 'none',
-    shoe_mesh: 'shoes',
+    shoe_mesh: 'sneakers',
     glasses_mesh: 'none',
     necklace_mesh: 'none',
     earring_mesh: 'none',
@@ -571,6 +739,7 @@ function DebugSelect({ label, value, options, disabled = false, onChange }) {
 }
 
 function TutorialApp() {
+  const [personaKeywordStep, setPersonaKeywordStep] = useState(0)
   const {
     stage,
     setStage,
@@ -600,13 +769,10 @@ function TutorialApp() {
     setEnterUrl,
     avatarModelUrl,
     setAvatarModelUrl,
-    isPersonaCustomInputOpen,
-    setIsPersonaCustomInputOpen,
     selectedOptionIds,
     setSelectedOptionIds,
     starredOptionId,
     setStarredOptionId,
-    answeredHistory,
     setAnsweredHistory,
     setHistoryViewIndex,
     captureLocked,
@@ -631,7 +797,6 @@ function TutorialApp() {
   const startInterviewInFlightRef = useRef(false)
   const startInterviewRequestIdRef = useRef(0)
   const captureSessionIdRef = useRef(0)
-  const syncedAppearanceAgentRef = useRef('')
   const capturePipelineRef = useRef(null)
   const personaAgentIdRef = useRef('')
   const personaCompletedRef = useRef(false)
@@ -661,6 +826,12 @@ function TutorialApp() {
     normalizeAssetUrl: avatarAssetUrl,
     setAvatarModelUrl,
   })
+
+  useEffect(() => {
+    if (stage !== 'persona') {
+      setPersonaKeywordStep(0)
+    }
+  }, [stage])
 
   useEffect(() => {
     void preloadCountdownFont()
@@ -697,7 +868,6 @@ function TutorialApp() {
     personaCompletedRef.current = false
     nicknameValueRef.current = ''
     nicknameInputRef.current = ''
-    syncedAppearanceAgentRef.current = ''
     avatarTransitionFinishingRef.current = false
     avatarPreloadReadyRef.current = false
     resetProfileImageUpload()
@@ -740,31 +910,21 @@ function TutorialApp() {
     stage,
   ])
 
-  const finishAvatarLoadingTransition = useCallback(() => {
-    if (avatarTransitionFinishingRef.current) {
-      return
-    }
-    avatarTransitionFinishingRef.current = true
-    setIsAvatarLoadingExit(true)
-    const cleanupTimer = window.setTimeout(() => {
-      setIsAvatarPreloading(false)
-      setIsAvatarLoadingExit(false)
-      setIsAvatarHandoffCover(false)
-      avatarTransitionFinishingRef.current = false
-    }, 620)
-    timeoutIdsRef.current.push(cleanupTimer)
-  }, [setIsAvatarHandoffCover, setIsAvatarLoadingExit, setIsAvatarPreloading])
-
-  const analyzePhotoWithLlmServer = async (cameraFrames, captureSessionId) => {
+  const runPhotoAppearancePipeline = async (cameraFrames, captureSessionId) => {
     try {
-      const result = await analyzeAppearance(cameraFrames)
+      const payload = await runAppearancePipeline({
+        agentId: `tutorial:${crypto.randomUUID()}`,
+        frontImageDataUrl: cameraFrames?.frontImageDataUrl || cameraFrames?.imageDataUrl || '',
+        rearImageDataUrl: cameraFrames?.rearImageDataUrl || '',
+      })
       if (captureSessionId !== captureSessionIdRef.current) {
         return null
       }
+      const result = payload.result
       setAnalysisResult(result)
-      return result
+      return payload
     } catch (error) {
-      console.error('[tutorial-appearance] analyze failed:', error)
+      console.error('[tutorial-appearance] pipeline failed:', error)
       if (captureSessionId === captureSessionIdRef.current) {
         setAnalysisResult(null)
       }
@@ -772,28 +932,7 @@ function TutorialApp() {
     }
   }
 
-  const syncAppearanceToAgent = useCallback(
-    async (agentId, appearance) => {
-      if (!agentId || !appearance || typeof appearance !== 'object') {
-        return
-      }
-
-      const syncKey = `${agentId}:${JSON.stringify(appearance)}`
-      if (syncedAppearanceAgentRef.current === syncKey) {
-        return
-      }
-
-      try {
-        await syncPersonaAppearance(agentId, appearance)
-        syncedAppearanceAgentRef.current = syncKey
-      } catch (error) {
-        setPersonaError(error instanceof Error ? error.message : 'Appearance sync request failed.')
-      }
-    },
-    [setPersonaError],
-  )
-
-  const startPersonaInterview = useCallback(async (appearanceOverride = null) => {
+  const startPersonaInterview = useCallback(async (appearanceOverride = null, agentIdOverride = '') => {
     if (startInterviewInFlightRef.current) {
       return false
     }
@@ -808,7 +947,7 @@ function TutorialApp() {
     const appearancePayload = appearanceOverride ?? analysisResult ?? null
 
     try {
-      const payload = await startPersona({ appearance: appearancePayload })
+      const payload = await startPersona({ agentId: agentIdOverride, appearance: appearancePayload })
 
       if (requestId !== startInterviewRequestIdRef.current) {
         return
@@ -889,13 +1028,6 @@ function TutorialApp() {
 
     void startPersonaInterview()
   }, [stage, personaQuestion, personaAgentId, personaResult, personaLoading, personaError, startPersonaInterview])
-
-  useEffect(() => {
-    if (!personaAgentId || !analysisResult) {
-      return
-    }
-    void syncAppearanceToAgent(personaAgentId, analysisResult)
-  }, [personaAgentId, analysisResult, syncAppearanceToAgent])
 
   const handleEnterCameraDesignStep = () => {
     if (stage !== 'idle') {
@@ -981,12 +1113,14 @@ function TutorialApp() {
       const capturePipeline = (async () => {
         try {
           let appearanceResult = null
+          let appearancePayload = null
           if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
             setAnalysisResult(MOCK_APPEARANCE_RESULT)
             appearanceResult = MOCK_APPEARANCE_RESULT
           } else {
             if (analysisFrames.frontImageDataUrl) {
-              appearanceResult = await analyzePhotoWithLlmServer(analysisFrames, captureSessionId)
+              appearancePayload = await runPhotoAppearancePipeline(analysisFrames, captureSessionId)
+              appearanceResult = appearancePayload?.result || null
             }
           }
 
@@ -999,22 +1133,25 @@ function TutorialApp() {
           }
 
           const avatarAppearance = appearanceResult
-          const personaPayload = await startPersonaInterview(avatarAppearance)
+          const personaPayload = await startPersonaInterview(avatarAppearance, appearancePayload?.agentId || '')
           if (captureSessionId !== captureSessionIdRef.current) {
             return null
           }
-          let avatarPayload = null
+          let avatarPayload = appearancePayload?.avatar || null
           if (personaPayload?.agentId) {
-            avatarPayload = await buildAvatarModel({
-              agentId: personaPayload.agentId,
-              appearance: avatarAppearance,
-            })
-            if (captureSessionId !== captureSessionIdRef.current) {
-              return null
+            if (!avatarPayload?.modelUrl) {
+              avatarPayload = await buildAvatarModel({
+                agentId: personaPayload.agentId,
+                appearance: avatarAppearance,
+              })
+              if (captureSessionId !== captureSessionIdRef.current) {
+                return null
+              }
             }
             if (!avatarPayload?.modelUrl) {
               throw new Error('아바타 생성에 실패했습니다. 다시 촬영해 주세요.')
             }
+            setAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl))
             const latestNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
             if (latestNickname) {
               await renameAvatar({
@@ -1066,36 +1203,42 @@ function TutorialApp() {
   }, [stage, autoCaptureRequested, cameraReady, captureLocked, isCaptureProcessing, countdown])
 
   const submitPersonaAnswer = async (answerPayload, answerText) => {
-    if (!personaQuestion || !personaAgentId || personaResult || personaLoading) {
+    if (!personaAgentId || personaResult || personaLoading) {
       return
     }
 
     const safePayload = answerPayload && typeof answerPayload === 'object' ? answerPayload : null
     const trimmedAnswerText = typeof answerText === 'string' ? answerText.trim() : ''
-    if (!safePayload || selectedOptionIds.length === 0 || !trimmedAnswerText) {
+    if (!safePayload || !canSubmitSelection || !trimmedAnswerText) {
       return
     }
 
     setPersonaLoading(true)
     setPersonaError('')
-    const submittedQuestion = personaQuestion
     const submittedAnswerRecord = {
-      selectedOptionIds: Array.isArray(safePayload.selectedOptionIds) ? safePayload.selectedOptionIds : [],
-      starredOptionId: safePayload.starredOptionId || '',
-      customText: safePayload.customText || '',
+      positiveKeywords: safePayload.positiveKeywords,
+      negativeKeywords: safePayload.negativeKeywords,
+      unusualKeywords: safePayload.unusualKeywords,
+      terariumWish: safePayload.terariumWish,
     }
 
     try {
-      const payload = await answerPersona({
+      const payload = await synthesizePersona({
         agentId: personaAgentId,
-        answer: safePayload,
-        turn: personaQuestion.turn,
+        appearance: analysisResult,
+        positiveKeywords: safePayload.positiveKeywords,
+        negativeKeywords: safePayload.negativeKeywords,
+        unusualKeywords: safePayload.unusualKeywords,
+        terariumWish: safePayload.terariumWish,
       })
 
       setPersonaInput('')
 
       if (payload?.done) {
         personaCompletedRef.current = true
+        if (payload.enterUrl) {
+          setEnterUrl(payload.enterUrl)
+        }
         const finalNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
         const didCommitNickname = await commitNicknameToServer(finalNickname, personaAgentId)
         if (!didCommitNickname) {
@@ -1104,17 +1247,15 @@ function TutorialApp() {
           return
         }
 
-        if (submittedQuestion) {
-          setAnsweredHistory((prev) => [
-            ...prev,
-            {
-              question: submittedQuestion,
-              answerText: trimmedAnswerText,
-              answerMode: 'taste',
-              answerPayload: submittedAnswerRecord,
-            },
-          ])
-        }
+        setAnsweredHistory((prev) => [
+          ...prev,
+          {
+            question: { turn: 1, question: '키워드와 TERARiUM wish' },
+            answerText: trimmedAnswerText,
+            answerMode: 'keyword_persona',
+            answerPayload: submittedAnswerRecord,
+          },
+        ])
         setPersonaResult(payload.result ?? null)
         setPersonaQuestion(null)
         setIsQuestionTransitionLoading(false)
@@ -1122,27 +1263,7 @@ function TutorialApp() {
         return
       }
 
-      if (!payload?.question) {
-        throw new Error('Server returned an invalid next-question response.')
-      }
-
-      if (submittedQuestion) {
-        setAnsweredHistory((prev) => [
-          ...prev,
-            {
-              question: submittedQuestion,
-              answerText: trimmedAnswerText,
-              answerMode: 'taste',
-              answerPayload: submittedAnswerRecord,
-            },
-          ])
-        }
-
-      setPersonaQuestion(payload.question)
-      setSelectedOptionIds([])
-      setStarredOptionId('')
-      setIsPersonaCustomInputOpen(false)
-      setIsQuestionTransitionLoading(false)
+      throw new Error('Server returned an invalid persona synthesis response.')
     } catch (error) {
       setPersonaError(error instanceof Error ? error.message : 'Unknown error while processing persona answer.')
       setIsQuestionTransitionLoading(false)
@@ -1163,93 +1284,41 @@ function TutorialApp() {
         if (starredOptionId === optionId) {
           setStarredOptionId(next[0] || '')
         }
-        if (optionId === 'other_custom') {
-          setIsPersonaCustomInputOpen(false)
-          setPersonaInput('')
-        }
         return next
       }
 
-      if (prev.length >= (displayQuestion?.maxSelections || displayQuestion?.max_select || 3)) {
+      const optionCategory = option.category || displayQuestion?.category || ''
+      const selectedInCategory = prev.filter((id) => id.startsWith(`${optionCategory}:`)).length
+      if (selectedInCategory >= (displayQuestion?.maxSelections || displayQuestion?.max_select || 6)) {
         return prev
       }
 
       const next = [...prev, optionId]
       setStarredOptionId(next[0] || '')
-      if (option?.allowsCustom) {
-        setIsPersonaCustomInputOpen(true)
-      }
       return next
     })
   }
 
   const handleNextClick = () => {
+    if (!isFinalPersonaQuestion) {
+      if (currentStepSelectionCount > 0) {
+        setPersonaKeywordStep((step) => Math.min(step + 1, PERSONA_KEYWORD_QUESTIONS.length - 1))
+      }
+      return
+    }
+
     if (canSubmitSelection) {
       setIsQuestionTransitionLoading(true)
       void submitPersonaAnswer(
         {
-          selectedOptionIds,
-          starredOptionId: selectedOptionIds[0] || '',
-          customText: selectedOptionIds.includes('other_custom') ? personaInput.trim() : '',
+          positiveKeywords: selectedKeywordGroups.positive,
+          negativeKeywords: selectedKeywordGroups.negative,
+          unusualKeywords: selectedKeywordGroups.unusual,
+          terariumWish: personaInput.trim(),
         },
         selectedAnswerText,
       )
     }
-  }
-
-  const restoreAnswerForEditing = (entry, serverAnswer = null) => {
-    const localPayload = entry?.answerPayload && typeof entry.answerPayload === 'object' ? entry.answerPayload : null
-    const selectedIds = Array.isArray(serverAnswer?.selectedOptionIds)
-      ? serverAnswer.selectedOptionIds
-      : Array.isArray(localPayload?.selectedOptionIds)
-        ? localPayload.selectedOptionIds
-        : []
-    const customText = typeof serverAnswer?.customText === 'string'
-      ? serverAnswer.customText
-      : typeof localPayload?.customText === 'string'
-        ? localPayload.customText
-        : ''
-    const starredId = typeof serverAnswer?.starredOptionId === 'string' && serverAnswer.starredOptionId
-      ? serverAnswer.starredOptionId
-      : typeof localPayload?.starredOptionId === 'string' && localPayload.starredOptionId
-        ? localPayload.starredOptionId
-        : selectedIds[0] || ''
-
-    setSelectedOptionIds(selectedIds)
-    setStarredOptionId(starredId)
-    setPersonaInput(customText)
-    setIsPersonaCustomInputOpen(selectedIds.includes('other_custom'))
-  }
-
-  const editHistoryAnswer = async (entry, entryIndex) => {
-    if (!entry?.question || !personaAgentId || personaLoading || isQuestionTransitionLoading) {
-      return
-    }
-
-    setPersonaLoading(true)
-    setPersonaError('')
-    try {
-      const payload = await undoPersonaAnswer({
-        agentId: personaAgentId,
-        turn: entry.question.turn,
-      })
-      setPersonaQuestion(payload.question)
-      setPersonaResult(null)
-      setAnsweredHistory((prev) => prev.slice(0, Math.max(0, entryIndex)))
-      setHistoryViewIndex(null)
-      restoreAnswerForEditing(entry, payload.restoredAnswer)
-    } catch (error) {
-      setPersonaError(error instanceof Error ? error.message : '이전 답변을 다시 불러오지 못했습니다.')
-    } finally {
-      setPersonaLoading(false)
-    }
-  }
-
-  const resetCurrentSelection = () => {
-    setSelectedOptionIds([])
-    setStarredOptionId('')
-    setIsPersonaCustomInputOpen(false)
-    setPersonaInput('')
   }
 
   const handlePrevClick = () => {
@@ -1261,38 +1330,51 @@ function TutorialApp() {
       return
     }
 
-    if (answeredHistory.length > 0) {
-      const previousEntryIndex = answeredHistory.length - 1
-      const previousEntry = answeredHistory[previousEntryIndex]
-      void editHistoryAnswer(previousEntry, previousEntryIndex)
-      return
-    }
-
-    if (selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim()) {
-      resetCurrentSelection()
+    if (personaKeywordStep > 0) {
+      setPersonaKeywordStep((step) => Math.max(0, step - 1))
     }
   }
 
-  const currentQuestion = personaQuestion
-  const displayQuestion = currentQuestion
+  const displayQuestion = PERSONA_KEYWORD_QUESTIONS[personaKeywordStep] || PERSONA_KEYWORD_QUESTIONS[0]
   const personaQuestionText = displayQuestion?.question ?? ''
   const personaTotalTurns = Number(displayQuestion?.total_turns || displayQuestion?.totalTurns || PERSONA_TOTAL_TURNS) || PERSONA_TOTAL_TURNS
   const personaCurrentTurn = Number(displayQuestion?.turn || 0) || 0
   const isFinalPersonaQuestion = Boolean(displayQuestion && personaCurrentTurn >= personaTotalTurns)
+  const isWishQuestion = displayQuestion?.category === 'wish'
   const personaTurnKey = personaResult ? 'persona-result' : `persona-turn-${displayQuestion?.turn ?? 0}`
   const displayOptions = Array.isArray(displayQuestion?.options) ? displayQuestion.options : []
-  const optionLabelMap = new Map(displayOptions.map((option) => [option.id, option]))
+  const optionLabelMap = new Map(PERSONA_KEYWORD_OPTIONS.map((option) => [option.id, option]))
+  const currentStepSelectionCount = selectedOptionIds.filter((optionId) => {
+    const option = optionLabelMap.get(optionId)
+    return option?.category === displayQuestion?.category
+  }).length
   const selectedOptionLabels = selectedOptionIds
     .map((optionId) => optionLabelMap.get(optionId))
     .filter(Boolean)
-    .map((option) => (option.id === 'other_custom' && personaInput.trim() ? `직접입력: ${personaInput.trim()}` : option.label))
-  const selectedAnswerText = selectedOptionLabels.join(' / ')
-  const hasSelectedCustom = selectedOptionIds.includes('other_custom')
-  const canSubmitSelection = selectedOptionIds.length > 0
-    && (!hasSelectedCustom || personaInput.trim().length >= 2)
+    .map((option) => `${option.categoryLabel}: ${option.label}`)
+  const selectedKeywordGroups = selectedOptionIds.reduce((groups, optionId) => {
+    const option = optionLabelMap.get(optionId)
+    if (!option) return groups
+    return {
+      ...groups,
+      [option.category]: [...groups[option.category], option.label],
+    }
+  }, { positive: [], negative: [], unusual: [] })
+  const selectedAnswerText = [
+    ...selectedOptionLabels,
+    personaInput.trim() ? `하고 싶은 일: ${personaInput.trim()}` : '',
+  ].filter(Boolean).join(' / ')
+  const hasAllKeywordGroups = selectedKeywordGroups.positive.length > 0
+    && selectedKeywordGroups.negative.length > 0
+    && selectedKeywordGroups.unusual.length > 0
+  const canSubmitSelection = hasAllKeywordGroups && personaInput.trim().length >= 2
+  const canContinueCurrentQuestion = isWishQuestion
+    ? canSubmitSelection
+    : currentStepSelectionCount > 0
   const personaKeywords = [
-    ...(Array.isArray(personaResult?.survey_trace?.starred_tastes) ? personaResult.survey_trace.starred_tastes : []),
-    ...(Array.isArray(personaResult?.survey_trace?.dominant_tokens) ? personaResult.survey_trace.dominant_tokens : []),
+    ...(Array.isArray(personaResult?.keyword_input?.positive_keywords) ? personaResult.keyword_input.positive_keywords : []),
+    ...(Array.isArray(personaResult?.keyword_input?.negative_keywords) ? personaResult.keyword_input.negative_keywords : []),
+    ...(Array.isArray(personaResult?.keyword_input?.unusual_keywords) ? personaResult.keyword_input.unusual_keywords : []),
   ]
     .map((value) => String(value || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/)[0])
     .filter(Boolean)
@@ -1570,10 +1652,14 @@ function TutorialApp() {
                 <section className="persona-options" aria-label="선택지">
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
 
-                  {displayOptions.map((option, index) => {
+                  {!isWishQuestion && displayOptions.map((option, index) => {
                       const isSelected = selectedOptionIds.includes(option.id)
-                      const selectionRank = selectedOptionIds.indexOf(option.id) + 1
-                      const isDimmed = selectedOptionIds.length > 0 && !isSelected
+                      const currentCategorySelectionIds = selectedOptionIds.filter((optionId) => {
+                        const selectedOption = optionLabelMap.get(optionId)
+                        return selectedOption?.category === displayQuestion?.category
+                      })
+                      const selectionRank = currentCategorySelectionIds.indexOf(option.id) + 1
+                      const isDimmed = currentStepSelectionCount > 0 && !isSelected
                       const isCustom = option.allowsCustom || option.id === 'other_custom'
                       return (
                         <button
@@ -1597,19 +1683,19 @@ function TutorialApp() {
                       )
                     })}
 
-                  {isPersonaCustomInputOpen ? (
+                  {isWishQuestion && (
                     <div className="persona-custom-editor" style={{ animationDelay: '0.1s' }}>
                       <div className="persona-custom-editor-inner">
                         <textarea
                           className="persona-custom-editor-textarea"
                           value={personaInput}
                           onChange={(e) => setPersonaInput(e.target.value)}
-                          placeholder="직접 입력하세요. (2글자 이상)"
+                          placeholder="당신이 TERARiUM에 간다면 무엇을 하고 싶은가요?"
                           disabled={personaLoading}
                         />
                       </div>
                     </div>
-                  ) : null}
+                  )}
                 </section>
               )}
             </div>
@@ -1617,7 +1703,7 @@ function TutorialApp() {
 
           {!personaResult && displayQuestion && (
             <nav className="persona-bottom-nav">
-              {answeredHistory.length > 0 || selectedOptionIds.length > 0 || isPersonaCustomInputOpen || personaInput.trim() ? (
+              {personaKeywordStep > 0 || currentStepSelectionCount > 0 || (isWishQuestion && personaInput.trim()) ? (
                 <button
                   className="nav-btn prev-btn"
                   type="button"
@@ -1629,12 +1715,12 @@ function TutorialApp() {
               ) : (
                 <div />
               )}
-              {(canSubmitSelection || isQuestionTransitionLoading) && (
+              {(canContinueCurrentQuestion || isQuestionTransitionLoading) && (
                 <button
                   className="nav-btn next-btn is-active"
                   type="button"
                   onClick={handleNextClick}
-                  disabled={personaLoading || isQuestionTransitionLoading || !canSubmitSelection}
+                  disabled={personaLoading || isQuestionTransitionLoading || !canContinueCurrentQuestion}
                 >
                   {isQuestionTransitionLoading ? '분석 중...' : '다음으로'}
                 </button>
@@ -1644,7 +1730,7 @@ function TutorialApp() {
 
           {isQuestionTransitionLoading && isFinalPersonaQuestion && (
             <div className="persona-analysis-status-layer" aria-live="polite">
-              <p className="persona-analysis-status-text">답변 분석중</p>
+              <p className="persona-analysis-status-text">페르소나와 계획 생성 중</p>
             </div>
           )}
 

@@ -1244,12 +1244,12 @@ body,
 }
 
 .character-layer.step-character-12 .character-img {
-  top: 40% !important;
-  left: 50% !important;
-  right: auto !important;
-  bottom: auto !important;
-  width: min(38vw, 660px) !important;
-  translate: -50% -50% !important;
+  top: auto !important;
+  left: auto !important;
+  bottom: 0vh !important;
+  right: 5vw !important;
+  width: clamp(250px, 20vw, 360px) !important;
+  translate: 0 0 !important;
   transform: none !important;
 }
 
