@@ -39,7 +39,7 @@ const SCENE_ONE_SWITCH_MS = 3200;
 const PREVIEW_AVATAR_URL = '';
 const DUPLICATE_NAME_ERROR = '그 이름은 이미 누군가 사용하고 있어. 다시 입력해줄래?';
 const DUPLICATE_NAME_NOTICE =
-  '이미 다른 친구가 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!';
+  '다른 친구가 이미 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!';
 const ANSWER_SELECTION_NOTICE = '답변은 좋아하는 순서대로 3개까지 선택할 수 있어.';
 
 const STEP_SCENE_CHARACTERS = {

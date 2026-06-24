@@ -35,13 +35,13 @@ const keywordOptions = (category, categoryLabel, labels) => labels.map((label) =
   category,
   categoryLabel,
 }))
-const PERSONA_KEYWORD_QUESTIONS = [
+const PERSONA_KEYWORD_QUESTION_CATALOG = [
   {
     turn: 1,
     total_turns: PERSONA_TOTAL_TURNS,
     category: 'negative',
     categoryLabel: '부정',
-    question: '스스로에게 있을 법한 불편한 면을 골라주세요.',
+    question: '자신에게 해당하는 성격 키워드를 골라주세요. (1~6개 선택 가능)',
     maxSelections: 6,
     options: keywordOptions('negative', '부정', [
       '이기적인',
@@ -74,7 +74,7 @@ const PERSONA_KEYWORD_QUESTIONS = [
     total_turns: PERSONA_TOTAL_TURNS,
     category: 'positive',
     categoryLabel: '긍정',
-    question: '사람들에게 보여주고 싶은 좋은 면을 골라주세요.',
+    question: '자신에게 해당하는 성격 키워드를 골라주세요. (1~6개 선택 가능)',
     maxSelections: 6,
     options: keywordOptions('positive', '긍정', [
       '다정다감한',
@@ -114,7 +114,7 @@ const PERSONA_KEYWORD_QUESTIONS = [
     total_turns: PERSONA_TOTAL_TURNS,
     category: 'unusual',
     categoryLabel: '특이',
-    question: '조금 독특하거나 쉽게 설명되지 않는 면을 골라주세요.',
+    question: '자신에게 해당하는 성격 키워드를 골라주세요. (1~6개 선택 가능)',
     maxSelections: 6,
     options: keywordOptions('unusual', '특이', [
       '관찰자적인',
@@ -145,6 +145,11 @@ const PERSONA_KEYWORD_QUESTIONS = [
     options: [],
   },
 ]
+const PERSONA_KEYWORD_QUESTIONS = [
+  PERSONA_KEYWORD_QUESTION_CATALOG[1],
+  PERSONA_KEYWORD_QUESTION_CATALOG[0],
+  ...PERSONA_KEYWORD_QUESTION_CATALOG.slice(2),
+].map((question, index) => ({ ...question, turn: index + 1 }))
 const PERSONA_KEYWORD_OPTIONS = PERSONA_KEYWORD_QUESTIONS.flatMap((question) => question.options)
 let countdownFontPreloadPromise = null
 
@@ -1659,13 +1664,12 @@ function TutorialApp() {
                         return selectedOption?.category === displayQuestion?.category
                       })
                       const selectionRank = currentCategorySelectionIds.indexOf(option.id) + 1
-                      const isDimmed = currentStepSelectionCount > 0 && !isSelected
                       const isCustom = option.allowsCustom || option.id === 'other_custom'
                       return (
                         <button
                           key={`persona-option-${displayQuestion.turn}-${option.id || index}`}
                           type="button"
-                          className={`persona-option ${isSelected ? 'is-selected' : ''} ${isDimmed ? 'is-dimmed' : ''} ${isCustom ? 'is-custom' : ''}`}
+                          className={`persona-option ${isSelected ? 'is-selected' : ''} ${isCustom ? 'is-custom' : ''}`}
                           style={{
                             animationDelay: `${0.1 + index * 0.035}s`,
                             '--persona-option-bg': option.visual?.background || undefined,
@@ -1690,7 +1694,7 @@ function TutorialApp() {
                           className="persona-custom-editor-textarea"
                           value={personaInput}
                           onChange={(e) => setPersonaInput(e.target.value)}
-                          placeholder="당신이 TERARiUM에 간다면 무엇을 하고 싶은가요?"
+                          placeholder="예) 연애를 하고 싶어요. / 바닷가에서 별을 보고 싶어요. / 인기가 많은 사람이 되고 싶어요."
                           disabled={personaLoading}
                         />
                       </div>
