@@ -415,6 +415,99 @@ const readAvatarColorParams = (params) => {
 
 const hasAvatarColorOverrides = (colors) => Object.values(colors || {}).some(Boolean)
 
+const AVATAR_COLOR_FIELD_BY_KEY = {
+  hair: 'hair_color',
+  top: 'top_color',
+  bottom: 'bottom_color',
+}
+
+const AVATAR_COLOR_HEX_BY_VALUE = new Map(DEBUG_COLOR_OPTIONS.map(([value, , hex]) => [value, hex]))
+
+const parseHexColor = (value) => {
+  const color = normalizeHexColorParam(value)
+  if (!color) return null
+  return {
+    r: Number.parseInt(color.slice(1, 3), 16),
+    g: Number.parseInt(color.slice(3, 5), 16),
+    b: Number.parseInt(color.slice(5, 7), 16),
+  }
+}
+
+const nearestAvatarColorValue = (hexColor) => {
+  const rgb = parseHexColor(hexColor)
+  if (!rgb) return 'gray'
+  let nearest = DEBUG_COLOR_OPTIONS[0]?.[0] || 'gray'
+  let nearestDistance = Number.POSITIVE_INFINITY
+  for (const [value, , optionHex] of DEBUG_COLOR_OPTIONS) {
+    const optionRgb = parseHexColor(optionHex)
+    if (!optionRgb) continue
+    const distance =
+      ((rgb.r - optionRgb.r) ** 2) +
+      ((rgb.g - optionRgb.g) ** 2) +
+      ((rgb.b - optionRgb.b) ** 2)
+    if (distance < nearestDistance) {
+      nearest = value
+      nearestDistance = distance
+    }
+  }
+  return nearest
+}
+
+const avatarColorValueToHex = (value, fallback) => {
+  const normalized = normalizeHexColorParam(value)
+  if (normalized) return normalized
+  return AVATAR_COLOR_HEX_BY_VALUE.get(String(value || '').trim()) || fallback
+}
+
+const getAvatarEditColorsFromAppearance = (appearance) => {
+  const source = appearance && typeof appearance === 'object' ? appearance : {}
+  return AVATAR_EDIT_COLOR_CONTROLS.reduce((colors, control) => {
+    const fieldName = AVATAR_COLOR_FIELD_BY_KEY[control.key]
+    colors[control.key] = avatarColorValueToHex(source[fieldName], control.fallback)
+    return colors
+  }, {})
+}
+
+const normalizeAvatarAppearanceForBuild = (appearance) => {
+  const source = appearance && typeof appearance === 'object' && !Array.isArray(appearance) ? appearance : {}
+  const tags = source.asset_tags && typeof source.asset_tags === 'object' && !Array.isArray(source.asset_tags)
+    ? source.asset_tags
+    : {}
+
+  return {
+    hair_color: source.hair_color || 'black',
+    eye_color: source.eye_color || 'brown',
+    top_color: source.top_color || 'white',
+    bottom_color: source.bottom_color || source.top_color || 'gray',
+    shoe_color: source.shoe_color || 'white',
+    asset_tags: {
+      skin_texture: tags.skin_texture || source.skin_texture || 'soft_peach_skin',
+      eye_texture: tags.eye_texture || source.eye_texture || 'round_eyes',
+      mouth_texture: tags.mouth_texture || source.mouth_texture || 'bored_mouth',
+      hair_mesh: tags.hair_mesh || source.hair_mesh || 'straight_hair',
+      top_mesh: tags.top_mesh || source.top_mesh || 'short_Tshirt',
+      bottom_mesh: tags.bottom_mesh || source.bottom_mesh || 'long_pants',
+      outfit_mesh: tags.outfit_mesh || source.outfit_mesh || 'none',
+      shoe_mesh: tags.shoe_mesh || source.shoe_mesh || 'shoes',
+      glasses_mesh: tags.glasses_mesh || source.glasses_mesh || 'none',
+      necklace_mesh: tags.necklace_mesh || source.necklace_mesh || 'none',
+      earring_mesh: tags.earring_mesh || source.earring_mesh || 'none',
+    },
+  }
+}
+
+const applyAvatarColorsToAppearance = (appearance, colors) => {
+  const nextAppearance = normalizeAvatarAppearanceForBuild(appearance)
+  for (const control of AVATAR_EDIT_COLOR_CONTROLS) {
+    const fieldName = AVATAR_COLOR_FIELD_BY_KEY[control.key]
+    const color = normalizeHexColorParam(colors?.[control.key])
+    if (fieldName && color) {
+      nextAppearance[fieldName] = nearestAvatarColorValue(color)
+    }
+  }
+  return nextAppearance
+}
+
 const getRandomOptionValue = (options) => options[Math.floor(Math.random() * options.length)]?.[0] || ''
 const TEST_RANDOM_COLOR_OPTIONS = [
   ['black'],
@@ -898,7 +991,14 @@ function TutorialApp() {
   const avatarTransitionFinishingRef = useRef(false)
   const avatarPreloadReadyRef = useRef(false)
   const frontCaptureDataUrlRef = useRef('')
+  const avatarColorApplyRequestRef = useRef(0)
+  const avatarColorEditorDragRef = useRef(null)
   const [rearCapturePromptVisible, setRearCapturePromptVisible] = useState(false)
+  const [avatarColorInputs, setAvatarColorInputs] = useState(AVATAR_EDIT_COLOR_FALLBACKS)
+  const [avatarColorOverrides, setAvatarColorOverrides] = useState({})
+  const [avatarColorEditorPosition, setAvatarColorEditorPosition] = useState(null)
+  const [avatarColorApplyStatus, setAvatarColorApplyStatus] = useState('idle')
+  const [avatarColorApplyError, setAvatarColorApplyError] = useState('')
   const {
     videoRef,
     rearVideoRef,
@@ -965,10 +1065,107 @@ function TutorialApp() {
     nicknameInputRef.current = ''
     avatarTransitionFinishingRef.current = false
     avatarPreloadReadyRef.current = false
+    setAvatarColorInputs(AVATAR_EDIT_COLOR_FALLBACKS)
+    setAvatarColorOverrides({})
+    setAvatarColorEditorPosition(null)
+    setAvatarColorApplyStatus('idle')
+    setAvatarColorApplyError('')
     resetProfileImageUpload()
     setSelectedWishOptionIds([])
     resetFlowState()
   }
+
+  const handleAvatarColorChange = useCallback((key, value) => {
+    const color = normalizeHexColorParam(value)
+    if (!color) return
+
+    setAvatarColorApplyStatus('dirty')
+    setAvatarColorApplyError('')
+    setAvatarColorInputs((prev) => ({ ...prev, [key]: color }))
+    setAvatarColorOverrides((prev) => ({ ...prev, [key]: color }))
+  }, [])
+
+  const handleAvatarColorEditorDragStart = useCallback((event) => {
+    const panel = event.currentTarget.closest('.avatar-color-editor')
+    if (!panel) return
+
+    const rect = panel.getBoundingClientRect()
+    avatarColorEditorDragRef.current = {
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+    }
+    setAvatarColorEditorPosition({ left: rect.left, top: rect.top })
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    event.preventDefault()
+  }, [])
+
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      const drag = avatarColorEditorDragRef.current
+      if (!drag) return
+
+      const maxLeft = Math.max(8, window.innerWidth - drag.width - 8)
+      const maxTop = Math.max(8, window.innerHeight - drag.height - 8)
+      setAvatarColorEditorPosition({
+        left: Math.min(maxLeft, Math.max(8, event.clientX - drag.offsetX)),
+        top: Math.min(maxTop, Math.max(8, event.clientY - drag.offsetY)),
+      })
+    }
+
+    const handlePointerUp = () => {
+      avatarColorEditorDragRef.current = null
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+  }, [])
+
+  const avatarColorEditorSlot = (
+    <section
+      className="avatar-color-editor"
+      style={avatarColorEditorPosition ? {
+        left: `${avatarColorEditorPosition.left}px`,
+        top: `${avatarColorEditorPosition.top}px`,
+        right: 'auto',
+        bottom: 'auto',
+      } : null}
+      aria-label="아바타 색상 편집"
+    >
+      <div
+        className="avatar-color-editor-title"
+        onPointerDown={handleAvatarColorEditorDragStart}
+      >
+        컬러그램
+      </div>
+      <div className="avatar-color-editor-controls">
+        {AVATAR_EDIT_COLOR_CONTROLS.map((control) => (
+          <label className="avatar-color-control" key={control.key}>
+            <span>{control.label}</span>
+            <input
+              type="color"
+              value={avatarColorInputs[control.key] || control.fallback}
+              onInput={(event) => handleAvatarColorChange(control.key, event.currentTarget.value)}
+              onChange={(event) => handleAvatarColorChange(control.key, event.target.value)}
+            />
+          </label>
+        ))}
+      </div>
+      {avatarColorApplyStatus === 'applying' ? (
+        <p className="avatar-color-editor-message">색상 적용 중</p>
+      ) : null}
+      {avatarColorApplyError ? (
+        <p className="avatar-color-editor-message is-error">{avatarColorApplyError}</p>
+      ) : null}
+    </section>
+  )
 
   const handleAvatarPreviewRotationChange = useCallback((rotation) => {
     avatarPreviewRotationRef.current = {
@@ -1417,6 +1614,64 @@ function TutorialApp() {
     })
   }
 
+  useEffect(() => {
+    if (!analysisResult) {
+      setAvatarColorInputs(AVATAR_EDIT_COLOR_FALLBACKS)
+      setAvatarColorOverrides({})
+      setAvatarColorApplyStatus('idle')
+      setAvatarColorApplyError('')
+      return
+    }
+
+    const colors = getAvatarEditColorsFromAppearance(analysisResult)
+    setAvatarColorInputs(colors)
+    setAvatarColorOverrides({})
+    setAvatarColorApplyStatus('idle')
+    setAvatarColorApplyError('')
+  }, [analysisResult])
+
+  const handleApplyAvatarFinalColors = useCallback(async () => {
+    const activeAgentId = getActiveAvatarAgentId()
+    if (!activeAgentId || !analysisResult || avatarColorApplyStatus === 'applying') {
+      return
+    }
+
+    const requestId = avatarColorApplyRequestRef.current + 1
+    avatarColorApplyRequestRef.current = requestId
+    setAvatarColorApplyStatus('applying')
+    setAvatarColorApplyError('')
+
+    const nextAppearance = applyAvatarColorsToAppearance(analysisResult, avatarColorInputs)
+    try {
+      const payload = await buildAvatarModel({
+        agentId: activeAgentId,
+        appearance: nextAppearance,
+      })
+      if (avatarColorApplyRequestRef.current !== requestId) {
+        return
+      }
+      if (!payload?.modelUrl) {
+        throw new Error('avatar build did not return modelUrl')
+      }
+      setAnalysisResult(nextAppearance)
+      setAvatarColorOverrides({})
+      setAvatarColorApplyStatus('ready')
+    } catch (error) {
+      if (avatarColorApplyRequestRef.current !== requestId) {
+        return
+      }
+      setAvatarColorApplyStatus('error')
+      setAvatarColorApplyError(error instanceof Error ? error.message : '색상 적용에 실패했습니다.')
+    }
+  }, [
+    analysisResult,
+    avatarColorApplyStatus,
+    avatarColorInputs,
+    buildAvatarModel,
+    getActiveAvatarAgentId,
+    setAnalysisResult,
+  ])
+
   const handleWishGoalCustomInputChange = (event) => {
     setSelectedWishOptionIds([])
     setPersonaInput(event.target.value)
@@ -1756,9 +2011,12 @@ function TutorialApp() {
           avatarUrl={avatarModelUrl}
           avatarInitialYaw={0}
           externalName={nicknameValue}
+          avatarColorEditorSlot={avatarColorEditorSlot}
+          avatarColorOverrides={hasAvatarColorOverrides(avatarColorOverrides) ? avatarColorOverrides : null}
           avatarIntroTextStartDelay={650}
           onAvatarRotationChange={handleAvatarPreviewRotationChange}
           onAvatarReady={null}
+          onAvatarConfirm={handleApplyAvatarFinalColors}
           onAvatarProfileImageReady={handleAvatarProfileImageReady}
           onNameSubmit={(name) => handleNicknameClaim(name, null)}
           onStartQuestions={() => setStage('persona')}
@@ -1773,6 +2031,7 @@ function TutorialApp() {
         initialId={15}
         avatarUrl={avatarModelUrl}
         externalName={nicknameValue || nicknameInput.trim()}
+        avatarColorOverrides={hasAvatarColorOverrides(avatarColorOverrides) ? avatarColorOverrides : null}
         keywords={personaKeywords}
         enterUrl={enterUrl}
         onFinish={() => setStage('idle')}
@@ -2065,50 +2324,16 @@ function AvatarProfileCapturePage() {
   const [modelUrl, setModelUrl] = useState('')
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
-  const [editColorsEnabled, setEditColorsEnabled] = useState(false)
-  const [colorInputs, setColorInputs] = useState(AVATAR_EDIT_COLOR_FALLBACKS)
   const [colorOverrides, setColorOverrides] = useState({})
-  const [colorViewUrl, setColorViewUrl] = useState('')
-
-  const updateColorViewUrl = useCallback((nextColors) => {
-    const params = new URLSearchParams(window.location.search)
-    params.set('editColors', '1')
-    for (const control of AVATAR_EDIT_COLOR_CONTROLS) {
-      const color = normalizeHexColorParam(nextColors?.[control.key])
-      if (color) {
-        params.set(control.param, color)
-      } else {
-        params.delete(control.param)
-      }
-    }
-    const nextUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`
-    window.history.replaceState(null, '', nextUrl)
-    setColorViewUrl(nextUrl)
-  }, [])
-
-  const handleAvatarColorChange = useCallback((key, value) => {
-    const color = normalizeHexColorParam(value)
-    if (!color) return
-    setColorInputs((prev) => ({ ...prev, [key]: color }))
-    setColorOverrides((prev) => {
-      const nextColors = { ...prev, [key]: color }
-      updateColorViewUrl(nextColors)
-      return nextColors
-    })
-  }, [updateColorViewUrl])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const agentId = String(params.get('agentId') || '').trim()
     const explicitModelUrl = String(params.get('modelUrl') || '').trim()
-    const isColorEditor = params.get('editColors') === '1' || params.get('editColors') === 'true'
     const initialColors = readAvatarColorParams(params)
-    setEditColorsEnabled(isColorEditor)
     setColorOverrides(initialColors)
-    setColorInputs({ ...AVATAR_EDIT_COLOR_FALLBACKS, ...initialColors })
-    if (isColorEditor || hasAvatarColorOverrides(initialColors)) {
-      setColorViewUrl(window.location.href)
-    }
+    window.__TERARIUM_AVATAR_PROFILE_CAPTURE_READY__ = false
+    window.__TERARIUM_AVATAR_PROFILE_CAPTURE_COLORS__ = initialColors
     if (explicitModelUrl) {
       setModelUrl(avatarAssetUrl(explicitModelUrl))
       return
@@ -2148,33 +2373,11 @@ function AvatarProfileCapturePage() {
             colorOverrides={hasAvatarColorOverrides(colorOverrides) ? colorOverrides : null}
             onReady={() => {
               setStatus('ready')
+              window.__TERARIUM_AVATAR_PROFILE_CAPTURE_COLORS__ = colorOverrides
               window.__TERARIUM_AVATAR_PROFILE_CAPTURE_READY__ = true
             }}
           />
         </Suspense>
-      ) : null}
-      {editColorsEnabled ? (
-        <section className="avatar-color-editor" aria-label="아바타 색상 편집">
-          <div className="avatar-color-editor-title">컬러그램</div>
-          <div className="avatar-color-editor-controls">
-            {AVATAR_EDIT_COLOR_CONTROLS.map((control) => (
-              <label className="avatar-color-control" key={control.key}>
-                <span>{control.label}</span>
-                <input
-                  type="color"
-                  value={colorInputs[control.key] || control.fallback}
-                  onInput={(event) => handleAvatarColorChange(control.key, event.currentTarget.value)}
-                  onChange={(event) => handleAvatarColorChange(control.key, event.target.value)}
-                />
-              </label>
-            ))}
-          </div>
-          {colorViewUrl ? (
-            <a className="avatar-color-editor-link" href={colorViewUrl}>
-              색상 적용 URL
-            </a>
-          ) : null}
-        </section>
       ) : null}
       {status !== 'ready' && <span className="avatar-profile-capture-status">{error || status}</span>}
     </main>

@@ -842,6 +842,13 @@
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.avatar-color-editor-title:active {
+  cursor: grabbing;
 }
 
 .avatar-color-editor-controls {
@@ -881,6 +888,43 @@
   font-size: 13px;
   font-weight: 800;
   text-decoration: none;
+}
+
+.avatar-color-editor-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: #74b7f0;
+  color: #ffffff;
+  font-family: 'NanumSquareNeo', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.avatar-color-editor-button:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.avatar-color-editor-message {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.avatar-color-editor-message.is-error {
+  color: #ffb4b4;
+}
+
+.avatar-final-color-editor {
+  top: 50%;
+  right: clamp(22px, 5vw, 96px);
+  bottom: auto;
+  transform: translateY(-50%);
+  z-index: 45;
 }
 
 .random-agent-page {

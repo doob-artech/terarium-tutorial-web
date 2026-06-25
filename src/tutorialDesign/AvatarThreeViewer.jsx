@@ -60,11 +60,18 @@ const applyColorOverrides = (modelRoot, colorOverrides) => {
       if (!colorRole) continue;
       const originalColor = material.userData?.editableOriginalColor || `#${material.color.getHexString()}`;
       const nextColor = colorOverrides?.[colorRole] || originalColor;
+      const hasOverride = Boolean(colorOverrides?.[colorRole]);
       try {
         material.color.set(nextColor);
+        if (Object.hasOwn(material.userData, 'editableOriginalMap')) {
+          material.map = hasOverride ? null : material.userData.editableOriginalMap;
+        }
         material.needsUpdate = true;
       } catch {
         material.color.set(originalColor);
+        if (Object.hasOwn(material.userData, 'editableOriginalMap')) {
+          material.map = material.userData.editableOriginalMap;
+        }
         material.needsUpdate = true;
       }
     }
@@ -502,6 +509,7 @@ const AvatarThreeViewer = ({
             const nextMaterial = makeSoftToonMaterial(material, { role: renderRole, variant });
             nextMaterial.userData.editableColorRole = editableColorRole;
             nextMaterial.userData.editableOriginalColor = `#${nextMaterial.color.getHexString()}`;
+            nextMaterial.userData.editableOriginalMap = nextMaterial.map || null;
             return nextMaterial;
           });
           child.material = nextMaterials.length > 1 ? nextMaterials : nextMaterials[0];
