@@ -283,8 +283,8 @@ export function useCameraCapture({ stage, setCameraReady }) {
             setCameraReady(true)
           }
         }
-        if (rearVideoRef.current && rearStream) {
-          rearVideoRef.current.srcObject = rearStream
+        if (rearVideoRef.current) {
+          rearVideoRef.current.srcObject = rearStream || stream
         }
         setCameraReady(true)
       } catch (error) {
