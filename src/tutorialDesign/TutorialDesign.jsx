@@ -35,9 +35,50 @@ const STEP_BACKGROUNDS = {
 
 const SKY_BACKGROUND_STEPS = new Set([9, 10, 11, 12]);
 const DEFAULT_CHARACTER_EXCLUDED_STEPS = new Set([10, 12, 15]);
+const CAMERA_ASSET_PRELOAD_STEPS = new Set([6, 7]);
 const SCENE_ONE_SWITCH_MS = 3200;
 const PREVIEW_AVATAR_URL = '';
 const DUPLICATE_NAME_ERROR = '그 이름은 이미 누군가 사용하고 있어. 다시 입력해줄래?';
+const CAMERA_STEP_ASSETS = [cameraBubbleImage, cameraButtonImage];
+
+let cameraStepAssetPreloadPromise = null;
+
+const preloadImageAsset = (src) => {
+  if (typeof document === 'undefined' || !src) {
+    return Promise.resolve();
+  }
+
+  const selector = `link[data-terarium-preload-image="${src}"]`;
+  if (!document.querySelector(selector)) {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = src;
+    link.dataset.terariumPreloadImage = src;
+    document.head.appendChild(link);
+  }
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      if (typeof image.decode === 'function') {
+        void image.decode().then(resolve).catch(resolve);
+        return;
+      }
+      resolve();
+    };
+    image.onerror = resolve;
+    image.src = src;
+  });
+};
+
+const preloadCameraStepAssets = () => {
+  if (!cameraStepAssetPreloadPromise) {
+    cameraStepAssetPreloadPromise = Promise.all(CAMERA_STEP_ASSETS.map(preloadImageAsset)).then(() => undefined);
+  }
+  return cameraStepAssetPreloadPromise;
+};
 const DUPLICATE_NAME_NOTICE =
   '다른 친구가 이미 쓰고 있는 이름은 사용할 수 없으니, 너만의 유일무이한 이름을 입력해 줘!';
 const ANSWER_SELECTION_NOTICE = '답변은 좋아하는 순서대로 3개까지 선택할 수 있어.';
@@ -421,6 +462,23 @@ const TutorialDesign = ({
   useEffect(() => {
     setCurrentId(initialId);
   }, [initialId]);
+
+  useEffect(() => {
+    if (!CAMERA_ASSET_PRELOAD_STEPS.has(currentId)) {
+      return undefined;
+    }
+
+    const preload = () => {
+      void preloadCameraStepAssets();
+    };
+    const idleCallback = window.requestIdleCallback?.(preload, { timeout: 700 });
+    if (idleCallback) {
+      return () => window.cancelIdleCallback?.(idleCallback);
+    }
+
+    const timer = window.setTimeout(preload, 0);
+    return () => window.clearTimeout(timer);
+  }, [currentId]);
 
   useEffect(() => {
     if (externalName) {

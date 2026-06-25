@@ -94,10 +94,13 @@ export function useCameraCapture({ stage, setCameraReady }) {
     return captureVideoFrame(videoRef.current)
   }, [])
 
-  const captureCameraFrames = useCallback(() => ({
-    frontImageDataUrl: captureVideoFrame(videoRef.current),
-    rearImageDataUrl: captureVideoFrame(rearVideoRef.current),
-  }), [])
+  const captureCameraFrames = useCallback(() => {
+    const frontImageDataUrl = captureVideoFrame(videoRef.current)
+    return {
+      frontImageDataUrl,
+      rearImageDataUrl: captureVideoFrame(rearVideoRef.current) || frontImageDataUrl || '',
+    }
+  }, [])
 
   const refreshCameraDevices = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
