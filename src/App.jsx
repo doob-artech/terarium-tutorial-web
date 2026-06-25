@@ -1890,7 +1890,6 @@ function TutorialApp() {
 
                   {isWishQuestion && (
                     <div className="persona-wish-builder" style={{ animationDelay: '0.1s' }}>
-                      {renderPersonaCategoryTabs()}
                       <div className="persona-wish-sentence" aria-live="polite">
                         <span className="persona-wish-prefix">나는 이곳에서</span>
                         <span className={`persona-wish-blank${wishBlankText ? ' is-filled' : ''}`}>
