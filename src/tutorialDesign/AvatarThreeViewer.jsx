@@ -41,6 +41,36 @@ const getRenderRole = (mesh) => {
   return 'body';
 };
 
+const getEditableColorRole = (mesh) => {
+  const name = `${mesh.name || ''} ${mesh.parent?.name || ''}`.toLowerCase();
+  if (/hair|bang|gael|wolf|crop|pompadour|dandy|ponytail|braid|bob|bun/.test(name)) return 'hair';
+  if (/shirt|tshirt|top|jacket|hoodie|sleeve|onepiece|dress/.test(name)) return 'top';
+  if (/pants|skirt|bottom/.test(name)) return 'bottom';
+  return '';
+};
+
+const getMaterials = (material) => (Array.isArray(material) ? material : [material]).filter(Boolean);
+
+const applyColorOverrides = (modelRoot, colorOverrides) => {
+  if (!modelRoot) return;
+  modelRoot.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    for (const material of getMaterials(child.material)) {
+      const colorRole = material.userData?.editableColorRole || child.userData?.editableColorRole || '';
+      if (!colorRole) continue;
+      const originalColor = material.userData?.editableOriginalColor || `#${material.color.getHexString()}`;
+      const nextColor = colorOverrides?.[colorRole] || originalColor;
+      try {
+        material.color.set(nextColor);
+        material.needsUpdate = true;
+      } catch {
+        material.color.set(originalColor);
+        material.needsUpdate = true;
+      }
+    }
+  });
+};
+
 const isLoadingBaseBodyMesh = (mesh) => {
   const name = `${mesh.name || ''} ${mesh.parent?.name || ''}`.toLowerCase();
   if (/hair|bang|cloth|sleeve|shirt|pants|skirt|onepiece|dress|bottom|top|jacket|hoodie|short|long|shoe|sandal|glass|necklace|earring|accessory/.test(name)) {
@@ -260,10 +290,13 @@ const AvatarThreeViewer = ({
   fitFullBounds = false,
   initialYaw = 0,
   idleSway = false,
+  colorOverrides = null,
   onRotationChange = null,
   onReady = null,
 }) => {
   const mountRef = useRef(null);
+  const modelRootRef = useRef(null);
+  const colorOverridesRef = useRef(colorOverrides);
   const initialYawRef = useRef(initialYaw);
   const onReadyRef = useRef(onReady);
   const onRotationChangeRef = useRef(onRotationChange);
@@ -282,6 +315,11 @@ const AvatarThreeViewer = ({
   }, [onRotationChange]);
 
   useEffect(() => {
+    colorOverridesRef.current = colorOverrides;
+    applyColorOverrides(modelRootRef.current, colorOverrides);
+  }, [colorOverrides]);
+
+  useEffect(() => {
     const mount = mountRef.current;
     setLoadState(src ? 'loading' : 'empty');
     if (!mount || !src) return undefined;
@@ -290,6 +328,7 @@ const AvatarThreeViewer = ({
     let frameId = 0;
     let lastRenderAt = 0;
     let modelRoot = null;
+    modelRootRef.current = null;
     const rotationState = {
       yaw: Number.isFinite(initialYawRef.current) ? initialYawRef.current : 0,
       pitch: 0,
@@ -448,6 +487,8 @@ const AvatarThreeViewer = ({
         model.traverse((child) => {
           if (!child.isMesh) return;
           const renderRole = getRenderRole(child);
+          const editableColorRole = getEditableColorRole(child);
+          child.userData.editableColorRole = editableColorRole;
           try {
             child.geometry = smoothGeometryNormals(child.geometry, renderRole);
           } catch (error) {
@@ -457,9 +498,13 @@ const AvatarThreeViewer = ({
           child.receiveShadow = true;
           child.renderOrder = getRenderOrder(renderRole);
           const materials = Array.isArray(child.material) ? child.material : [child.material].filter(Boolean);
-          child.material = materials.length > 1
-            ? materials.map((material) => makeSoftToonMaterial(material, { role: renderRole, variant }))
-            : makeSoftToonMaterial(materials[0], { role: renderRole, variant });
+          const nextMaterials = materials.map((material) => {
+            const nextMaterial = makeSoftToonMaterial(material, { role: renderRole, variant });
+            nextMaterial.userData.editableColorRole = editableColorRole;
+            nextMaterial.userData.editableOriginalColor = `#${nextMaterial.color.getHexString()}`;
+            return nextMaterial;
+          });
+          child.material = nextMaterials.length > 1 ? nextMaterials : nextMaterials[0];
           if (shouldRevealAvatarVariant(variant)) {
             const childMaterials = Array.isArray(child.material) ? child.material : [child.material].filter(Boolean);
             const revealDelay = getRevealDelay(renderRole, revealMeshIndex);
@@ -498,6 +543,8 @@ const AvatarThreeViewer = ({
           modelRoot.add(createSoftShadowPlane(model));
         }
         scene.add(modelRoot);
+        modelRootRef.current = modelRoot;
+        applyColorOverrides(modelRoot, colorOverridesRef.current);
         fitCameraToObject(camera, modelRoot, target, distanceMultiplier, fitFullBounds || variant === 'staticFront');
         applyModelRotation(modelRoot, variant, rotationState);
         renderer.domElement.style.opacity = '1';
@@ -577,6 +624,7 @@ const AvatarThreeViewer = ({
       if (modelRoot) {
         disposeObject(modelRoot);
       }
+      modelRootRef.current = null;
       renderer?.domElement.removeEventListener('pointerdown', handlePointerDown);
       renderer?.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer?.domElement.removeEventListener('pointerup', endDrag);

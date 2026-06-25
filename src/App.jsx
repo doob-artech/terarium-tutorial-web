@@ -24,7 +24,12 @@ import './App.css'
 const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
 const AvatarThreeViewer = lazy(() => import('./tutorialDesign/AvatarThreeViewer.jsx'))
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
+const TEST_MODE_RANDOM_AVATAR_ON_EMPTY_CAPTURE =
+  import.meta.env.DEV ||
+  import.meta.env.VITE_RANDOM_AVATAR_ON_EMPTY_CAPTURE === 'true' ||
+  import.meta.env.VITE_BASIC_AVATAR_ON_EMPTY_CAPTURE === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
+const TEST_MODE_RANDOM_AGENT_SHORTCUT = import.meta.env.DEV || import.meta.env.VITE_ENABLE_RANDOM_AGENT_SHORTCUT === 'true'
 const PERSONA_TOTAL_TURNS = 4
 const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
@@ -151,6 +156,31 @@ const PERSONA_KEYWORD_QUESTIONS = [
   ...PERSONA_KEYWORD_QUESTION_CATALOG.slice(2),
 ].map((question, index) => ({ ...question, turn: index + 1 }))
 const PERSONA_KEYWORD_OPTIONS = PERSONA_KEYWORD_QUESTIONS.flatMap((question) => question.options)
+const WISH_GOAL_MAX_SELECTIONS = 2
+const WISH_GOAL_OPTIONS = [
+  '연애를 하고',
+  '친구를 만들고',
+  '쉬고',
+  '비밀을 찾고',
+  '천재가 되고',
+  '인기스타가 되고',
+  '맛집을 찾아다니고',
+  '탐험을 하고',
+  '라이벌을 만들고',
+  '장난을 치고',
+  '일탈을 하고',
+].map((label, index) => ({
+  id: `wish-goal-${index + 1}`,
+  label,
+}))
+
+const buildWishGoalSentence = (optionIds) => {
+  const selectedLabels = optionIds
+    .map((optionId) => WISH_GOAL_OPTIONS.find((option) => option.id === optionId)?.label)
+    .filter(Boolean)
+
+  return selectedLabels.length ? `나는 이곳에서 ${selectedLabels.join(', ')} 싶다` : ''
+}
 let countdownFontPreloadPromise = null
 
 const avatarAssetUrl = (value) => {
@@ -358,6 +388,82 @@ const DEBUG_COLOR_OPTIONS = [
   ['pink', 'Pink', '#d879a7'],
 ]
 
+const AVATAR_EDIT_COLOR_CONTROLS = [
+  { key: 'hair', param: 'hairColor', label: '머리카락', fallback: '#101010' },
+  { key: 'top', param: 'topColor', label: '상의', fallback: '#777777' },
+  { key: 'bottom', param: 'bottomColor', label: '하의', fallback: '#777777' },
+]
+const AVATAR_EDIT_COLOR_FALLBACKS = AVATAR_EDIT_COLOR_CONTROLS.reduce((acc, control) => {
+  acc[control.key] = control.fallback
+  return acc
+}, {})
+const HEX_COLOR_PARAM_PATTERN = /^#[0-9a-f]{6}$/i
+
+const normalizeHexColorParam = (value) => {
+  const color = String(value || '').trim()
+  return HEX_COLOR_PARAM_PATTERN.test(color) ? color.toLowerCase() : ''
+}
+
+const readAvatarColorParams = (params) => {
+  const colors = {}
+  for (const control of AVATAR_EDIT_COLOR_CONTROLS) {
+    const color = normalizeHexColorParam(params.get(control.param))
+    if (color) colors[control.key] = color
+  }
+  return colors
+}
+
+const hasAvatarColorOverrides = (colors) => Object.values(colors || {}).some(Boolean)
+
+const getRandomOptionValue = (options) => options[Math.floor(Math.random() * options.length)]?.[0] || ''
+const TEST_RANDOM_COLOR_OPTIONS = [
+  ['black'],
+  ['dark_brown'],
+  ['brown'],
+  ['light_brown'],
+  ['beige'],
+  ['gray'],
+  ['white'],
+  ['red'],
+  ['orange'],
+  ['yellow'],
+  ['green'],
+  ['blue'],
+  ['navy'],
+  ['purple'],
+  ['pink'],
+  ['multicolor'],
+]
+
+const createRandomTestAppearance = () => {
+  const hairColor = getRandomOptionValue(TEST_RANDOM_COLOR_OPTIONS)
+  const topColor = getRandomOptionValue(TEST_RANDOM_COLOR_OPTIONS)
+  const bottomColor = getRandomOptionValue(TEST_RANDOM_COLOR_OPTIONS)
+  const shoeColor = getRandomOptionValue(TEST_RANDOM_COLOR_OPTIONS)
+  const outfit = getRandomOptionValue(DEBUG_AVATAR_OPTIONS.outfit)
+
+  return {
+    hair_color: hairColor,
+    eye_color: 'dark_brown',
+    top_color: topColor,
+    bottom_color: outfit !== 'none' ? topColor : bottomColor,
+    shoe_color: shoeColor,
+    asset_tags: {
+      skin_texture: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.skin),
+      eye_texture: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.eye),
+      mouth_texture: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.mouth),
+      hair_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.hair),
+      top_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.top),
+      bottom_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.bottom),
+      outfit_mesh: outfit,
+      shoe_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.shoes),
+      glasses_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.glasses),
+      necklace_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.necklace),
+      earring_mesh: getRandomOptionValue(DEBUG_AVATAR_OPTIONS.earrings),
+    },
+  }
+}
+
 let personaClickAudioPool = []
 let personaClickAudioPoolIndex = 0
 let personaClickBlockedUntil = 0
@@ -398,27 +504,6 @@ const playPersonaClickSound = () => {
   personaClickBlockedUntil = Date.now() + clickDurationMs + CLICK_SOUND_TAIL_GAP_MS
   audio.currentTime = 0
   void audio.play().catch(() => {})
-}
-
-const MOCK_APPEARANCE_RESULT = {
-  hair_color: 'black',
-  eye_color: 'dark_brown',
-  top_color: 'black',
-  bottom_color: 'black',
-  shoe_color: 'black',
-  asset_tags: {
-    skin_texture: 'soft_peach_skin',
-    eye_texture: 'puppy_eyes',
-    mouth_texture: 'closed_smile_mouth',
-    hair_mesh: 'soft_dandy_cut',
-    top_mesh: 'short_sleeve_tshirt',
-    bottom_mesh: 'long_pants',
-    outfit_mesh: 'none',
-    shoe_mesh: 'sneakers',
-    glasses_mesh: 'none',
-    necklace_mesh: 'none',
-    earring_mesh: 'none',
-  },
 }
 
 function App() {
@@ -745,6 +830,8 @@ function DebugSelect({ label, value, options, disabled = false, onChange }) {
 
 function TutorialApp() {
   const [personaKeywordStep, setPersonaKeywordStep] = useState(0)
+  const [selectedWishOptionIds, setSelectedWishOptionIds] = useState([])
+  const randomAgentShortcutCountRef = useRef(0)
   const {
     stage,
     setStage,
@@ -814,6 +901,7 @@ function TutorialApp() {
   const [rearCapturePromptVisible, setRearCapturePromptVisible] = useState(false)
   const {
     videoRef,
+    rearVideoRef,
     stopCamera,
     captureCameraFrames,
   } = useCameraCapture({ stage, setCameraReady })
@@ -835,6 +923,7 @@ function TutorialApp() {
   useEffect(() => {
     if (stage !== 'persona') {
       setPersonaKeywordStep(0)
+      setSelectedWishOptionIds([])
     }
   }, [stage])
 
@@ -876,6 +965,7 @@ function TutorialApp() {
     avatarTransitionFinishingRef.current = false
     avatarPreloadReadyRef.current = false
     resetProfileImageUpload()
+    setSelectedWishOptionIds([])
     resetFlowState()
   }
 
@@ -964,6 +1054,7 @@ function TutorialApp() {
       setPersonaInput('')
       setPersonaError('')
       setSelectedOptionIds([])
+      setSelectedWishOptionIds([])
       setStarredOptionId('')
       setAnsweredHistory([])
       setHistoryViewIndex(null)
@@ -1052,6 +1143,13 @@ function TutorialApp() {
     setStage('cameraDesignCapture')
   }
 
+  const handleRandomAgentShortcutClick = () => {
+    randomAgentShortcutCountRef.current += 1
+    if (randomAgentShortcutCountRef.current >= 5) {
+      window.location.assign('/random-agent')
+    }
+  }
+
   const handleCapture = () => {
     if (stage !== 'cameraDesignCapture' || countdown !== null || captureLocked || isCaptureProcessing) {
       return
@@ -1081,29 +1179,20 @@ function TutorialApp() {
         return
       }
       const cameraFrames = captureCameraFrames()
-      const capturedImageDataUrl = cameraFrames.frontImageDataUrl
 
       setCountdown(null)
-      if (!frontCaptureDataUrlRef.current) {
-        if (!capturedImageDataUrl) {
-          setPersonaError('촬영에 실패했습니다. 다시 촬영해 주세요.')
-          setCaptureLocked(false)
-          return
-        }
-        frontCaptureDataUrlRef.current = capturedImageDataUrl
-        setCaptureLocked(false)
-        setRearCapturePromptVisible(true)
-        return
-      }
-
       const analysisFrames = {
-        frontImageDataUrl: frontCaptureDataUrlRef.current,
-        rearImageDataUrl: capturedImageDataUrl || '',
+        frontImageDataUrl: cameraFrames.frontImageDataUrl || '',
+        rearImageDataUrl: cameraFrames.rearImageDataUrl || '',
       }
-      if (!analysisFrames.rearImageDataUrl) {
-        setPersonaError('옆모습 촬영에 실패했습니다. 다시 촬영해 주세요.')
+      const hasAnyCaptureFrame = Boolean(analysisFrames.frontImageDataUrl || analysisFrames.rearImageDataUrl)
+      const shouldUseRandomAvatarFallback =
+        TEST_MODE_RANDOM_AVATAR_ON_EMPTY_CAPTURE &&
+        !hasAnyCaptureFrame
+
+      if (!hasAnyCaptureFrame && !shouldUseRandomAvatarFallback) {
+        setPersonaError('촬영에 실패했습니다. 다시 촬영해 주세요.')
         setCaptureLocked(false)
-        setRearCapturePromptVisible(true)
         return
       }
       setIsCaptureProcessing(true)
@@ -1119,18 +1208,25 @@ function TutorialApp() {
         try {
           let appearanceResult = null
           let appearancePayload = null
-          if (TEST_MODE_SKIP_CAPTURE_ANALYSIS) {
-            setAnalysisResult(MOCK_APPEARANCE_RESULT)
-            appearanceResult = MOCK_APPEARANCE_RESULT
-          } else {
-            if (analysisFrames.frontImageDataUrl) {
-              appearancePayload = await runPhotoAppearancePipeline(analysisFrames, captureSessionId)
-              appearanceResult = appearancePayload?.result || null
+          if (TEST_MODE_SKIP_CAPTURE_ANALYSIS || shouldUseRandomAvatarFallback) {
+            if (shouldUseRandomAvatarFallback) {
+              console.info('[tutorial-camera] empty capture; using random avatar fallback for local testing.')
             }
+            appearanceResult = createRandomTestAppearance()
+            setAnalysisResult(appearanceResult)
+          } else if (hasAnyCaptureFrame) {
+            appearancePayload = await runPhotoAppearancePipeline(analysisFrames, captureSessionId)
+            appearanceResult = appearancePayload?.result || null
           }
 
           if (captureSessionId !== captureSessionIdRef.current) {
             return null
+          }
+
+          if (!appearanceResult && shouldUseRandomAvatarFallback) {
+            console.info('[tutorial-camera] appearance analysis unavailable; using random avatar fallback for local testing.')
+            appearanceResult = createRandomTestAppearance()
+            setAnalysisResult(appearanceResult)
           }
 
           if (!appearanceResult) {
@@ -1304,6 +1400,22 @@ function TutorialApp() {
     })
   }
 
+  const handleWishGoalOptionClick = (optionId) => {
+    if (!optionId) return
+    playPersonaClickSound()
+
+    setSelectedWishOptionIds((prev) => {
+      const next = prev.includes(optionId)
+        ? prev.filter((id) => id !== optionId)
+        : prev.length >= WISH_GOAL_MAX_SELECTIONS
+          ? prev
+          : [...prev, optionId]
+
+      setPersonaInput(buildWishGoalSentence(next))
+      return next
+    })
+  }
+
   const handleNextClick = () => {
     if (!isFinalPersonaQuestion) {
       if (currentStepSelectionCount > 0) {
@@ -1340,8 +1452,40 @@ function TutorialApp() {
     }
   }
 
+  const handlePersonaCategoryTabClick = (targetIndex) => {
+    if (personaResult || personaLoading || isQuestionTransitionLoading) {
+      return
+    }
+
+    setPersonaKeywordStep(Math.max(0, Math.min(targetIndex, PERSONA_KEYWORD_QUESTIONS.length - 1)))
+  }
+
+  const renderPersonaCategoryTabs = () => (
+    <div className="persona-category-tabs" aria-label="성격 카테고리 진행 상황">
+      {PERSONA_KEYWORD_QUESTIONS.map((question, questionIndex) => {
+        const isActiveCategory = question.category === displayQuestion?.category
+        const selectedCount = categorySelectionCounts[question.category] || 0
+        return (
+          <button
+            key={question.category}
+            type="button"
+            className={`persona-category-tab${isActiveCategory ? ' is-active' : ''}${selectedCount > 0 ? ' has-selection' : ''}`}
+            onClick={() => handlePersonaCategoryTabClick(questionIndex)}
+            disabled={personaLoading || isQuestionTransitionLoading}
+            aria-current={isActiveCategory ? 'step' : undefined}
+          >
+            <span>{question.categoryLabel}</span>
+            <strong>{selectedCount}</strong>
+          </button>
+        )
+      })}
+    </div>
+  )
+
   const displayQuestion = PERSONA_KEYWORD_QUESTIONS[personaKeywordStep] || PERSONA_KEYWORD_QUESTIONS[0]
-  const personaQuestionText = displayQuestion?.question ?? ''
+  const personaQuestionText = displayQuestion?.category === 'wish'
+    ? '나는 이곳에서 ______ 싶다. (최대 2개 선택)'
+    : (displayQuestion?.question ?? '')
   const personaTotalTurns = Number(displayQuestion?.total_turns || displayQuestion?.totalTurns || PERSONA_TOTAL_TURNS) || PERSONA_TOTAL_TURNS
   const personaCurrentTurn = Number(displayQuestion?.turn || 0) || 0
   const isFinalPersonaQuestion = Boolean(displayQuestion && personaCurrentTurn >= personaTotalTurns)
@@ -1353,10 +1497,19 @@ function TutorialApp() {
     const option = optionLabelMap.get(optionId)
     return option?.category === displayQuestion?.category
   }).length
+  const categorySelectionCounts = PERSONA_KEYWORD_QUESTIONS.reduce((counts, question) => ({
+    ...counts,
+    [question.category]: question.category === 'wish'
+      ? selectedWishOptionIds.length
+      : selectedOptionIds.filter((optionId) => optionLabelMap.get(optionId)?.category === question.category).length,
+  }), {})
   const selectedOptionLabels = selectedOptionIds
     .map((optionId) => optionLabelMap.get(optionId))
     .filter(Boolean)
     .map((option) => `${option.categoryLabel}: ${option.label}`)
+  const selectedKeywordChipOptions = selectedOptionIds
+    .map((optionId) => optionLabelMap.get(optionId))
+    .filter(Boolean)
   const selectedKeywordGroups = selectedOptionIds.reduce((groups, optionId) => {
     const option = optionLabelMap.get(optionId)
     if (!option) return groups
@@ -1475,10 +1628,21 @@ function TutorialApp() {
 
   if (stage === 'idle') {
     return (
-      <TutorialDesign
-        onCameraStepEnter={handleEnterCameraDesignStep}
-        onBeginCamera={handleEnterCameraDesignStep}
-      />
+      <>
+        <TutorialDesign
+          onCameraStepEnter={handleEnterCameraDesignStep}
+          onBeginCamera={handleEnterCameraDesignStep}
+        />
+        {TEST_MODE_RANDOM_AGENT_SHORTCUT && (
+          <button
+            type="button"
+            className="random-agent-shortcut-hotspot"
+            tabIndex={-1}
+            aria-label="랜덤 캐릭터 테스트 화면 열기"
+            onClick={handleRandomAgentShortcutClick}
+          />
+        )}
+      </>
     )
   }
 
@@ -1494,6 +1658,13 @@ function TutorialApp() {
               <video
                 ref={videoRef}
                 className="tutorial-camera-background-video"
+                autoPlay
+                playsInline
+                muted
+              />
+              <video
+                ref={rearVideoRef}
+                className="tutorial-rear-camera-preview-video"
                 autoPlay
                 playsInline
                 muted
@@ -1620,12 +1791,19 @@ function TutorialApp() {
             <span className="persona-meta-label">Question</span>
             <span className="persona-meta-count">{`${displayQuestion ? displayQuestion.turn : 1}/${personaTotalTurns}`}</span>
           </div>
-          <p className="persona-question">
-            {personaResult
-              ? '페르소나 분석이 완료되었습니다.'
-              : isQuestionTransitionLoading
-                ? ''
-              : personaQuestionText || (personaLoading ? '질문을 준비하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')}
+          <p className={`persona-question${isWishQuestion && !personaResult && !isQuestionTransitionLoading ? ' is-wish-question' : ''}`}>
+            {personaResult ? (
+              '페르소나 분석이 완료되었습니다.'
+            ) : isQuestionTransitionLoading ? (
+              ''
+            ) : isWishQuestion ? (
+              <>
+                <span>나는 이곳에서 ______ 싶다.</span>
+                <span className="persona-question-guide">(최대 2개 선택)</span>
+              </>
+            ) : (
+              personaQuestionText || (personaLoading ? '질문을 준비하고 있습니다...' : '질문을 불러오는 중 문제가 발생했습니다.')
+            )}
           </p>
           {isQuestionTransitionLoading && <div className="persona-question-loading" aria-hidden="true" />}
         </header>
@@ -1654,48 +1832,101 @@ function TutorialApp() {
                   ))}
                 </section>
               ) : (
-                <section className="persona-options" aria-label="선택지">
+                <section className={`persona-options${isWishQuestion ? '' : ' is-keyword-question'}`} aria-label="선택지">
                   {personaError && <p className="persona-inline-error">{personaError}</p>}
 
-                  {!isWishQuestion && displayOptions.map((option, index) => {
-                      const isSelected = selectedOptionIds.includes(option.id)
-                      const currentCategorySelectionIds = selectedOptionIds.filter((optionId) => {
-                        const selectedOption = optionLabelMap.get(optionId)
-                        return selectedOption?.category === displayQuestion?.category
-                      })
-                      const selectionRank = currentCategorySelectionIds.indexOf(option.id) + 1
-                      const isCustom = option.allowsCustom || option.id === 'other_custom'
-                      return (
-                        <button
-                          key={`persona-option-${displayQuestion.turn}-${option.id || index}`}
-                          type="button"
-                          className={`persona-option ${isSelected ? 'is-selected' : ''} ${isCustom ? 'is-custom' : ''}`}
-                          style={{
-                            animationDelay: `${0.1 + index * 0.035}s`,
-                            '--persona-option-bg': option.visual?.background || undefined,
-                          }}
-                          onClick={() => handlePersonaOptionClick(option)}
-                          disabled={personaLoading}
-                        >
-                          <span className="persona-option-text">{option.label}</span>
-                          {isSelected && (
-                            <span className="persona-option-rank" aria-label={`${selectionRank}순위`}>
-                              {selectionRank}
+                  {!isWishQuestion && (
+                    <div className="persona-keyword-layout">
+                      {renderPersonaCategoryTabs()}
+
+                      {selectedKeywordChipOptions.length > 0 && (
+                        <div className="persona-selected-strip" aria-label="선택된 키워드">
+                          {selectedKeywordChipOptions.map((option) => (
+                            <span key={`selected-chip-${option.id}`} className="persona-selected-chip">
+                              <small>{option.categoryLabel}</small>
+                              {option.label}
                             </span>
-                          )}
-                        </button>
-                      )
-                    })}
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="persona-category-panel">
+                        <div className="persona-category-panel-head">
+                          <strong>{displayQuestion.categoryLabel}</strong>
+                          <span>{`${currentStepSelectionCount}/${displayQuestion?.maxSelections || displayQuestion?.max_select || 6}`}</span>
+                        </div>
+                        <div className="persona-option-grid">
+                          {displayOptions.map((option, index) => {
+                            const isSelected = selectedOptionIds.includes(option.id)
+                            const currentCategorySelectionIds = selectedOptionIds.filter((optionId) => {
+                              const selectedOption = optionLabelMap.get(optionId)
+                              return selectedOption?.category === displayQuestion?.category
+                            })
+                            const selectionRank = currentCategorySelectionIds.indexOf(option.id) + 1
+                            const isCustom = option.allowsCustom || option.id === 'other_custom'
+                            return (
+                              <button
+                                key={`persona-option-${displayQuestion.turn}-${option.id || index}`}
+                                type="button"
+                                className={`persona-option ${isSelected ? 'is-selected' : ''} ${isCustom ? 'is-custom' : ''}`}
+                                style={{
+                                  animationDelay: `${0.1 + index * 0.035}s`,
+                                  '--persona-option-bg': option.visual?.background || undefined,
+                                }}
+                                onClick={() => handlePersonaOptionClick(option)}
+                                disabled={personaLoading}
+                              >
+                                <span className="persona-option-text">{option.label}</span>
+                                {isSelected && (
+                                  <span className="persona-option-rank" aria-label={`${selectionRank}순위`}>
+                                    {selectionRank}
+                                  </span>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {isWishQuestion && (
-                    <div className="persona-custom-editor" style={{ animationDelay: '0.1s' }}>
-                      <div className="persona-custom-editor-inner">
+                    <div className="persona-wish-builder" style={{ animationDelay: '0.1s' }}>
+                      {renderPersonaCategoryTabs()}
+                      <div className="persona-wish-sentence" aria-live="polite">
+                        <span className="persona-wish-prefix">나는 이곳에서</span>
+                        <span className={`persona-wish-blank${selectedWishOptionIds.length ? ' is-filled' : ''}`}>
+                          {selectedWishOptionIds
+                            .map((optionId) => WISH_GOAL_OPTIONS.find((option) => option.id === optionId)?.label)
+                            .filter(Boolean)
+                            .join(', ')}
+                        </span>
+                        <span className="persona-wish-suffix">싶다</span>
+                      </div>
+                      <div className="persona-wish-options" aria-label="테라리움 목표 선택">
+                        {WISH_GOAL_OPTIONS.map((option, index) => {
+                          const isSelected = selectedWishOptionIds.includes(option.id)
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className={`persona-wish-option${isSelected ? ' is-selected' : ''}`}
+                              style={{ animationDelay: `${0.1 + index * 0.035}s` }}
+                              onClick={() => handleWishGoalOptionClick(option.id)}
+                              disabled={personaLoading}
+                            >
+                              {option.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="persona-custom-editor-inner persona-wish-hidden-input" aria-hidden="true">
                         <textarea
                           className="persona-custom-editor-textarea"
                           value={personaInput}
-                          onChange={(e) => setPersonaInput(e.target.value)}
+                          readOnly
                           placeholder="예) 연애를 하고 싶어요. / 바닷가에서 별을 보고 싶어요. / 인기가 많은 사람이 되고 싶어요."
-                          disabled={personaLoading}
+                          tabIndex={-1}
                         />
                       </div>
                     </div>
@@ -1752,7 +1983,25 @@ function RandomAgentPage() {
     setStatus('creating')
     setError('')
     try {
-      const nextPayload = await createRandomAgent()
+      let nextPayload = null
+      try {
+        nextPayload = await createRandomAgent()
+      } catch (serverError) {
+        console.warn('[random-agent] server random-agent unavailable; using local test fallback:', serverError)
+        const agentId = `random-test-${crypto.randomUUID()}`
+        const avatarPayload = await buildAvatar({
+          agentId,
+          appearance: createRandomTestAppearance(),
+        })
+        nextPayload = {
+          agentId,
+          nickname: '랜덤 테스트',
+          enterUrl: `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(agentId)}`,
+          avatar: {
+            modelUrl: avatarPayload.modelUrl,
+          },
+        }
+      }
       setPayload(nextPayload)
       setStatus('rendering')
     } catch (createError) {
@@ -1819,11 +2068,50 @@ function AvatarProfileCapturePage() {
   const [modelUrl, setModelUrl] = useState('')
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
+  const [editColorsEnabled, setEditColorsEnabled] = useState(false)
+  const [colorInputs, setColorInputs] = useState(AVATAR_EDIT_COLOR_FALLBACKS)
+  const [colorOverrides, setColorOverrides] = useState({})
+  const [colorViewUrl, setColorViewUrl] = useState('')
+
+  const updateColorViewUrl = useCallback((nextColors) => {
+    const params = new URLSearchParams(window.location.search)
+    params.set('editColors', '1')
+    for (const control of AVATAR_EDIT_COLOR_CONTROLS) {
+      const color = normalizeHexColorParam(nextColors?.[control.key])
+      if (color) {
+        params.set(control.param, color)
+      } else {
+        params.delete(control.param)
+      }
+    }
+    const nextUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`
+    window.history.replaceState(null, '', nextUrl)
+    setColorViewUrl(nextUrl)
+  }, [])
+
+  const handleAvatarColorChange = useCallback((key, value) => {
+    const color = normalizeHexColorParam(value)
+    if (!color) return
+    setColorInputs((prev) => ({ ...prev, [key]: color }))
+    setColorOverrides((prev) => {
+      const nextColors = { ...prev, [key]: color }
+      updateColorViewUrl(nextColors)
+      return nextColors
+    })
+  }, [updateColorViewUrl])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const agentId = String(params.get('agentId') || '').trim()
     const explicitModelUrl = String(params.get('modelUrl') || '').trim()
+    const isColorEditor = params.get('editColors') === '1' || params.get('editColors') === 'true'
+    const initialColors = readAvatarColorParams(params)
+    setEditColorsEnabled(isColorEditor)
+    setColorOverrides(initialColors)
+    setColorInputs({ ...AVATAR_EDIT_COLOR_FALLBACKS, ...initialColors })
+    if (isColorEditor || hasAvatarColorOverrides(initialColors)) {
+      setColorViewUrl(window.location.href)
+    }
     if (explicitModelUrl) {
       setModelUrl(avatarAssetUrl(explicitModelUrl))
       return
@@ -1860,12 +2148,36 @@ function AvatarProfileCapturePage() {
             alt="avatar profile capture"
             variant="profileCapture"
             distanceMultiplier={1}
+            colorOverrides={hasAvatarColorOverrides(colorOverrides) ? colorOverrides : null}
             onReady={() => {
               setStatus('ready')
               window.__TERARIUM_AVATAR_PROFILE_CAPTURE_READY__ = true
             }}
           />
         </Suspense>
+      ) : null}
+      {editColorsEnabled ? (
+        <section className="avatar-color-editor" aria-label="아바타 색상 편집">
+          <div className="avatar-color-editor-title">컬러그램</div>
+          <div className="avatar-color-editor-controls">
+            {AVATAR_EDIT_COLOR_CONTROLS.map((control) => (
+              <label className="avatar-color-control" key={control.key}>
+                <span>{control.label}</span>
+                <input
+                  type="color"
+                  value={colorInputs[control.key] || control.fallback}
+                  onInput={(event) => handleAvatarColorChange(control.key, event.currentTarget.value)}
+                  onChange={(event) => handleAvatarColorChange(control.key, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          {colorViewUrl ? (
+            <a className="avatar-color-editor-link" href={colorViewUrl}>
+              색상 적용 URL
+            </a>
+          ) : null}
+        </section>
       ) : null}
       {status !== 'ready' && <span className="avatar-profile-capture-status">{error || status}</span>}
     </main>

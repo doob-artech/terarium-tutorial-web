@@ -63,9 +63,12 @@ const captureVideoFrame = (
 
 export function useCameraCapture({ stage, setCameraReady }) {
   const videoRef = useRef(null)
+  const rearVideoRef = useRef(null)
   const streamRef = useRef(null)
+  const rearStreamRef = useRef(null)
   const [cameraDevices, setCameraDevices] = useState([])
   const [selectedCameraId, setSelectedCameraId] = useState('')
+  const [selectedRearCameraId, setSelectedRearCameraId] = useState('')
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -76,6 +79,15 @@ export function useCameraCapture({ stage, setCameraReady }) {
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
+
+    if (rearStreamRef.current) {
+      rearStreamRef.current.getTracks().forEach((track) => track.stop())
+      rearStreamRef.current = null
+    }
+
+    if (rearVideoRef.current) {
+      rearVideoRef.current.srcObject = null
+    }
   }, [])
 
   const captureCurrentFrame = useCallback(() => {
@@ -84,7 +96,7 @@ export function useCameraCapture({ stage, setCameraReady }) {
 
   const captureCameraFrames = useCallback(() => ({
     frontImageDataUrl: captureVideoFrame(videoRef.current),
-    rearImageDataUrl: '',
+    rearImageDataUrl: captureVideoFrame(rearVideoRef.current),
   }), [])
 
   const refreshCameraDevices = useCallback(async () => {
@@ -121,6 +133,12 @@ export function useCameraCapture({ stage, setCameraReady }) {
   }, [])
 
   const choosePreferredCameraId = useCallback((devices) => {
+    if (selectedCameraId && devices.some((device) => (
+      device.deviceId === selectedCameraId && !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || '')
+    ))) {
+      return selectedCameraId
+    }
+
     const preferredDevices = devices.filter((device) => PREFERRED_CAMERA_LABEL_PATTERN.test(device.label || ''))
     const preferredDevice =
       preferredDevices.find((device) => {
@@ -139,14 +157,20 @@ export function useCameraCapture({ stage, setCameraReady }) {
       return preferredDevice.deviceId
     }
 
-    if (selectedCameraId && devices.some((device) => (
-      device.deviceId === selectedCameraId && !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || '')
-    ))) {
-      return selectedCameraId
-    }
-
     return devices.find((device) => !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || ''))?.deviceId || devices[0]?.deviceId || ''
   }, [selectedCameraId])
+
+  const chooseRearCameraId = useCallback((devices, frontCameraId) => {
+    if (selectedRearCameraId && selectedRearCameraId !== frontCameraId && devices.some((device) => (
+      device.deviceId === selectedRearCameraId && !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || '')
+    ))) {
+      return selectedRearCameraId
+    }
+
+    return devices.find((device) => (
+      device.deviceId !== frontCameraId && !NON_COLOR_CAMERA_LABEL_PATTERN.test(device.label || '')
+    ))?.deviceId || ''
+  }, [selectedRearCameraId])
 
   useEffect(() => {
     if (!CAMERA_STAGES.has(stage)) {
@@ -218,10 +242,36 @@ export function useCameraCapture({ stage, setCameraReady }) {
           })
         }
 
-        streamRef.current = stream
         const activeCameraId = activeDeviceId || preferredAfterPermissionId || preferredCameraId || devices[0]?.deviceId || ''
+        const rearCameraId = chooseRearCameraId(devices, activeCameraId)
+        let rearStream = null
+        if (rearCameraId) {
+          try {
+            rearStream = await openCameraStream(rearCameraId)
+            if (canceled) {
+              rearStream.getTracks().forEach((track) => track.stop())
+              stream.getTracks().forEach((track) => track.stop())
+              return
+            }
+            const rearTrack = rearStream.getVideoTracks()[0]
+            console.info(CAMERA_LOG_PREFIX, 'rear camera opened:', {
+              label: rearTrack?.label || '',
+              hasDeviceId: Boolean(rearTrack?.getSettings?.().deviceId),
+            })
+          } catch (rearError) {
+            console.warn(CAMERA_LOG_PREFIX, 'rear camera failed; continuing with front camera only:', rearError)
+          }
+        } else {
+          console.warn(CAMERA_LOG_PREFIX, 'rear camera not found; connect a second video input for rear capture.')
+        }
+
+        streamRef.current = stream
+        rearStreamRef.current = rearStream
         if (activeCameraId && activeCameraId !== selectedCameraId) {
           setSelectedCameraId(activeCameraId)
+        }
+        if (rearCameraId && rearCameraId !== selectedRearCameraId) {
+          setSelectedRearCameraId(rearCameraId)
         }
 
         if (videoRef.current) {
@@ -229,6 +279,9 @@ export function useCameraCapture({ stage, setCameraReady }) {
           videoRef.current.onloadedmetadata = () => {
             setCameraReady(true)
           }
+        }
+        if (rearVideoRef.current && rearStream) {
+          rearVideoRef.current.srcObject = rearStream
         }
         setCameraReady(true)
       } catch (error) {
@@ -250,16 +303,19 @@ export function useCameraCapture({ stage, setCameraReady }) {
       setCameraReady(false)
       stopCamera()
     }
-  }, [stage, selectedCameraId, setCameraReady, stopCamera, refreshCameraDevices, choosePreferredCameraId])
+  }, [stage, selectedCameraId, selectedRearCameraId, setCameraReady, stopCamera, refreshCameraDevices, choosePreferredCameraId, chooseRearCameraId])
 
   return {
     videoRef,
+    rearVideoRef,
     stopCamera,
     captureCurrentFrame,
     captureCameraFrames,
     cameraDevices,
     selectedCameraId,
+    selectedRearCameraId,
     setSelectedCameraId,
+    setSelectedRearCameraId,
     refreshCameraDevices,
   }
 }

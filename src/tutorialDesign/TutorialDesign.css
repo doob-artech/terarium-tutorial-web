@@ -423,7 +423,7 @@ body,
   left: 55%;
   top: 73%;
   z-index: 2;
-  width: min(72vw, 720px);
+  width: min(86vw, 1040px);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
@@ -436,14 +436,14 @@ body,
 
 .camera-step-bubble-text {
   position: absolute;
-  left: 9%;
-  right: 12%;
-  top: 54%;
+  left: 6%;
+  right: 9%;
+  top: 52%;
   color: #111;
   text-align: center;
-  font-size: var(--tutorial-body-font-size);
+  font-size: clamp(20px, 1.95vw, 32px);
   font-weight: 800;
-  line-height: 1.42;
+  line-height: 1.16;
   word-break: keep-all;
   white-space: pre-line;
   transform: translateY(-50%);
@@ -708,6 +708,22 @@ body,
   transform: none;
 }
 
+.glass-bubble-card.step-12 {
+  width: min(92vw, 1360px);
+  min-height: clamp(320px, 40vh, 470px);
+  padding: clamp(42px, 5vh, 72px) clamp(64px, 6vw, 110px);
+}
+
+.glass-bubble-card.step-12 .main-desc {
+  max-width: min(82vw, 1160px);
+  font-size: var(--tutorial-body-font-size);
+  line-height: var(--tutorial-line-height);
+}
+
+.glass-bubble-card.step-12 .action-row {
+  margin-top: clamp(24px, 3vh, 42px);
+}
+
 .glass-bubble-card.step-15 {
   position: absolute;
   top: 8vh;
@@ -907,7 +923,7 @@ body,
 }
 
 .glass-bubble-card.type-SELECT .main-desc {
-  max-width: 68vw;
+  max-width: min(84vw, 1280px);
   font-size: var(--tutorial-body-font-size);
   font-weight: 800;
   line-height: var(--tutorial-line-height);
