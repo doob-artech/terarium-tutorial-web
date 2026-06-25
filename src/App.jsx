@@ -1465,28 +1465,24 @@ function TutorialApp() {
     setPersonaKeywordStep(Math.max(0, Math.min(targetIndex, PERSONA_KEYWORD_QUESTIONS.length - 1)))
   }
 
-  const renderPersonaCategoryTabs = () => (
-    <>
+  const renderPersonaCategoryArrow = (direction) => {
+    const isPrevious = direction === 'previous'
+    return (
       <button
         type="button"
         className="persona-category-arrow"
-        onClick={() => handlePersonaCategoryTabClick(personaKeywordStep - 1)}
-        disabled={personaLoading || isQuestionTransitionLoading || personaKeywordStep <= 0}
-        aria-label="이전 카테고리"
+        onClick={() => handlePersonaCategoryTabClick(personaKeywordStep + (isPrevious ? -1 : 1))}
+        disabled={
+          personaLoading ||
+          isQuestionTransitionLoading ||
+          (isPrevious ? personaKeywordStep <= 0 : personaKeywordStep >= PERSONA_KEYWORD_QUESTIONS.length - 1)
+        }
+        aria-label={isPrevious ? '이전 카테고리' : '다음 카테고리'}
       >
-        &lt;
+        {isPrevious ? '<' : '>'}
       </button>
-      <button
-        type="button"
-        className="persona-category-arrow"
-        onClick={() => handlePersonaCategoryTabClick(personaKeywordStep + 1)}
-        disabled={personaLoading || isQuestionTransitionLoading || personaKeywordStep >= PERSONA_KEYWORD_QUESTIONS.length - 1}
-        aria-label="다음 카테고리"
-      >
-        &gt;
-      </button>
-    </>
-  )
+    )
+  }
 
   const displayQuestion = PERSONA_KEYWORD_QUESTIONS[personaKeywordStep] || PERSONA_KEYWORD_QUESTIONS[0]
   const personaQuestionText = displayQuestion?.category === 'wish'
@@ -1853,7 +1849,7 @@ function TutorialApp() {
                       )}
 
                       <div className="persona-category-tabs" aria-label="성격 카테고리 이동">
-                        {renderPersonaCategoryTabs()}
+                        {renderPersonaCategoryArrow('previous')}
                         <div className="persona-category-panel">
                           <div className="persona-option-grid">
                             {displayOptions.map((option, index) => {
@@ -1887,6 +1883,7 @@ function TutorialApp() {
                             })}
                           </div>
                         </div>
+                        {renderPersonaCategoryArrow('next')}
                       </div>
                     </div>
                   )}
