@@ -1466,7 +1466,7 @@ function TutorialApp() {
   }
 
   const renderPersonaCategoryTabs = () => (
-    <div className="persona-category-tabs" aria-label="성격 카테고리 이동">
+    <>
       <button
         type="button"
         className="persona-category-arrow"
@@ -1476,10 +1476,6 @@ function TutorialApp() {
       >
         &lt;
       </button>
-      <div className="persona-category-progress" aria-live="polite">
-        <span>{`${personaKeywordStep + 1}/${PERSONA_KEYWORD_QUESTIONS.length}`}</span>
-        <strong>{`${currentStepSelectionCount}/${displayQuestion?.maxSelections || displayQuestion?.max_select || 6}`}</strong>
-      </div>
       <button
         type="button"
         className="persona-category-arrow"
@@ -1489,7 +1485,7 @@ function TutorialApp() {
       >
         &gt;
       </button>
-    </div>
+    </>
   )
 
   const displayQuestion = PERSONA_KEYWORD_QUESTIONS[personaKeywordStep] || PERSONA_KEYWORD_QUESTIONS[0]
@@ -1799,10 +1795,6 @@ function TutorialApp() {
         style={{ '--persona-logo-bg': `url(${logo1Src})` }}
       >
         <header className="persona-header">
-          <div className="persona-question-meta">
-            <span className="persona-meta-label">Question</span>
-            <span className="persona-meta-count">{`${displayQuestion ? displayQuestion.turn : 1}/${personaTotalTurns}`}</span>
-          </div>
           <p className={`persona-question${isWishQuestion && !personaResult && !isQuestionTransitionLoading ? ' is-wish-question' : ''}`}>
             {personaResult ? (
               '페르소나 분석이 완료되었습니다.'
@@ -1849,8 +1841,6 @@ function TutorialApp() {
 
                   {!isWishQuestion && (
                     <div className="persona-keyword-layout">
-                      {renderPersonaCategoryTabs()}
-
                       {selectedKeywordChipOptions.length > 0 && (
                         <div className="persona-selected-strip" aria-label="선택된 키워드">
                           {selectedKeywordChipOptions.map((option) => (
@@ -1862,40 +1852,40 @@ function TutorialApp() {
                         </div>
                       )}
 
-                      <div className="persona-category-panel">
-                        <div className="persona-category-panel-head">
-                          <span>{`${currentStepSelectionCount}/${displayQuestion?.maxSelections || displayQuestion?.max_select || 6}`}</span>
-                        </div>
-                        <div className="persona-option-grid">
-                          {displayOptions.map((option, index) => {
-                            const isSelected = selectedOptionIds.includes(option.id)
-                            const currentCategorySelectionIds = selectedOptionIds.filter((optionId) => {
-                              const selectedOption = optionLabelMap.get(optionId)
-                              return selectedOption?.category === displayQuestion?.category
-                            })
-                            const selectionRank = currentCategorySelectionIds.indexOf(option.id) + 1
-                            const isCustom = option.allowsCustom || option.id === 'other_custom'
-                            return (
-                              <button
-                                key={`persona-option-${displayQuestion.turn}-${option.id || index}`}
-                                type="button"
-                                className={`persona-option ${isSelected ? 'is-selected' : ''} ${isCustom ? 'is-custom' : ''}`}
-                                style={{
-                                  animationDelay: `${0.1 + index * 0.035}s`,
-                                  '--persona-option-bg': option.visual?.background || undefined,
-                                }}
-                                onClick={() => handlePersonaOptionClick(option)}
-                                disabled={personaLoading}
-                              >
-                                <span className="persona-option-text">{option.label}</span>
-                                {isSelected && (
-                                  <span className="persona-option-rank" aria-label={`${selectionRank}순위`}>
-                                    {selectionRank}
-                                  </span>
-                                )}
-                              </button>
-                            )
-                          })}
+                      <div className="persona-category-tabs" aria-label="성격 카테고리 이동">
+                        {renderPersonaCategoryTabs()}
+                        <div className="persona-category-panel">
+                          <div className="persona-option-grid">
+                            {displayOptions.map((option, index) => {
+                              const isSelected = selectedOptionIds.includes(option.id)
+                              const currentCategorySelectionIds = selectedOptionIds.filter((optionId) => {
+                                const selectedOption = optionLabelMap.get(optionId)
+                                return selectedOption?.category === displayQuestion?.category
+                              })
+                              const selectionRank = currentCategorySelectionIds.indexOf(option.id) + 1
+                              const isCustom = option.allowsCustom || option.id === 'other_custom'
+                              return (
+                                <button
+                                  key={`persona-option-${displayQuestion.turn}-${option.id || index}`}
+                                  type="button"
+                                  className={`persona-option ${isSelected ? 'is-selected' : ''} ${isCustom ? 'is-custom' : ''}`}
+                                  style={{
+                                    animationDelay: `${0.1 + index * 0.035}s`,
+                                    '--persona-option-bg': option.visual?.background || undefined,
+                                  }}
+                                  onClick={() => handlePersonaOptionClick(option)}
+                                  disabled={personaLoading}
+                                >
+                                  <span className="persona-option-text">{option.label}</span>
+                                  {isSelected && (
+                                    <span className="persona-option-rank" aria-label={`${selectionRank}순위`}>
+                                      {selectionRank}
+                                    </span>
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
                     </div>
