@@ -316,6 +316,7 @@ const TutorialDesign = ({
   externalName = '',
   avatarUrl = '',
   avatarReveal = false,
+  avatarColorOverrides = null,
   avatarInitialYaw = 0,
   keywords = [],
   enterUrl = '',
@@ -708,6 +709,7 @@ const TutorialDesign = ({
                       style={currentId === 11 ? null : character.style}
                       variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
                       distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
+                      colorOverrides={currentId === 9 ? avatarColorOverrides : null}
                       initialYaw={currentId === 9 ? avatarInitialYaw : 0}
                       idleSway={currentId === 9 || currentId === 11}
                       onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
