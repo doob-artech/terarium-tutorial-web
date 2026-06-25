@@ -1612,13 +1612,13 @@ transform: scale(1.01) translateY(-2px) !important;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(16px, 2vh, 28px);
+  gap: clamp(10px, 1.2vh, 18px);
   animation: persona-option-enter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .persona-wish-sentence {
   width: min(100%, 1260px);
-  min-height: clamp(88px, 11vh, 128px);
+  min-height: clamp(74px, 9.2vh, 112px);
   border-radius: 999px;
   background: #fff174;
   box-shadow: 0 10px 22px rgba(66, 111, 146, 0.12);
@@ -1627,9 +1627,9 @@ transform: scale(1.01) translateY(-2px) !important;
   align-items: center;
   justify-content: center;
   gap: clamp(10px, 1.1vw, 18px);
-  padding: clamp(14px, 1.8vh, 24px) clamp(30px, 3.6vw, 64px);
+  padding: clamp(12px, 1.4vh, 20px) clamp(28px, 3.2vw, 58px);
   font-family: 'NanumSquareNeo', sans-serif !important;
-  font-size: clamp(24px, 2.2vw, 38px);
+  font-size: clamp(22px, 2vw, 34px);
   font-weight: 900;
   line-height: 1.05;
   white-space: nowrap;
@@ -1655,20 +1655,20 @@ transform: scale(1.01) translateY(-2px) !important;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(10px, 1vw, 16px);
+  gap: clamp(8px, 0.8vw, 12px);
 }
 
 .persona-wish-option {
-  min-height: clamp(50px, 6vh, 72px);
+  min-height: clamp(42px, 5vh, 58px);
   width: max-content;
   max-width: min(100%, 360px);
   border: 2px solid rgba(110, 118, 128, 0.72);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
   color: #333;
-  padding: 0 clamp(22px, 2vw, 36px);
+  padding: 0 clamp(18px, 1.8vw, 30px);
   font-family: 'NanumSquareNeo', sans-serif;
-  font-size: clamp(20px, 1.55vw, 30px);
+  font-size: clamp(17px, 1.32vw, 25px);
   font-weight: 900;
   line-height: 1.1;
   white-space: nowrap;
@@ -1693,13 +1693,26 @@ transform: scale(1.01) translateY(-2px) !important;
   box-shadow: 0 0 0 3px #ffc42e, 0 12px 24px rgba(255, 196, 46, 0.28);
 }
 
-.persona-wish-hidden-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
+.persona-wish-custom-input {
+  width: min(100%, 1040px);
+  margin-top: clamp(0px, 0.2vh, 4px);
+}
+
+.persona-wish-custom-input .persona-custom-editor-textarea {
+  min-height: clamp(46px, 6vh, 66px);
+  border-color: rgba(110, 118, 128, 0.42);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: clamp(10px, 0.95vw, 14px) clamp(18px, 1.8vw, 26px);
+  font-size: clamp(16px, 1.05vw, 21px);
+  font-weight: 800;
+  line-height: 1.25;
+  resize: none;
+}
+
+.persona-wish-custom-input .persona-custom-editor-textarea:focus {
+  border-color: #ffc42e;
+  box-shadow: 0 0 0 4px rgba(255, 196, 46, 0.2), 0 8px 18px rgba(66, 111, 146, 0.12);
 }
 
 .persona-answer-review-card {

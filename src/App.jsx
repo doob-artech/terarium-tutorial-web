@@ -1416,6 +1416,11 @@ function TutorialApp() {
     })
   }
 
+  const handleWishGoalCustomInputChange = (event) => {
+    setSelectedWishOptionIds([])
+    setPersonaInput(event.target.value)
+  }
+
   const handleNextClick = () => {
     if (!isFinalPersonaQuestion) {
       if (currentStepSelectionCount > 0) {
@@ -1522,6 +1527,14 @@ function TutorialApp() {
     ...selectedOptionLabels,
     personaInput.trim() ? `하고 싶은 일: ${personaInput.trim()}` : '',
   ].filter(Boolean).join(' / ')
+  const selectedWishLabels = selectedWishOptionIds
+    .map((optionId) => WISH_GOAL_OPTIONS.find((option) => option.id === optionId)?.label)
+    .filter(Boolean)
+  const customWishPreview = personaInput
+    .trim()
+    .replace(/^나는\s*이곳에서\s*/, '')
+    .replace(/\s*싶다$/, '')
+  const wishBlankText = selectedWishLabels.length ? selectedWishLabels.join(', ') : customWishPreview
   const hasAllKeywordGroups = selectedKeywordGroups.positive.length > 0
     && selectedKeywordGroups.negative.length > 0
     && selectedKeywordGroups.unusual.length > 0
@@ -1895,11 +1908,8 @@ function TutorialApp() {
                       {renderPersonaCategoryTabs()}
                       <div className="persona-wish-sentence" aria-live="polite">
                         <span className="persona-wish-prefix">나는 이곳에서</span>
-                        <span className={`persona-wish-blank${selectedWishOptionIds.length ? ' is-filled' : ''}`}>
-                          {selectedWishOptionIds
-                            .map((optionId) => WISH_GOAL_OPTIONS.find((option) => option.id === optionId)?.label)
-                            .filter(Boolean)
-                            .join(', ')}
+                        <span className={`persona-wish-blank${wishBlankText ? ' is-filled' : ''}`}>
+                          {wishBlankText}
                         </span>
                         <span className="persona-wish-suffix">싶다</span>
                       </div>
@@ -1920,13 +1930,15 @@ function TutorialApp() {
                           )
                         })}
                       </div>
-                      <div className="persona-custom-editor-inner persona-wish-hidden-input" aria-hidden="true">
+                      <div className="persona-wish-custom-input">
                         <textarea
                           className="persona-custom-editor-textarea"
                           value={personaInput}
-                          readOnly
-                          placeholder="예) 연애를 하고 싶어요. / 바닷가에서 별을 보고 싶어요. / 인기가 많은 사람이 되고 싶어요."
-                          tabIndex={-1}
+                          onChange={handleWishGoalCustomInputChange}
+                          placeholder="직접 쓰고 싶은 목표를 적어줘"
+                          disabled={personaLoading}
+                          rows={2}
+                          aria-label="테라리움 목표 직접 입력"
                         />
                       </div>
                     </div>
