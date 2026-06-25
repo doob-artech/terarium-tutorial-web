@@ -1466,24 +1466,29 @@ function TutorialApp() {
   }
 
   const renderPersonaCategoryTabs = () => (
-    <div className="persona-category-tabs" aria-label="성격 카테고리 진행 상황">
-      {PERSONA_KEYWORD_QUESTIONS.map((question, questionIndex) => {
-        const isActiveCategory = question.category === displayQuestion?.category
-        const selectedCount = categorySelectionCounts[question.category] || 0
-        return (
-          <button
-            key={question.category}
-            type="button"
-            className={`persona-category-tab${isActiveCategory ? ' is-active' : ''}${selectedCount > 0 ? ' has-selection' : ''}`}
-            onClick={() => handlePersonaCategoryTabClick(questionIndex)}
-            disabled={personaLoading || isQuestionTransitionLoading}
-            aria-current={isActiveCategory ? 'step' : undefined}
-          >
-            <span>{question.categoryLabel}</span>
-            <strong>{selectedCount}</strong>
-          </button>
-        )
-      })}
+    <div className="persona-category-tabs" aria-label="성격 카테고리 이동">
+      <button
+        type="button"
+        className="persona-category-arrow"
+        onClick={() => handlePersonaCategoryTabClick(personaKeywordStep - 1)}
+        disabled={personaLoading || isQuestionTransitionLoading || personaKeywordStep <= 0}
+        aria-label="이전 카테고리"
+      >
+        &lt;
+      </button>
+      <div className="persona-category-progress" aria-live="polite">
+        <span>{`${personaKeywordStep + 1}/${PERSONA_KEYWORD_QUESTIONS.length}`}</span>
+        <strong>{`${currentStepSelectionCount}/${displayQuestion?.maxSelections || displayQuestion?.max_select || 6}`}</strong>
+      </div>
+      <button
+        type="button"
+        className="persona-category-arrow"
+        onClick={() => handlePersonaCategoryTabClick(personaKeywordStep + 1)}
+        disabled={personaLoading || isQuestionTransitionLoading || personaKeywordStep >= PERSONA_KEYWORD_QUESTIONS.length - 1}
+        aria-label="다음 카테고리"
+      >
+        &gt;
+      </button>
     </div>
   )
 
@@ -1502,12 +1507,6 @@ function TutorialApp() {
     const option = optionLabelMap.get(optionId)
     return option?.category === displayQuestion?.category
   }).length
-  const categorySelectionCounts = PERSONA_KEYWORD_QUESTIONS.reduce((counts, question) => ({
-    ...counts,
-    [question.category]: question.category === 'wish'
-      ? selectedWishOptionIds.length
-      : selectedOptionIds.filter((optionId) => optionLabelMap.get(optionId)?.category === question.category).length,
-  }), {})
   const selectedOptionLabels = selectedOptionIds
     .map((optionId) => optionLabelMap.get(optionId))
     .filter(Boolean)
@@ -1865,7 +1864,6 @@ function TutorialApp() {
 
                       <div className="persona-category-panel">
                         <div className="persona-category-panel-head">
-                          <strong>{displayQuestion.categoryLabel}</strong>
                           <span>{`${currentStepSelectionCount}/${displayQuestion?.maxSelections || displayQuestion?.max_select || 6}`}</span>
                         </div>
                         <div className="persona-option-grid">
