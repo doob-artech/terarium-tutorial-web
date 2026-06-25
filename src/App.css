@@ -793,6 +793,10 @@
   pointer-events: none;
 }
 
+.tutorial-rear-camera-preview-video.is-hidden {
+  display: none;
+}
+
 .avatar-profile-capture-page {
   position: fixed;
   inset: 0;

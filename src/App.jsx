@@ -902,6 +902,7 @@ function TutorialApp() {
   const {
     videoRef,
     rearVideoRef,
+    rearCameraReady,
     stopCamera,
     captureCameraFrames,
   } = useCameraCapture({ stage, setCameraReady })
@@ -1668,7 +1669,7 @@ function TutorialApp() {
               />
               <video
                 ref={rearVideoRef}
-                className="tutorial-rear-camera-preview-video"
+                className={`tutorial-rear-camera-preview-video${rearCameraReady ? '' : ' is-hidden'}`}
                 autoPlay
                 playsInline
                 muted
