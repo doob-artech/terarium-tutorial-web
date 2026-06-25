@@ -838,6 +838,13 @@
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.avatar-color-editor-title:active {
+  cursor: grabbing;
 }
 
 .avatar-color-editor-controls {

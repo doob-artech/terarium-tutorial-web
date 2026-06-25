@@ -1317,12 +1317,12 @@ body,
 .character-layer.step-character-11 .tutorial-avatar-model,
 .tutorial-avatar-model.is-name-input-avatar {
   position: fixed !important;
-  left: clamp(14px, 4vw, 64px) !important;
-  top: clamp(8px, 2vh, 32px) !important;
+  left: clamp(10px, 3vw, 48px) !important;
+  top: clamp(6px, 1.5vh, 22px) !important;
   right: auto !important;
   bottom: auto !important;
-  width: min(38vw, 520px) !important;
-  height: min(56vh, 680px) !important;
+  width: min(30vw, 390px) !important;
+  height: min(45vh, 520px) !important;
   transform: none !important;
   translate: none !important;
   filter:

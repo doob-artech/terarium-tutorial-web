@@ -48,7 +48,6 @@ const STEP_SCENE_CHARACTERS = {
   4: 'scene4',
   7: 'scene7',
   8: 'scene8',
-  10: 'scene10',
   12: 'defaultStand',
   14: 'scene14',
   15: 'scene15',
@@ -56,6 +55,7 @@ const STEP_SCENE_CHARACTERS = {
 
 const STEP_SPECIAL_CHARACTERS = {
   9: 'avatar',
+  10: 'avatarSmall',
   11: 'avatarResult',
 };
 
@@ -322,11 +322,13 @@ const TutorialDesign = ({
   enterUrl = '',
   backgroundSlot = null,
   hideUi = false,
+  avatarColorEditorSlot = null,
   onCameraStepEnter,
   onBeginCamera,
   onNameSubmit,
   onAvatarRotationChange,
   onAvatarReady,
+  onAvatarConfirm,
   onAvatarProfileImageReady,
   onStartQuestions,
   onFinish,
@@ -492,6 +494,10 @@ const TutorialDesign = ({
         setIsWhiteLayerTransition(false);
       }, 650);
       return;
+    }
+
+    if (currentId === 9) {
+      await onAvatarConfirm?.();
     }
 
     if (nextId === 'FINISH_ALL') {
@@ -702,14 +708,14 @@ const TutorialDesign = ({
                   <Suspense fallback={<div className="character-img tutorial-avatar-model" />}>
                     <AvatarThreeViewer
                       className={`character-img tutorial-avatar-model ${
-                        currentId === 11 ? 'is-name-input-avatar' : ''
+                        currentId === 10 || currentId === 11 ? 'is-name-input-avatar' : ''
                       }`}
                       src={avatarPreviewUrl}
                       alt={character.alt || 'avatar'}
-                      style={currentId === 11 ? null : character.style}
-                      variant={currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
-                      distanceMultiplier={currentId === 11 ? 1.18 : 1.82}
-                      colorOverrides={currentId === 9 ? avatarColorOverrides : null}
+                      style={currentId === 10 || currentId === 11 ? null : character.style}
+                      variant={currentId === 10 || currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}
+                      distanceMultiplier={currentId === 10 || currentId === 11 ? 1.26 : 1.82}
+                      colorOverrides={avatarColorOverrides}
                       initialYaw={currentId === 9 ? avatarInitialYaw : 0}
                       idleSway={currentId === 9 || currentId === 11}
                       onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
@@ -745,6 +751,7 @@ const TutorialDesign = ({
                 />
               </div>
             )}
+            {currentId === 9 && avatarColorEditorSlot}
 
             {currentId !== 12 && (step.type === 'AUTO_STACK' ||
               step.type === 'RESULT_DISPLAY') && (
