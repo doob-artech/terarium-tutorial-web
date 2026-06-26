@@ -50,13 +50,14 @@ const STEP_SCENE_CHARACTERS = {
   8: 'scene8',
   12: 'defaultStand',
   14: 'scene14',
-  15: 'scene15',
+  15: 'avatarResult',
 };
 
 const STEP_SPECIAL_CHARACTERS = {
   9: 'avatar',
   10: 'avatarSmall',
   11: 'avatarResult',
+  16: 'avatarResult',
 };
 
 const STEP_BACKGROUND_VIDEOS = {
@@ -329,6 +330,7 @@ const TutorialDesign = ({
   onAvatarRotationChange,
   onAvatarReady,
   onAvatarConfirm,
+  onAvatarPartClick,
   onAvatarProfileImageReady,
   onStartQuestions,
   onFinish,
@@ -720,6 +722,7 @@ const TutorialDesign = ({
                       idleSway={currentId === 9 || currentId === 11}
                       onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
                       onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
+                      onPartClick={currentId === 9 ? onAvatarPartClick : null}
                     />
                   </Suspense>
                 ) : (

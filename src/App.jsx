@@ -508,6 +508,42 @@ const applyAvatarColorsToAppearance = (appearance, colors) => {
   return nextAppearance
 }
 
+const AVATAR_CLICK_ASSET_CONFIG = {
+  hair: {
+    field: 'hair_mesh',
+    options: DEBUG_AVATAR_OPTIONS.hair.map(([value]) => debugAssetToSemantic.hair_mesh[value] || value),
+  },
+  top: {
+    field: 'top_mesh',
+    options: DEBUG_AVATAR_OPTIONS.top.map(([value]) => debugAssetToSemantic.top_mesh[value] || value),
+  },
+  bottom: {
+    field: 'bottom_mesh',
+    options: DEBUG_AVATAR_OPTIONS.bottom.map(([value]) => debugAssetToSemantic.bottom_mesh[value] || value),
+  },
+  eye: {
+    field: 'eye_texture',
+    options: DEBUG_AVATAR_OPTIONS.eye.map(([value]) => value),
+  },
+}
+
+const cycleAvatarAssetInAppearance = (appearance, partRole) => {
+  const config = AVATAR_CLICK_ASSET_CONFIG[partRole]
+  if (!config?.field || !config.options.length) {
+    return null
+  }
+
+  const nextAppearance = normalizeAvatarAppearanceForBuild(appearance)
+  const currentValue = nextAppearance.asset_tags[config.field]
+  const currentIndex = config.options.findIndex((value) => value === currentValue)
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % config.options.length : 0
+  nextAppearance.asset_tags[config.field] = config.options[nextIndex]
+  if (partRole === 'top' || partRole === 'bottom') {
+    nextAppearance.asset_tags.outfit_mesh = 'none'
+  }
+  return nextAppearance
+}
+
 const getRandomOptionValue = (options) => options[Math.floor(Math.random() * options.length)]?.[0] || ''
 const TEST_RANDOM_COLOR_OPTIONS = [
   ['black'],
@@ -990,6 +1026,7 @@ function TutorialApp() {
   const avatarPreviewRotationRef = useRef({ yaw: 0, pitch: 0 })
   const avatarTransitionFinishingRef = useRef(false)
   const avatarPreloadReadyRef = useRef(false)
+  const lastAvatarModelUrlRef = useRef('')
   const frontCaptureDataUrlRef = useRef('')
   const avatarColorApplyRequestRef = useRef(0)
   const avatarColorEditorDragRef = useRef(null)
@@ -1009,15 +1046,26 @@ function TutorialApp() {
     () => personaAgentIdRef.current || personaAgentId,
     [personaAgentId],
   )
+  const setPersistentAvatarModelUrl = useCallback((nextUrl) => {
+    setAvatarModelUrl((currentUrl) => {
+      const resolvedUrl = typeof nextUrl === 'function' ? nextUrl(currentUrl) : nextUrl
+      if (resolvedUrl) {
+        lastAvatarModelUrlRef.current = resolvedUrl
+        return resolvedUrl
+      }
+      return lastAvatarModelUrlRef.current || ''
+    })
+  }, [setAvatarModelUrl])
+  const visibleAvatarModelUrl = avatarModelUrl || lastAvatarModelUrlRef.current
   const {
     buildAvatarModel,
     handleAvatarProfileImageReady,
     resetProfileImageUpload,
   } = useAvatarWorkflow({
-    avatarModelUrl,
+    avatarModelUrl: visibleAvatarModelUrl,
     getActiveAgentId: getActiveAvatarAgentId,
     normalizeAssetUrl: avatarAssetUrl,
-    setAvatarModelUrl,
+    setAvatarModelUrl: setPersistentAvatarModelUrl,
   })
 
   useEffect(() => {
@@ -1058,6 +1106,7 @@ function TutorialApp() {
     startInterviewInFlightRef.current = false
     capturePipelineRef.current = null
     frontCaptureDataUrlRef.current = ''
+    lastAvatarModelUrlRef.current = ''
     personaAgentIdRef.current = ''
     personaCompletedRef.current = false
     nicknameValueRef.current = ''
@@ -1449,7 +1498,7 @@ function TutorialApp() {
             if (!avatarPayload?.modelUrl) {
               throw new Error('아바타 생성에 실패했습니다. 다시 촬영해 주세요.')
             }
-            setAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl))
+            setPersistentAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl))
             const latestNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
             if (latestNickname) {
               await renameAvatar({
@@ -1671,6 +1720,56 @@ function TutorialApp() {
     setAnalysisResult,
   ])
 
+  const handleAvatarPartClick = useCallback(async ({ role }) => {
+    const partRole = role === 'hair' || role === 'top' || role === 'bottom' || role === 'eye' ? role : ''
+    const activeAgentId = getActiveAvatarAgentId()
+    if (!partRole || !activeAgentId || !analysisResult || avatarColorApplyStatus === 'applying') {
+      return
+    }
+
+    const baseAppearance = applyAvatarColorsToAppearance(analysisResult, avatarColorInputs)
+    const nextAppearance = cycleAvatarAssetInAppearance(baseAppearance, partRole)
+    if (!nextAppearance) {
+      return
+    }
+
+    const requestId = avatarColorApplyRequestRef.current + 1
+    avatarColorApplyRequestRef.current = requestId
+    setAvatarColorApplyStatus('applying')
+    setAvatarColorApplyError('')
+
+    try {
+      const payload = await buildAvatarModel({
+        agentId: activeAgentId,
+        appearance: nextAppearance,
+      })
+      if (avatarColorApplyRequestRef.current !== requestId) {
+        return
+      }
+      if (!payload?.modelUrl) {
+        throw new Error('avatar build did not return modelUrl')
+      }
+      setAnalysisResult(nextAppearance)
+      setAvatarColorOverrides({})
+      setAvatarColorApplyStatus('ready')
+      resetProfileImageUpload()
+    } catch (error) {
+      if (avatarColorApplyRequestRef.current !== requestId) {
+        return
+      }
+      setAvatarColorApplyStatus('error')
+      setAvatarColorApplyError(error instanceof Error ? error.message : '에셋 변경에 실패했습니다.')
+    }
+  }, [
+    analysisResult,
+    avatarColorApplyStatus,
+    avatarColorInputs,
+    buildAvatarModel,
+    getActiveAvatarAgentId,
+    resetProfileImageUpload,
+    setAnalysisResult,
+  ])
+
   const handleWishGoalCustomInputChange = (event) => {
     setSelectedWishOptionIds([])
     setPersonaInput(event.target.value)
@@ -1838,7 +1937,7 @@ function TutorialApp() {
         nickname: targetNickname,
       }).catch(() => null)
       if (avatarPayload) {
-        setAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl) || avatarModelUrl)
+        setPersistentAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl) || visibleAvatarModelUrl)
       }
 
       setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(activeAgentId)}`)
@@ -1993,11 +2092,11 @@ function TutorialApp() {
         <div className="avatar-loading-status-layer">
           <p className="avatar-loading-status-text">AI 에이전트 생성중</p>
         </div>
-        {isAvatarPreloading && avatarModelUrl && (
+        {isAvatarPreloading && visibleAvatarModelUrl && (
           <div className="avatar-background-preloader" aria-hidden="true">
             <AvatarThreeViewer
               className="avatar-background-preloader-viewer"
-              src={avatarModelUrl}
+              src={visibleAvatarModelUrl}
               alt="avatar preload"
               variant="avatar"
               distanceMultiplier={1.82}
@@ -2016,7 +2115,7 @@ function TutorialApp() {
       <>
         <TutorialDesign
           initialId={9}
-          avatarUrl={avatarModelUrl}
+          avatarUrl={visibleAvatarModelUrl}
           avatarInitialYaw={0}
           externalName={nicknameValue}
           avatarColorEditorSlot={avatarColorEditorSlot}
@@ -2025,6 +2124,7 @@ function TutorialApp() {
           onAvatarRotationChange={handleAvatarPreviewRotationChange}
           onAvatarReady={null}
           onAvatarConfirm={handleApplyAvatarFinalColors}
+          onAvatarPartClick={handleAvatarPartClick}
           onAvatarProfileImageReady={handleAvatarProfileImageReady}
           onNameSubmit={(name) => handleNicknameClaim(name, null)}
           onStartQuestions={() => setStage('persona')}
@@ -2037,7 +2137,7 @@ function TutorialApp() {
     return (
         <TutorialDesign
         initialId={15}
-        avatarUrl={avatarModelUrl}
+        avatarUrl={visibleAvatarModelUrl}
         externalName={nicknameValue || nicknameInput.trim()}
         avatarColorOverrides={hasAvatarColorOverrides(avatarColorOverrides) ? avatarColorOverrides : null}
         keywords={personaKeywords}

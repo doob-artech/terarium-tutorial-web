@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const CAMERA_STAGES = new Set(['webcam', 'cameraDesignCapture'])
 const CAMERA_LOG_PREFIX = '[tutorial-camera]'
+const FRONT_CAMERA_PREF_NAMES = ['frontCamera', 'cameraFront', 'front']
+const REAR_CAMERA_PREF_NAMES = ['rearCamera', 'cameraRear', 'rear']
+const ALLOW_EMPTY_CAPTURE_FALLBACK =
+  import.meta.env.DEV ||
+  import.meta.env.VITE_RANDOM_AVATAR_ON_EMPTY_CAPTURE === 'true' ||
+  import.meta.env.VITE_BASIC_AVATAR_ON_EMPTY_CAPTURE === 'true'
 const PREFERRED_CAMERA_LABEL_PATTERN = /(orbbec|femto|bolt)/i
 const PREFERRED_COLOR_CAMERA_LABEL_PATTERN = /(color|colour|rgb|webcam|video)/i
 const NON_COLOR_CAMERA_LABEL_PATTERN = /(depth|ir|infrared|tof|stereo)/i
@@ -191,6 +197,10 @@ export function useCameraCapture({ stage, setCameraReady }) {
 
     const startCamera = async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (ALLOW_EMPTY_CAPTURE_FALLBACK) {
+          console.warn(CAMERA_LOG_PREFIX, 'camera API unavailable; continuing with empty capture fallback.')
+          setCameraReady(true)
+        }
         return
       }
 
@@ -286,7 +296,10 @@ export function useCameraCapture({ stage, setCameraReady }) {
         setCameraReady(true)
       } catch (error) {
         console.error(CAMERA_LOG_PREFIX, 'main camera failed:', error)
-        setCameraReady(false)
+        setCameraReady(ALLOW_EMPTY_CAPTURE_FALLBACK)
+        if (ALLOW_EMPTY_CAPTURE_FALLBACK) {
+          console.warn(CAMERA_LOG_PREFIX, 'continuing without a camera; empty capture will use local test fallback.')
+        }
       }
     }
 

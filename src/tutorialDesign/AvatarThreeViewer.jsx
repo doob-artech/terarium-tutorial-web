@@ -49,7 +49,61 @@ const getEditableColorRole = (mesh) => {
   return '';
 };
 
+const getClickableAvatarPartRole = (mesh) => {
+  const name = `${mesh?.name || ''} ${mesh?.parent?.name || ''}`.toLowerCase();
+  const colorRole = getEditableColorRole(mesh);
+  if (colorRole) return colorRole;
+  if (/eye|iris|pupil|lash|face/.test(name)) return 'eye';
+  return '';
+};
+
+const getSpatialAvatarPartRole = (localPoint, bounds, meshRole = '') => {
+  if (!localPoint || !bounds || bounds.isEmpty()) return meshRole;
+  const size = bounds.getSize(new THREE.Vector3());
+  if (!size.y) return meshRole;
+
+  const x = size.x ? (localPoint.x - bounds.min.x) / size.x : 0.5;
+  const y = (localPoint.y - bounds.min.y) / size.y;
+  const centerDistance = Math.abs(x - 0.5);
+
+  if (y >= 0.62) {
+    if (centerDistance < 0.25 && y < 0.88) return 'eye';
+    return 'hair';
+  }
+  if (y >= 0.34) return 'top';
+  return 'bottom';
+};
+
 const getMaterials = (material) => (Array.isArray(material) ? material : [material]).filter(Boolean);
+
+const setObjectHover = (object, isHovered) => {
+  if (!object?.material) return;
+  for (const material of getMaterials(object.material)) {
+    if (!material) continue;
+    if (material.userData.hoverOriginalEmissiveIntensity === undefined) {
+      material.userData.hoverOriginalEmissiveIntensity = material.emissiveIntensity ?? 0;
+    }
+    if (material.userData.hoverOriginalColor === undefined && material.color) {
+      material.userData.hoverOriginalColor = `#${material.color.getHexString()}`;
+    }
+    if (isHovered) {
+      if (material.emissiveIntensity !== undefined) {
+        material.emissiveIntensity = Math.max(material.userData.hoverOriginalEmissiveIntensity, 0.18);
+      }
+      if (material.color && material.userData.hoverOriginalColor) {
+        material.color.set(material.userData.hoverOriginalColor).offsetHSL(0, 0, 0.08);
+      }
+    } else {
+      if (material.emissiveIntensity !== undefined) {
+        material.emissiveIntensity = material.userData.hoverOriginalEmissiveIntensity;
+      }
+      if (material.color && material.userData.hoverOriginalColor) {
+        material.color.set(material.userData.hoverOriginalColor);
+      }
+    }
+    material.needsUpdate = true;
+  }
+};
 
 const applyColorOverrides = (modelRoot, colorOverrides) => {
   if (!modelRoot) return;
@@ -300,12 +354,14 @@ const AvatarThreeViewer = ({
   colorOverrides = null,
   onRotationChange = null,
   onReady = null,
+  onPartClick = null,
 }) => {
   const mountRef = useRef(null);
   const modelRootRef = useRef(null);
   const colorOverridesRef = useRef(colorOverrides);
   const initialYawRef = useRef(initialYaw);
   const onReadyRef = useRef(onReady);
+  const onPartClickRef = useRef(onPartClick);
   const onRotationChangeRef = useRef(onRotationChange);
   const [loadState, setLoadState] = useState(src ? 'loading' : 'empty');
 
@@ -316,6 +372,10 @@ const AvatarThreeViewer = ({
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
+
+  useEffect(() => {
+    onPartClickRef.current = onPartClick;
+  }, [onPartClick]);
 
   useEffect(() => {
     onRotationChangeRef.current = onRotationChange;
@@ -343,6 +403,9 @@ const AvatarThreeViewer = ({
       pointerId: null,
       lastX: 0,
       lastY: 0,
+      downX: 0,
+      downY: 0,
+      downPartRole: '',
       lastInteractionAt: 0,
       velocityX: 0,
       velocityY: 0,
@@ -354,6 +417,11 @@ const AvatarThreeViewer = ({
     let camera;
     let renderer;
     let resizeObserver;
+    let avatarModelBounds = null;
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const clickableObjects = [];
+    let hoveredObject = null;
 
     try {
       scene = new THREE.Scene();
@@ -384,12 +452,52 @@ const AvatarThreeViewer = ({
     renderer.domElement.style.cursor = isDragDisabledVariant(variant) ? 'default' : 'grab';
     mount.appendChild(renderer.domElement);
 
+    const getClickableHit = (event) => {
+      if (!clickableObjects.length) return null;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+      pointer.y = -(((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 - 1);
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster.intersectObjects(clickableObjects, true)[0] || null;
+    };
+
+    const getHitRole = (object, hitPoint = null) => {
+      const material = Array.isArray(object?.material) ? object.material[0] : object?.material;
+      const meshRole = material?.userData?.clickableAvatarPartRole || object?.userData?.clickableAvatarPartRole || '';
+      if (!hitPoint || !modelRoot || !avatarModelBounds) return meshRole;
+
+      const localPoint = modelRoot.worldToLocal(hitPoint.clone());
+      const spatialRole = getSpatialAvatarPartRole(localPoint, avatarModelBounds, meshRole);
+      if (spatialRole) return spatialRole;
+      return meshRole;
+    };
+
+    const updateHoverFromEvent = (event) => {
+      if (rotationState.isDragging || !onPartClickRef.current) return;
+      const hitObject = getClickableHit(event)?.object || null;
+      if (hoveredObject === hitObject) return;
+      setObjectHover(hoveredObject, false);
+      hoveredObject = hitObject;
+      setObjectHover(hoveredObject, true);
+      renderer.domElement.style.cursor = hoveredObject ? 'pointer' : isDragDisabledVariant(variant) ? 'default' : 'grab';
+    };
+
+    const clearHover = () => {
+      setObjectHover(hoveredObject, false);
+      hoveredObject = null;
+      renderer.domElement.style.cursor = isDragDisabledVariant(variant) ? 'default' : 'grab';
+    };
+
     const handlePointerDown = (event) => {
       if (isDragDisabledVariant(variant)) return;
+      const hit = getClickableHit(event);
       rotationState.isDragging = true;
       rotationState.pointerId = event.pointerId;
       rotationState.lastX = event.clientX;
       rotationState.lastY = event.clientY;
+      rotationState.downX = event.clientX;
+      rotationState.downY = event.clientY;
+      rotationState.downPartRole = getHitRole(hit?.object, hit?.point);
       rotationState.velocityX = 0;
       rotationState.velocityY = 0;
       rotationState.lastInteractionAt = performance.now();
@@ -398,7 +506,10 @@ const AvatarThreeViewer = ({
     };
 
     const handlePointerMove = (event) => {
-      if (!rotationState.isDragging || rotationState.pointerId !== event.pointerId) return;
+      if (!rotationState.isDragging || rotationState.pointerId !== event.pointerId) {
+        updateHoverFromEvent(event);
+        return;
+      }
       const dx = event.clientX - rotationState.lastX;
       const dy = event.clientY - rotationState.lastY;
       rotationState.lastX = event.clientX;
@@ -412,17 +523,32 @@ const AvatarThreeViewer = ({
 
     const endDrag = (event) => {
       if (rotationState.pointerId !== event.pointerId) return;
+      const clickDistance = Math.hypot(event.clientX - rotationState.downX, event.clientY - rotationState.downY);
       rotationState.isDragging = false;
       rotationState.pointerId = null;
       rotationState.lastInteractionAt = performance.now();
       renderer.domElement.style.cursor = isDragDisabledVariant(variant) ? 'default' : 'grab';
       renderer.domElement.releasePointerCapture?.(event.pointerId);
+      if (clickDistance <= 3 && modelRoot && onPartClickRef.current) {
+        const hit = getClickableHit(event);
+        const object = hit?.object;
+        const role = getHitRole(object, hit?.point);
+        if (role && role === rotationState.downPartRole) {
+          onPartClickRef.current({
+            role,
+            meshName: object?.name || '',
+          });
+        }
+      }
+      rotationState.downPartRole = '';
+      updateHoverFromEvent(event);
     };
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointermove', handlePointerMove);
     renderer.domElement.addEventListener('pointerup', endDrag);
     renderer.domElement.addEventListener('pointercancel', endDrag);
+    renderer.domElement.addEventListener('pointerleave', clearHover);
 
     const ambientLight = new THREE.HemisphereLight(
       0xffffff,
@@ -495,7 +621,10 @@ const AvatarThreeViewer = ({
           if (!child.isMesh) return;
           const renderRole = getRenderRole(child);
           const editableColorRole = getEditableColorRole(child);
+          const clickableAvatarPartRole = getClickableAvatarPartRole(child);
           child.userData.editableColorRole = editableColorRole;
+          child.userData.clickableAvatarPartRole = clickableAvatarPartRole;
+          clickableObjects.push(child);
           try {
             child.geometry = smoothGeometryNormals(child.geometry, renderRole);
           } catch (error) {
@@ -508,6 +637,7 @@ const AvatarThreeViewer = ({
           const nextMaterials = materials.map((material) => {
             const nextMaterial = makeSoftToonMaterial(material, { role: renderRole, variant });
             nextMaterial.userData.editableColorRole = editableColorRole;
+            nextMaterial.userData.clickableAvatarPartRole = clickableAvatarPartRole;
             nextMaterial.userData.editableOriginalColor = `#${nextMaterial.color.getHexString()}`;
             nextMaterial.userData.editableOriginalMap = nextMaterial.map || null;
             return nextMaterial;
@@ -547,6 +677,7 @@ const AvatarThreeViewer = ({
           modelRoot.add(outline);
         }
         modelRoot.add(model);
+        avatarModelBounds = new THREE.Box3().setFromObject(model);
         if (variant !== 'staticFront') {
           modelRoot.add(createSoftShadowPlane(model));
         }
@@ -629,6 +760,9 @@ const AvatarThreeViewer = ({
       disposed = true;
       window.cancelAnimationFrame(frameId);
       resizeObserver?.disconnect();
+      setObjectHover(hoveredObject, false);
+      hoveredObject = null;
+      clickableObjects.length = 0;
       if (modelRoot) {
         disposeObject(modelRoot);
       }
@@ -637,6 +771,7 @@ const AvatarThreeViewer = ({
       renderer?.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer?.domElement.removeEventListener('pointerup', endDrag);
       renderer?.domElement.removeEventListener('pointercancel', endDrag);
+      renderer?.domElement.removeEventListener('pointerleave', clearHover);
       renderer?.dispose();
       renderer?.domElement.remove();
     };
