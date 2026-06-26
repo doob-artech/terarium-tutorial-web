@@ -179,7 +179,7 @@ const buildWishGoalSentence = (optionIds) => {
     .map((optionId) => WISH_GOAL_OPTIONS.find((option) => option.id === optionId)?.label)
     .filter(Boolean)
 
-  return selectedLabels.length ? `나는 이곳에서 ${selectedLabels.join(', ')} 싶다` : ''
+  return selectedLabels.length ? `나는 이곳에서 ${selectedLabels.join(', ')} 싶어` : ''
 }
 let countdownFontPreloadPromise = null
 
@@ -1843,7 +1843,7 @@ function TutorialApp() {
 
   const displayQuestion = PERSONA_KEYWORD_QUESTIONS[personaKeywordStep] || PERSONA_KEYWORD_QUESTIONS[0]
   const personaQuestionText = displayQuestion?.category === 'wish'
-    ? '나는 이곳에서 ______ 싶다. (최대 2개 선택)'
+    ? '나는 이곳에서 ~~~ 싶어. (최대 2개 선택)'
     : (displayQuestion?.question ?? '')
   const personaTotalTurns = Number(displayQuestion?.total_turns || displayQuestion?.totalTurns || PERSONA_TOTAL_TURNS) || PERSONA_TOTAL_TURNS
   const personaCurrentTurn = Number(displayQuestion?.turn || 0) || 0
@@ -1887,7 +1887,7 @@ function TutorialApp() {
   const customWishPreview = personaInput
     .trim()
     .replace(/^나는\s*이곳에서\s*/, '')
-    .replace(/\s*싶다$/, '')
+    .replace(/\s*싶어$/, '')
   const wishBlankText = selectedWishLabels.length ? selectedWishLabels.join(', ') : customWishPreview
   const hasAllKeywordGroups = selectedKeywordGroups.positive.length > 0
     && selectedKeywordGroups.negative.length > 0
@@ -2170,7 +2170,7 @@ function TutorialApp() {
               ''
             ) : isWishQuestion ? (
               <>
-                <span>나는 이곳에서 ______ 싶다.</span>
+                <span>나는 이곳에서 ~~~ 싶어.</span>
                 <span className="persona-question-guide">(최대 2개 선택)</span>
               </>
             ) : (
@@ -2270,7 +2270,7 @@ function TutorialApp() {
                         <span className={`persona-wish-blank${wishBlankText ? ' is-filled' : ''}`}>
                           {wishBlankText}
                         </span>
-                        <span className="persona-wish-suffix">싶다</span>
+                        <span className="persona-wish-suffix">싶어</span>
                       </div>
                       <div className="persona-wish-options" aria-label="테라리움 목표 선택">
                         {WISH_GOAL_OPTIONS.map((option, index) => {
