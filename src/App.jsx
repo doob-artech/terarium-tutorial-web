@@ -25,11 +25,9 @@ const COUNTDOWN_FONT_FAMILY = 'ChangwonDangamAsac'
 const AvatarThreeViewer = lazy(() => import('./tutorialDesign/AvatarThreeViewer.jsx'))
 const TEST_MODE_SKIP_CAPTURE_ANALYSIS = import.meta.env.VITE_SKIP_CAPTURE_ANALYSIS === 'true'
 const TEST_MODE_RANDOM_AVATAR_ON_EMPTY_CAPTURE =
-  import.meta.env.DEV ||
-  import.meta.env.VITE_RANDOM_AVATAR_ON_EMPTY_CAPTURE === 'true' ||
-  import.meta.env.VITE_BASIC_AVATAR_ON_EMPTY_CAPTURE === 'true'
+  import.meta.env.VITE_RANDOM_AVATAR_ON_EMPTY_CAPTURE === 'true'
 const TEST_MODE_RELAXED_NICKNAME = import.meta.env.DEV || import.meta.env.VITE_ALLOW_DUPLICATE_NICKNAME === 'true'
-const TEST_MODE_RANDOM_AGENT_SHORTCUT = import.meta.env.DEV || import.meta.env.VITE_ENABLE_RANDOM_AGENT_SHORTCUT === 'true'
+const TEST_MODE_RANDOM_AGENT_SHORTCUT = import.meta.env.VITE_ENABLE_RANDOM_AGENT_SHORTCUT === 'true'
 const PERSONA_TOTAL_TURNS = 4
 const CLICK_SOUND_FALLBACK_MS = 320
 const CLICK_SOUND_TAIL_GAP_MS = 40
@@ -527,17 +525,20 @@ const AVATAR_CLICK_ASSET_CONFIG = {
   },
 }
 
-const cycleAvatarAssetInAppearance = (appearance, partRole) => {
+const AVATAR_HAIR_ASSET_OPTIONS = DEBUG_AVATAR_OPTIONS.hair.map(([value, label]) => ({
+  value: debugAssetToSemantic.hair_mesh[value] || value,
+  label,
+}))
+
+const setAvatarAssetInAppearance = (appearance, partRole, assetValue) => {
   const config = AVATAR_CLICK_ASSET_CONFIG[partRole]
-  if (!config?.field || !config.options.length) {
+  const nextValue = String(assetValue || '').trim()
+  if (!config?.field || !config.options.includes(nextValue)) {
     return null
   }
 
   const nextAppearance = normalizeAvatarAppearanceForBuild(appearance)
-  const currentValue = nextAppearance.asset_tags[config.field]
-  const currentIndex = config.options.findIndex((value) => value === currentValue)
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % config.options.length : 0
-  nextAppearance.asset_tags[config.field] = config.options[nextIndex]
+  nextAppearance.asset_tags[config.field] = nextValue
   if (partRole === 'top' || partRole === 'bottom') {
     nextAppearance.asset_tags.outfit_mesh = 'none'
   }
@@ -645,7 +646,7 @@ function App() {
   if (isProfileCaptureRoute) {
     return <AvatarProfileCapturePage />
   }
-  if (window.location.pathname === '/random-agent') {
+  if (window.location.pathname === '/random-agent' && TEST_MODE_RANDOM_AGENT_SHORTCUT) {
     return <RandomAgentPage />
   }
 
@@ -1030,10 +1031,12 @@ function TutorialApp() {
   const frontCaptureDataUrlRef = useRef('')
   const avatarColorApplyRequestRef = useRef(0)
   const avatarColorEditorDragRef = useRef(null)
+  const avatarHairMenuHideTimerRef = useRef(null)
   const [rearCapturePromptVisible, setRearCapturePromptVisible] = useState(false)
   const [avatarColorInputs, setAvatarColorInputs] = useState(AVATAR_EDIT_COLOR_FALLBACKS)
   const [avatarColorOverrides, setAvatarColorOverrides] = useState({})
   const [avatarColorEditorPosition, setAvatarColorEditorPosition] = useState(null)
+  const [avatarHairMenu, setAvatarHairMenu] = useState({ visible: false, left: 0, top: 0 })
   const [avatarColorApplyStatus, setAvatarColorApplyStatus] = useState('idle')
   const [avatarColorApplyError, setAvatarColorApplyError] = useState('')
   const {
@@ -1116,6 +1119,7 @@ function TutorialApp() {
     setAvatarColorInputs(AVATAR_EDIT_COLOR_FALLBACKS)
     setAvatarColorOverrides({})
     setAvatarColorEditorPosition(null)
+    setAvatarHairMenu({ visible: false, left: 0, top: 0 })
     setAvatarColorApplyStatus('idle')
     setAvatarColorApplyError('')
     resetProfileImageUpload()
@@ -1176,6 +1180,109 @@ function TutorialApp() {
     }
   }, [])
 
+  const clearAvatarHairMenuHideTimer = useCallback(() => {
+    if (!avatarHairMenuHideTimerRef.current) return
+    window.clearTimeout(avatarHairMenuHideTimerRef.current)
+    avatarHairMenuHideTimerRef.current = null
+  }, [])
+
+  const hideAvatarHairMenu = useCallback((delay = 0) => {
+    clearAvatarHairMenuHideTimer()
+    if (delay > 0) {
+      avatarHairMenuHideTimerRef.current = window.setTimeout(() => {
+        setAvatarHairMenu((prev) => ({ ...prev, visible: false }))
+        avatarHairMenuHideTimerRef.current = null
+      }, delay)
+      return
+    }
+
+    setAvatarHairMenu((prev) => ({ ...prev, visible: false }))
+  }, [clearAvatarHairMenuHideTimer])
+
+  const handleAvatarPartHover = useCallback((hit) => {
+    const activeAgentId = getActiveAvatarAgentId()
+    if (
+      hit?.role !== 'hair' ||
+      !activeAgentId ||
+      !analysisResult ||
+      avatarColorApplyStatus === 'applying'
+    ) {
+      hideAvatarHairMenu(180)
+      return
+    }
+
+    clearAvatarHairMenuHideTimer()
+    const menuWidth = 276
+    const menuHeight = 390
+    setAvatarHairMenu({
+      visible: true,
+      left: Math.min(Math.max(8, hit.clientX + 18), Math.max(8, window.innerWidth - menuWidth - 8)),
+      top: Math.min(Math.max(8, hit.clientY + 14), Math.max(8, window.innerHeight - menuHeight - 8)),
+    })
+  }, [
+    analysisResult,
+    avatarColorApplyStatus,
+    clearAvatarHairMenuHideTimer,
+    getActiveAvatarAgentId,
+    hideAvatarHairMenu,
+  ])
+
+  const currentAvatarHairMesh = analysisResult
+    ? normalizeAvatarAppearanceForBuild(analysisResult).asset_tags.hair_mesh
+    : ''
+
+  const handleAvatarHairOptionClick = useCallback(async (hairMesh) => {
+    const nextHairMesh = String(hairMesh || '').trim()
+    const activeAgentId = getActiveAvatarAgentId()
+    if (!nextHairMesh || !activeAgentId || !analysisResult || avatarColorApplyStatus === 'applying') {
+      return
+    }
+
+    const baseAppearance = applyAvatarColorsToAppearance(analysisResult, avatarColorInputs)
+    const nextAppearance = setAvatarAssetInAppearance(baseAppearance, 'hair', nextHairMesh)
+    if (!nextAppearance) {
+      return
+    }
+
+    hideAvatarHairMenu()
+    const requestId = avatarColorApplyRequestRef.current + 1
+    avatarColorApplyRequestRef.current = requestId
+    setAvatarColorApplyStatus('applying')
+    setAvatarColorApplyError('')
+
+    try {
+      const payload = await buildAvatarModel({
+        agentId: activeAgentId,
+        appearance: nextAppearance,
+      })
+      if (avatarColorApplyRequestRef.current !== requestId) {
+        return
+      }
+      if (!payload?.modelUrl) {
+        throw new Error('avatar build did not return modelUrl')
+      }
+      setAnalysisResult(nextAppearance)
+      setAvatarColorOverrides({})
+      setAvatarColorApplyStatus('ready')
+      resetProfileImageUpload()
+    } catch (error) {
+      if (avatarColorApplyRequestRef.current !== requestId) {
+        return
+      }
+      setAvatarColorApplyStatus('error')
+      setAvatarColorApplyError(error instanceof Error ? error.message : '머리 변경에 실패했습니다.')
+    }
+  }, [
+    analysisResult,
+    avatarColorApplyStatus,
+    avatarColorInputs,
+    buildAvatarModel,
+    getActiveAvatarAgentId,
+    hideAvatarHairMenu,
+    resetProfileImageUpload,
+    setAnalysisResult,
+  ])
+
   const avatarColorEditorSlot = (
     <section
       className="avatar-color-editor"
@@ -1214,6 +1321,38 @@ function TutorialApp() {
       ) : null}
     </section>
   )
+
+  const avatarHairMenuSlot = avatarHairMenu.visible ? (
+    <section
+      className="avatar-hair-menu"
+      style={{
+        left: `${avatarHairMenu.left}px`,
+        top: `${avatarHairMenu.top}px`,
+      }}
+      aria-label="머리 스타일 선택"
+      onPointerEnter={clearAvatarHairMenuHideTimer}
+      onPointerLeave={() => hideAvatarHairMenu(160)}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="avatar-hair-menu-title">머리 스타일</div>
+      <div className="avatar-hair-menu-list">
+        {AVATAR_HAIR_ASSET_OPTIONS.map((option) => {
+          const isSelected = option.value === currentAvatarHairMesh
+          return (
+            <button
+              type="button"
+              key={option.value}
+              className={`avatar-hair-menu-option${isSelected ? ' is-selected' : ''}`}
+              disabled={avatarColorApplyStatus === 'applying'}
+              onClick={() => handleAvatarHairOptionClick(option.value)}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  ) : null
 
   const handleAvatarPreviewRotationChange = useCallback((rotation) => {
     avatarPreviewRotationRef.current = {
@@ -1345,10 +1484,11 @@ function TutorialApp() {
   useEffect(() => {
     return () => {
       clearTimers()
+      clearAvatarHairMenuHideTimer()
       abandonActivePersonaSession()
       stopCamera()
     }
-  }, [abandonActivePersonaSession, stopCamera])
+  }, [abandonActivePersonaSession, clearAvatarHairMenuHideTimer, stopCamera])
 
   useEffect(() => {
     const handlePageExit = () => {
@@ -1720,56 +1860,6 @@ function TutorialApp() {
     setAnalysisResult,
   ])
 
-  const handleAvatarPartClick = useCallback(async ({ role }) => {
-    const partRole = role === 'hair' || role === 'top' || role === 'bottom' || role === 'eye' ? role : ''
-    const activeAgentId = getActiveAvatarAgentId()
-    if (!partRole || !activeAgentId || !analysisResult || avatarColorApplyStatus === 'applying') {
-      return
-    }
-
-    const baseAppearance = applyAvatarColorsToAppearance(analysisResult, avatarColorInputs)
-    const nextAppearance = cycleAvatarAssetInAppearance(baseAppearance, partRole)
-    if (!nextAppearance) {
-      return
-    }
-
-    const requestId = avatarColorApplyRequestRef.current + 1
-    avatarColorApplyRequestRef.current = requestId
-    setAvatarColorApplyStatus('applying')
-    setAvatarColorApplyError('')
-
-    try {
-      const payload = await buildAvatarModel({
-        agentId: activeAgentId,
-        appearance: nextAppearance,
-      })
-      if (avatarColorApplyRequestRef.current !== requestId) {
-        return
-      }
-      if (!payload?.modelUrl) {
-        throw new Error('avatar build did not return modelUrl')
-      }
-      setAnalysisResult(nextAppearance)
-      setAvatarColorOverrides({})
-      setAvatarColorApplyStatus('ready')
-      resetProfileImageUpload()
-    } catch (error) {
-      if (avatarColorApplyRequestRef.current !== requestId) {
-        return
-      }
-      setAvatarColorApplyStatus('error')
-      setAvatarColorApplyError(error instanceof Error ? error.message : '에셋 변경에 실패했습니다.')
-    }
-  }, [
-    analysisResult,
-    avatarColorApplyStatus,
-    avatarColorInputs,
-    buildAvatarModel,
-    getActiveAvatarAgentId,
-    resetProfileImageUpload,
-    setAnalysisResult,
-  ])
-
   const handleWishGoalCustomInputChange = (event) => {
     setSelectedWishOptionIds([])
     setPersonaInput(event.target.value)
@@ -2124,11 +2214,13 @@ function TutorialApp() {
           onAvatarRotationChange={handleAvatarPreviewRotationChange}
           onAvatarReady={null}
           onAvatarConfirm={handleApplyAvatarFinalColors}
-          onAvatarPartClick={handleAvatarPartClick}
+          onAvatarPartClick={null}
+          onAvatarPartHover={handleAvatarPartHover}
           onAvatarProfileImageReady={handleAvatarProfileImageReady}
           onNameSubmit={(name) => handleNicknameClaim(name, null)}
           onStartQuestions={() => setStage('persona')}
         />
+        {avatarHairMenuSlot}
       </>
     )
   }

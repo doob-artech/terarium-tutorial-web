@@ -355,6 +355,7 @@ const AvatarThreeViewer = ({
   onRotationChange = null,
   onReady = null,
   onPartClick = null,
+  onPartHover = null,
 }) => {
   const mountRef = useRef(null);
   const modelRootRef = useRef(null);
@@ -362,6 +363,7 @@ const AvatarThreeViewer = ({
   const initialYawRef = useRef(initialYaw);
   const onReadyRef = useRef(onReady);
   const onPartClickRef = useRef(onPartClick);
+  const onPartHoverRef = useRef(onPartHover);
   const onRotationChangeRef = useRef(onRotationChange);
   const [loadState, setLoadState] = useState(src ? 'loading' : 'empty');
 
@@ -376,6 +378,10 @@ const AvatarThreeViewer = ({
   useEffect(() => {
     onPartClickRef.current = onPartClick;
   }, [onPartClick]);
+
+  useEffect(() => {
+    onPartHoverRef.current = onPartHover;
+  }, [onPartHover]);
 
   useEffect(() => {
     onRotationChangeRef.current = onRotationChange;
@@ -465,6 +471,7 @@ const AvatarThreeViewer = ({
       const material = Array.isArray(object?.material) ? object.material[0] : object?.material;
       const meshRole = material?.userData?.clickableAvatarPartRole || object?.userData?.clickableAvatarPartRole || '';
       if (!hitPoint || !modelRoot || !avatarModelBounds) return meshRole;
+      if (meshRole === 'hair') return 'hair';
 
       const localPoint = modelRoot.worldToLocal(hitPoint.clone());
       const spatialRole = getSpatialAvatarPartRole(localPoint, avatarModelBounds, meshRole);
@@ -473,8 +480,20 @@ const AvatarThreeViewer = ({
     };
 
     const updateHoverFromEvent = (event) => {
-      if (rotationState.isDragging || !onPartClickRef.current) return;
-      const hitObject = getClickableHit(event)?.object || null;
+      if (rotationState.isDragging || (!onPartClickRef.current && !onPartHoverRef.current)) return;
+      const hit = getClickableHit(event);
+      const hitObject = hit?.object || null;
+      const role = getHitRole(hitObject, hit?.point);
+      onPartHoverRef.current?.(
+        role
+          ? {
+              role,
+              meshName: hitObject?.name || '',
+              clientX: event.clientX,
+              clientY: event.clientY,
+            }
+          : null,
+      );
       if (hoveredObject === hitObject) return;
       setObjectHover(hoveredObject, false);
       hoveredObject = hitObject;
@@ -485,6 +504,7 @@ const AvatarThreeViewer = ({
     const clearHover = () => {
       setObjectHover(hoveredObject, false);
       hoveredObject = null;
+      onPartHoverRef.current?.(null);
       renderer.domElement.style.cursor = isDragDisabledVariant(variant) ? 'default' : 'grab';
     };
 

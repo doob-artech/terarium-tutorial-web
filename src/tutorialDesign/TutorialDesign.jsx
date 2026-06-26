@@ -68,6 +68,69 @@ const STEP_BACKGROUND_VIDEOS = {
   6: { src: picnicVideo, loop: true },
 };
 
+const preloadImageAsset = (src) => {
+  if (typeof document === 'undefined' || !src) {
+    return Promise.resolve();
+  }
+
+  const selector = `link[data-terarium-preload-image="${src}"]`;
+  if (!document.querySelector(selector)) {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = src;
+    link.dataset.terariumPreloadImage = src;
+    document.head.appendChild(link);
+  }
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = resolve;
+    image.onerror = resolve;
+    image.src = src;
+  });
+};
+
+const preloadCharacterPresets = (keys) => {
+  const sources = [...new Set(keys.map((key) => CHARACTER_PRESETS[key]?.src).filter(Boolean))];
+  return Promise.all(sources.map(preloadImageAsset)).then(() => undefined);
+};
+
+const getNearbyCharacterKeys = (currentId) => {
+  const keys = [
+    STEP_SCENE_CHARACTERS[currentId],
+    STEP_SPECIAL_CHARACTERS[currentId],
+    STEP_SCENE_CHARACTERS[currentId + 1],
+    STEP_SPECIAL_CHARACTERS[currentId + 1],
+  ];
+
+  if (currentId <= 1) {
+    keys.push('scene1', 'scene1OnlyHi', 'scene2');
+  }
+  if (currentId >= 7 && currentId <= 9) {
+    keys.push('scene8', 'scene9', 'scene9One', 'avatar');
+  }
+  if (currentId >= 10 && currentId <= 12) {
+    keys.push('avatarSmall', 'avatarResult', 'scene9', 'defaultStand');
+  }
+  if (currentId >= 14) {
+    keys.push('scene14', 'scene15', 'avatarResult');
+  }
+
+  return keys;
+};
+
+const handleCharacterImageError = (event) => {
+  const fallbackSrc = CHARACTER_PRESETS.bubbleGuide?.src || CHARACTER_PRESETS.scene1OnlyHi?.src;
+  if (fallbackSrc && event.currentTarget.dataset.fallbackApplied !== 'true') {
+    event.currentTarget.dataset.fallbackApplied = 'true';
+    event.currentTarget.src = fallbackSrc;
+    return;
+  }
+  event.currentTarget.style.visibility = 'hidden';
+};
+
 let typingAudioPool = [];
 let typingAudioPoolIndex = 0;
 let clickAudioPool = [];
@@ -331,6 +394,7 @@ const TutorialDesign = ({
   onAvatarReady,
   onAvatarConfirm,
   onAvatarPartClick,
+  onAvatarPartHover,
   onAvatarProfileImageReady,
   onStartQuestions,
   onFinish,
@@ -426,6 +490,10 @@ const TutorialDesign = ({
   useEffect(() => {
     setCurrentId(initialId);
   }, [initialId]);
+
+  useEffect(() => {
+    void preloadCharacterPresets(getNearbyCharacterKeys(currentId));
+  }, [currentId]);
 
   useEffect(() => {
     if (externalName) {
@@ -723,6 +791,7 @@ const TutorialDesign = ({
                       onRotationChange={currentId === 9 ? onAvatarRotationChange : null}
                       onReady={currentId === 9 ? onAvatarReady : currentId === 11 ? onAvatarProfileImageReady : null}
                       onPartClick={currentId === 9 ? onAvatarPartClick : null}
+                      onPartHover={currentId === 9 ? onAvatarPartHover : null}
                     />
                   </Suspense>
                 ) : (
@@ -733,7 +802,10 @@ const TutorialDesign = ({
                       currentId === 1 ? 'scene-one-img' : ''
                     }`}
                     style={character.style}
-                    decoding="async"
+                    decoding="auto"
+                    loading="eager"
+                    fetchPriority="high"
+                    onError={handleCharacterImageError}
                   />
                 )}
               </div>
@@ -750,7 +822,10 @@ const TutorialDesign = ({
                   alt={supplementalCharacter.alt || 'character'}
                   className="character-img"
                   style={supplementalCharacter.style}
-                  decoding="async"
+                  decoding="auto"
+                  loading="eager"
+                  fetchPriority="high"
+                  onError={handleCharacterImageError}
                 />
               </div>
             )}

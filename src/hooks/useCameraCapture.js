@@ -5,9 +5,7 @@ const CAMERA_LOG_PREFIX = '[tutorial-camera]'
 const FRONT_CAMERA_PREF_NAMES = ['frontCamera', 'cameraFront', 'front']
 const REAR_CAMERA_PREF_NAMES = ['rearCamera', 'cameraRear', 'rear']
 const ALLOW_EMPTY_CAPTURE_FALLBACK =
-  import.meta.env.DEV ||
-  import.meta.env.VITE_RANDOM_AVATAR_ON_EMPTY_CAPTURE === 'true' ||
-  import.meta.env.VITE_BASIC_AVATAR_ON_EMPTY_CAPTURE === 'true'
+  import.meta.env.VITE_RANDOM_AVATAR_ON_EMPTY_CAPTURE === 'true'
 const PREFERRED_CAMERA_LABEL_PATTERN = /(orbbec|femto|bolt)/i
 const PREFERRED_COLOR_CAMERA_LABEL_PATTERN = /(color|colour|rgb|webcam|video)/i
 const NON_COLOR_CAMERA_LABEL_PATTERN = /(depth|ir|infrared|tof|stereo)/i
