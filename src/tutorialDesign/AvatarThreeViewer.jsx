@@ -57,6 +57,13 @@ const getClickableAvatarPartRole = (mesh) => {
   return '';
 };
 
+const AVATAR_PART_LABELS = {
+  hair: '머리',
+  eye: '눈',
+  top: '상의',
+  bottom: '하의',
+};
+
 const getSpatialAvatarPartRole = (localPoint, bounds, meshRole = '') => {
   if (!localPoint || !bounds || bounds.isEmpty()) return meshRole;
   const size = bounds.getSize(new THREE.Vector3());
@@ -102,6 +109,36 @@ const setObjectHover = (object, isHovered) => {
       }
     }
     material.needsUpdate = true;
+  }
+};
+
+const setObjectsHover = (objects, isHovered) => {
+  for (const object of objects || []) {
+    setObjectHover(object, isHovered);
+  }
+};
+
+const addHoverObject = (hoverObjectsByRole, role, object) => {
+  if (!role || !object) return;
+  const objects = hoverObjectsByRole.get(role);
+  if (objects && !objects.includes(object)) {
+    objects.push(object);
+  }
+};
+
+const registerHoverObject = (hoverObjectsByRole, mesh, renderRole, clickableRole) => {
+  const name = `${mesh?.name || ''} ${mesh?.parent?.name || ''}`.toLowerCase();
+  if (renderRole === 'hair' || clickableRole === 'hair') {
+    addHoverObject(hoverObjectsByRole, 'hair', mesh);
+  }
+  if (clickableRole === 'top' || /shirt|tshirt|top|jacket|hoodie|sleeve|onepiece|dress/.test(name)) {
+    addHoverObject(hoverObjectsByRole, 'top', mesh);
+  }
+  if (clickableRole === 'bottom' || /pants|skirt|bottom/.test(name)) {
+    addHoverObject(hoverObjectsByRole, 'bottom', mesh);
+  }
+  if (clickableRole === 'eye' || /eye|iris|pupil|lash/.test(name)) {
+    addHoverObject(hoverObjectsByRole, 'eye', mesh);
   }
 };
 
@@ -427,7 +464,18 @@ const AvatarThreeViewer = ({
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const clickableObjects = [];
-    let hoveredObject = null;
+    const hoverObjectsByRole = new Map([
+      ['hair', []],
+      ['eye', []],
+      ['top', []],
+      ['bottom', []],
+    ]);
+    let hoverBadge = null;
+    const activeHover = {
+      role: '',
+      objects: [],
+      locked: false,
+    };
 
     try {
       scene = new THREE.Scene();
@@ -457,6 +505,28 @@ const AvatarThreeViewer = ({
     renderer.domElement.style.touchAction = 'none';
     renderer.domElement.style.cursor = isDragDisabledVariant(variant) ? 'default' : 'grab';
     mount.appendChild(renderer.domElement);
+    hoverBadge = document.createElement('div');
+    hoverBadge.className = 'avatar-part-hover-badge';
+    Object.assign(hoverBadge.style, {
+      position: 'absolute',
+      zIndex: '4',
+      minWidth: '46px',
+      padding: '7px 10px',
+      borderRadius: '999px',
+      background: 'rgba(20, 27, 36, 0.82)',
+      color: '#fff',
+      fontSize: '13px',
+      fontWeight: '900',
+      lineHeight: '1',
+      textAlign: 'center',
+      boxShadow: '0 8px 20px rgba(15, 23, 35, 0.22)',
+      pointerEvents: 'none',
+      opacity: '0',
+      transform: 'translate(-50%, -140%) scale(0.96)',
+      transition: 'opacity 120ms ease, transform 120ms ease',
+      whiteSpace: 'nowrap',
+    });
+    mount.appendChild(hoverBadge);
 
     const getClickableHit = (event) => {
       if (!clickableObjects.length) return null;
@@ -471,7 +541,6 @@ const AvatarThreeViewer = ({
       const material = Array.isArray(object?.material) ? object.material[0] : object?.material;
       const meshRole = material?.userData?.clickableAvatarPartRole || object?.userData?.clickableAvatarPartRole || '';
       if (!hitPoint || !modelRoot || !avatarModelBounds) return meshRole;
-      if (meshRole === 'hair') return 'hair';
 
       const localPoint = modelRoot.worldToLocal(hitPoint.clone());
       const spatialRole = getSpatialAvatarPartRole(localPoint, avatarModelBounds, meshRole);
@@ -479,33 +548,88 @@ const AvatarThreeViewer = ({
       return meshRole;
     };
 
-    const updateHoverFromEvent = (event) => {
-      if (rotationState.isDragging || (!onPartClickRef.current && !onPartHoverRef.current)) return;
-      const hit = getClickableHit(event);
-      const hitObject = hit?.object || null;
-      const role = getHitRole(hitObject, hit?.point);
+    const emitPartHover = (role, hitObject, event, locked = false) => {
       onPartHoverRef.current?.(
         role
           ? {
               role,
               meshName: hitObject?.name || '',
-              clientX: event.clientX,
-              clientY: event.clientY,
+              clientX: event?.clientX || 0,
+              clientY: event?.clientY || 0,
+              locked,
             }
           : null,
       );
-      if (hoveredObject === hitObject) return;
-      setObjectHover(hoveredObject, false);
-      hoveredObject = hitObject;
-      setObjectHover(hoveredObject, true);
-      renderer.domElement.style.cursor = hoveredObject ? 'pointer' : isDragDisabledVariant(variant) ? 'default' : 'grab';
     };
 
-    const clearHover = () => {
-      setObjectHover(hoveredObject, false);
-      hoveredObject = null;
-      onPartHoverRef.current?.(null);
+    const getRoleHoverObjects = (role, hitObject) => {
+      const roleObjects = hoverObjectsByRole.get(role) || [];
+      if (roleObjects.length) return roleObjects;
+      return hitObject ? [hitObject] : [];
+    };
+
+    const positionHoverBadge = (event, role, locked = false) => {
+      if (!hoverBadge || !event || !role) return;
+      const mountRect = mount.getBoundingClientRect();
+      const left = event.clientX - mountRect.left;
+      const top = event.clientY - mountRect.top;
+      hoverBadge.textContent = locked ? `${AVATAR_PART_LABELS[role] || role} 선택` : (AVATAR_PART_LABELS[role] || role);
+      hoverBadge.style.left = `${left}px`;
+      hoverBadge.style.top = `${top}px`;
+      hoverBadge.style.opacity = '1';
+      hoverBadge.style.transform = locked ? 'translate(-50%, -150%) scale(1)' : 'translate(-50%, -140%) scale(1)';
+    };
+
+    const hideHoverBadge = () => {
+      if (!hoverBadge) return;
+      hoverBadge.style.opacity = '0';
+      hoverBadge.style.transform = 'translate(-50%, -140%) scale(0.96)';
+    };
+
+    const setActiveHover = (role, hitObject, event, locked = false) => {
+      const nextObjects = role ? getRoleHoverObjects(role, hitObject) : [];
+      if (activeHover.role === role && activeHover.locked === locked) {
+        positionHoverBadge(event, role, locked);
+        emitPartHover(role, hitObject || activeHover.hitObject, event, locked);
+        return;
+      }
+      setObjectsHover(activeHover.objects, false);
+      activeHover.role = role;
+      activeHover.objects = nextObjects;
+      activeHover.hitObject = hitObject || null;
+      activeHover.locked = locked;
+      setObjectsHover(activeHover.objects, true);
+      if (role) {
+        positionHoverBadge(event, role, locked);
+        emitPartHover(role, hitObject, event, locked);
+      } else {
+        hideHoverBadge();
+        emitPartHover('', null, event, false);
+      }
+      renderer.domElement.style.cursor = role ? 'pointer' : isDragDisabledVariant(variant) ? 'default' : 'grab';
+    };
+
+    const clearHover = ({ force = false } = {}) => {
+      if (activeHover.locked && !force) return;
+      setObjectsHover(activeHover.objects, false);
+      activeHover.role = '';
+      activeHover.objects = [];
+      activeHover.hitObject = null;
+      activeHover.locked = false;
+      hideHoverBadge();
+      emitPartHover('', null, null, false);
       renderer.domElement.style.cursor = isDragDisabledVariant(variant) ? 'default' : 'grab';
+    };
+
+    const updateHoverFromEvent = (event) => {
+      if (rotationState.isDragging || activeHover.locked || (!onPartClickRef.current && !onPartHoverRef.current)) return;
+      const hit = getClickableHit(event);
+      const role = getHitRole(hit?.object, hit?.point);
+      if (!role) {
+        clearHover();
+        return;
+      }
+      setActiveHover(role, hit?.object, event, false);
     };
 
     const handlePointerDown = (event) => {
@@ -544,6 +668,7 @@ const AvatarThreeViewer = ({
     const endDrag = (event) => {
       if (rotationState.pointerId !== event.pointerId) return;
       const clickDistance = Math.hypot(event.clientX - rotationState.downX, event.clientY - rotationState.downY);
+      let handledClick = false;
       rotationState.isDragging = false;
       rotationState.pointerId = null;
       rotationState.lastInteractionAt = performance.now();
@@ -553,22 +678,38 @@ const AvatarThreeViewer = ({
         const hit = getClickableHit(event);
         const object = hit?.object;
         const role = getHitRole(object, hit?.point);
-        if (role && role === rotationState.downPartRole) {
-          onPartClickRef.current({
-            role,
-            meshName: object?.name || '',
-          });
+        if (activeHover.locked) {
+          if (role && role === activeHover.role && role === rotationState.downPartRole) {
+            onPartClickRef.current({
+              role,
+              meshName: object?.name || '',
+            });
+          }
+          clearHover({ force: true });
+          handledClick = true;
+        } else if (role && role === rotationState.downPartRole) {
+          setActiveHover(role, object, event, true);
+          handledClick = true;
+        } else {
+          clearHover({ force: true });
+          handledClick = true;
         }
       }
       rotationState.downPartRole = '';
-      updateHoverFromEvent(event);
+      if (!handledClick) {
+        updateHoverFromEvent(event);
+      }
+    };
+
+    const handlePointerLeave = () => {
+      clearHover();
     };
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointermove', handlePointerMove);
     renderer.domElement.addEventListener('pointerup', endDrag);
     renderer.domElement.addEventListener('pointercancel', endDrag);
-    renderer.domElement.addEventListener('pointerleave', clearHover);
+    renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
 
     const ambientLight = new THREE.HemisphereLight(
       0xffffff,
@@ -645,6 +786,7 @@ const AvatarThreeViewer = ({
           child.userData.editableColorRole = editableColorRole;
           child.userData.clickableAvatarPartRole = clickableAvatarPartRole;
           clickableObjects.push(child);
+          registerHoverObject(hoverObjectsByRole, child, renderRole, clickableAvatarPartRole);
           try {
             child.geometry = smoothGeometryNormals(child.geometry, renderRole);
           } catch (error) {
@@ -780,9 +922,11 @@ const AvatarThreeViewer = ({
       disposed = true;
       window.cancelAnimationFrame(frameId);
       resizeObserver?.disconnect();
-      setObjectHover(hoveredObject, false);
-      hoveredObject = null;
+      clearHover({ force: true });
       clickableObjects.length = 0;
+      for (const objects of hoverObjectsByRole.values()) {
+        objects.length = 0;
+      }
       if (modelRoot) {
         disposeObject(modelRoot);
       }
@@ -791,7 +935,8 @@ const AvatarThreeViewer = ({
       renderer?.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer?.domElement.removeEventListener('pointerup', endDrag);
       renderer?.domElement.removeEventListener('pointercancel', endDrag);
-      renderer?.domElement.removeEventListener('pointerleave', clearHover);
+      renderer?.domElement.removeEventListener('pointerleave', handlePointerLeave);
+      hoverBadge?.remove();
       renderer?.dispose();
       renderer?.domElement.remove();
     };
