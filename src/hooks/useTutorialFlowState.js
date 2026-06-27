@@ -15,6 +15,7 @@ export function useTutorialFlowState() {
   const [nicknameValue, setNicknameValue] = useState('')
   const [enterUrl, setEnterUrl] = useState('')
   const [avatarModelUrl, setAvatarModelUrl] = useState('')
+  const [avatarRecipe, setAvatarRecipe] = useState(null)
   const [isPersonaCustomInputOpen, setIsPersonaCustomInputOpen] = useState(false)
   const [selectedOptionIds, setSelectedOptionIds] = useState([])
   const [starredOptionId, setStarredOptionId] = useState('')
@@ -41,6 +42,7 @@ export function useTutorialFlowState() {
     setNicknameValue('')
     setEnterUrl('')
     setAvatarModelUrl('')
+    setAvatarRecipe(null)
     setIsAvatarPreloading(false)
     setIsAvatarLoadingExit(false)
     setIsAvatarHandoffCover(false)
@@ -80,6 +82,8 @@ export function useTutorialFlowState() {
     setEnterUrl,
     avatarModelUrl,
     setAvatarModelUrl,
+    avatarRecipe,
+    setAvatarRecipe,
     isPersonaCustomInputOpen,
     setIsPersonaCustomInputOpen,
     selectedOptionIds,

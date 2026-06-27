@@ -379,6 +379,7 @@ const TutorialDesign = ({
   initialId = 0,
   externalName = '',
   avatarUrl = '',
+  avatarRecipe = null,
   avatarReveal = false,
   avatarColorOverrides = null,
   avatarInitialYaw = 0,
@@ -781,6 +782,7 @@ const TutorialDesign = ({
                         currentId === 10 || currentId === 11 ? 'is-name-input-avatar' : ''
                       }`}
                       src={avatarPreviewUrl}
+                      recipe={avatarRecipe}
                       alt={character.alt || 'avatar'}
                       style={currentId === 10 || currentId === 11 ? null : character.style}
                       variant={currentId === 10 || currentId === 11 ? 'staticFront' : currentId === 9 && avatarReveal ? 'avatarReveal' : 'avatar'}

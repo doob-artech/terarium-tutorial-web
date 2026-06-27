@@ -3,8 +3,10 @@ import { buildAvatar, saveAvatarProfileImage } from '../lib/tutorialApi.js'
 
 export function useAvatarWorkflow({
   avatarModelUrl,
+  avatarRecipe,
   getActiveAgentId,
   normalizeAssetUrl,
+  setAvatarRecipe,
   setAvatarModelUrl,
 }) {
   const uploadedProfileImageKeyRef = useRef('')
@@ -19,9 +21,11 @@ export function useAvatarWorkflow({
     }
 
     const payload = await buildAvatar({ agentId, appearance })
-    setAvatarModelUrl(normalizeAssetUrl(payload.modelUrl))
+    const recipe = payload?.recipe && typeof payload.recipe === 'object' ? payload.recipe : null
+    setAvatarRecipe?.(recipe)
+    setAvatarModelUrl(normalizeAssetUrl(recipe?.sourceGlbUrl || payload.modelUrl))
     return payload
-  }, [normalizeAssetUrl, setAvatarModelUrl])
+  }, [normalizeAssetUrl, setAvatarModelUrl, setAvatarRecipe])
 
   const handleAvatarProfileImageReady = useCallback(async (viewerApi) => {
     const activeAgentId = getActiveAgentId()
@@ -29,7 +33,8 @@ export function useAvatarWorkflow({
       return
     }
 
-    const uploadKey = `${activeAgentId}:${avatarModelUrl}`
+    const recipeKey = avatarRecipe?.selectedNodes?.join(',') || avatarRecipe?.modelUrl || ''
+    const uploadKey = `${activeAgentId}:${avatarModelUrl}:${recipeKey}`
     if (uploadedProfileImageKeyRef.current === uploadKey) {
       return
     }
@@ -50,7 +55,7 @@ export function useAvatarWorkflow({
       uploadedProfileImageKeyRef.current = ''
       console.warn(error instanceof Error ? error.message : 'Unknown error while saving avatar profile image.')
     }
-  }, [avatarModelUrl, getActiveAgentId])
+  }, [avatarModelUrl, avatarRecipe, getActiveAgentId])
 
   return {
     buildAvatarModel,

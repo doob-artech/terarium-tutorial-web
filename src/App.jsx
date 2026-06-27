@@ -991,6 +991,8 @@ function TutorialApp() {
     setEnterUrl,
     avatarModelUrl,
     setAvatarModelUrl,
+    avatarRecipe,
+    setAvatarRecipe,
     selectedOptionIds,
     setSelectedOptionIds,
     starredOptionId,
@@ -1028,6 +1030,7 @@ function TutorialApp() {
   const avatarTransitionFinishingRef = useRef(false)
   const avatarPreloadReadyRef = useRef(false)
   const lastAvatarModelUrlRef = useRef('')
+  const lastAvatarRecipeRef = useRef(null)
   const frontCaptureDataUrlRef = useRef('')
   const avatarColorApplyRequestRef = useRef(0)
   const avatarColorEditorDragRef = useRef(null)
@@ -1059,15 +1062,32 @@ function TutorialApp() {
       return lastAvatarModelUrlRef.current || ''
     })
   }, [setAvatarModelUrl])
+  const setPersistentAvatarRecipe = useCallback((nextRecipe) => {
+    const resolvedRecipe = nextRecipe && typeof nextRecipe === 'object' ? nextRecipe : null
+    lastAvatarRecipeRef.current = resolvedRecipe
+    setAvatarRecipe(resolvedRecipe)
+  }, [setAvatarRecipe])
   const visibleAvatarModelUrl = avatarModelUrl || lastAvatarModelUrlRef.current
+  const visibleAvatarRecipe = avatarRecipe || lastAvatarRecipeRef.current
+  const applyAvatarPayload = useCallback((payload, fallbackUrl = '') => {
+    const recipe = payload?.recipe && typeof payload.recipe === 'object' ? payload.recipe : null
+    setPersistentAvatarRecipe(recipe)
+    const nextUrl = avatarAssetUrl(recipe?.sourceGlbUrl || payload?.modelUrl || fallbackUrl || '')
+    if (nextUrl) {
+      setPersistentAvatarModelUrl(nextUrl)
+    }
+    return nextUrl
+  }, [setPersistentAvatarModelUrl, setPersistentAvatarRecipe])
   const {
     buildAvatarModel,
     handleAvatarProfileImageReady,
     resetProfileImageUpload,
   } = useAvatarWorkflow({
     avatarModelUrl: visibleAvatarModelUrl,
+    avatarRecipe: visibleAvatarRecipe,
     getActiveAgentId: getActiveAvatarAgentId,
     normalizeAssetUrl: avatarAssetUrl,
+    setAvatarRecipe: setPersistentAvatarRecipe,
     setAvatarModelUrl: setPersistentAvatarModelUrl,
   })
 
@@ -1524,6 +1544,10 @@ function TutorialApp() {
     setCameraReady(false)
     setIsCaptureProcessing(false)
     setAnalysisResult(null)
+    lastAvatarModelUrlRef.current = ''
+    lastAvatarRecipeRef.current = null
+    setAvatarModelUrl('')
+    setAvatarRecipe(null)
     frontCaptureDataUrlRef.current = ''
     setRearCapturePromptVisible(false)
     setStage('cameraDesignCapture')
@@ -1638,7 +1662,7 @@ function TutorialApp() {
             if (!avatarPayload?.modelUrl) {
               throw new Error('아바타 생성에 실패했습니다. 다시 촬영해 주세요.')
             }
-            setPersistentAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl))
+            applyAvatarPayload(avatarPayload)
             const latestNickname = (nicknameValueRef.current || nicknameInputRef.current || '').trim()
             if (latestNickname) {
               await renameAvatar({
@@ -2027,7 +2051,7 @@ function TutorialApp() {
         nickname: targetNickname,
       }).catch(() => null)
       if (avatarPayload) {
-        setPersistentAvatarModelUrl(avatarAssetUrl(avatarPayload.modelUrl) || visibleAvatarModelUrl)
+        applyAvatarPayload(avatarPayload, visibleAvatarModelUrl)
       }
 
       setEnterUrl(payload.enterUrl ?? `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(activeAgentId)}`)
@@ -2187,6 +2211,7 @@ function TutorialApp() {
             <AvatarThreeViewer
               className="avatar-background-preloader-viewer"
               src={visibleAvatarModelUrl}
+              recipe={visibleAvatarRecipe}
               alt="avatar preload"
               variant="avatar"
               distanceMultiplier={1.82}
@@ -2206,6 +2231,7 @@ function TutorialApp() {
         <TutorialDesign
           initialId={9}
           avatarUrl={visibleAvatarModelUrl}
+          avatarRecipe={visibleAvatarRecipe}
           avatarInitialYaw={0}
           externalName={nicknameValue}
           avatarColorEditorSlot={avatarColorEditorSlot}
@@ -2230,6 +2256,7 @@ function TutorialApp() {
         <TutorialDesign
         initialId={15}
         avatarUrl={visibleAvatarModelUrl}
+        avatarRecipe={visibleAvatarRecipe}
         externalName={nicknameValue || nicknameInput.trim()}
         avatarColorOverrides={hasAvatarColorOverrides(avatarColorOverrides) ? avatarColorOverrides : null}
         keywords={personaKeywords}
@@ -2462,6 +2489,7 @@ function RandomAgentPage() {
           enterUrl: `https://terarium.team-doob.com/profile?agentId=${encodeURIComponent(agentId)}`,
           avatar: {
             modelUrl: avatarPayload.modelUrl,
+            recipe: avatarPayload.recipe,
           },
         }
       }
@@ -2481,7 +2509,8 @@ function RandomAgentPage() {
     setStatus('ready')
   }, [])
 
-  const modelUrl = avatarAssetUrl(payload?.avatar?.modelUrl || '')
+  const randomAvatarRecipe = payload?.avatar?.recipe && typeof payload.avatar.recipe === 'object' ? payload.avatar.recipe : null
+  const modelUrl = avatarAssetUrl(randomAvatarRecipe?.sourceGlbUrl || payload?.avatar?.modelUrl || '')
   const statusText = status === 'creating'
     ? '랜덤 에이전트 생성 중'
     : status === 'rendering'
@@ -2498,6 +2527,7 @@ function RandomAgentPage() {
             <AvatarThreeViewer
               className="random-agent-viewer"
               src={modelUrl}
+              recipe={randomAvatarRecipe}
               alt="랜덤 에이전트 아바타"
               variant="avatar"
               distanceMultiplier={1.45}
@@ -2529,6 +2559,7 @@ function RandomAgentPage() {
 
 function AvatarProfileCapturePage() {
   const [modelUrl, setModelUrl] = useState('')
+  const [avatarRecipe, setAvatarRecipe] = useState(null)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const [colorOverrides, setColorOverrides] = useState({})
@@ -2543,6 +2574,7 @@ function AvatarProfileCapturePage() {
     window.__TERARIUM_AVATAR_PROFILE_CAPTURE_COLORS__ = initialColors
     if (explicitModelUrl) {
       setModelUrl(avatarAssetUrl(explicitModelUrl))
+      setAvatarRecipe(null)
       return
     }
     if (!agentId) {
@@ -2554,7 +2586,11 @@ function AvatarProfileCapturePage() {
     let cancelled = false
     fetchAvatarRecipe(agentId)
       .then((payload) => {
-        if (!cancelled) setModelUrl(avatarAssetUrl(payload?.recipe?.modelUrl))
+        if (!cancelled) {
+          const recipe = payload?.recipe && typeof payload.recipe === 'object' ? payload.recipe : null
+          setAvatarRecipe(recipe)
+          setModelUrl(avatarAssetUrl(recipe?.sourceGlbUrl || recipe?.modelUrl))
+        }
       })
       .catch((loadError) => {
         if (!cancelled) {
@@ -2574,6 +2610,7 @@ function AvatarProfileCapturePage() {
           <AvatarThreeViewer
             className="avatar-profile-capture-viewer"
             src={modelUrl}
+            recipe={avatarRecipe}
             alt="avatar profile capture"
             variant="profileCapture"
             distanceMultiplier={1}

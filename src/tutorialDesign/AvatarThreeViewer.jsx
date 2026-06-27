@@ -57,6 +57,35 @@ const getClickableAvatarPartRole = (mesh) => {
   return '';
 };
 
+const getRecipeSelectedNodeNames = (recipe) => new Set(
+  (Array.isArray(recipe?.selectedNodes) ? recipe.selectedNodes : [])
+    .map((name) => String(name || '').trim())
+    .filter(Boolean),
+);
+
+const isMeshSelectedByRecipe = (mesh, selectedNodeNames) => {
+  if (!mesh?.isMesh || selectedNodeNames.size === 0) return true;
+  if (selectedNodeNames.has(mesh.name || '')) return true;
+  let node = mesh.parent;
+  while (node) {
+    if (selectedNodeNames.has(node.name || '')) return true;
+    node = node.parent;
+  }
+  return false;
+};
+
+const getRecipeColorForMesh = (mesh, colors = {}, editableColorRole = '', renderRole = '') => {
+  const name = `${mesh?.name || ''} ${mesh?.parent?.name || ''}`.toLowerCase();
+  if (editableColorRole === 'hair' || renderRole === 'hair') return colors.hair || '';
+  if (editableColorRole === 'top') return colors.top || '';
+  if (editableColorRole === 'bottom') return colors.bottom || colors.bottoms || '';
+  if (/shoe|sandal/.test(name)) return colors.shoes || '';
+  if (/glass/.test(name)) return colors.glasses || '';
+  if (/necklace/.test(name)) return colors.necklace || '';
+  if (/earring/.test(name)) return colors.earrings || '';
+  return '';
+};
+
 const getSpatialAvatarPartRole = (localPoint, bounds, meshRole = '') => {
   if (!localPoint || !bounds || bounds.isEmpty()) return meshRole;
   const size = bounds.getSize(new THREE.Vector3());
@@ -346,6 +375,7 @@ const AvatarThreeViewer = ({
   alt = '',
   className = '',
   style = null,
+  recipe = null,
   variant = 'avatar',
   distanceMultiplier = 1.82,
   fitFullBounds = false,
@@ -625,10 +655,22 @@ const AvatarThreeViewer = ({
         const model = gltf.scene;
         const revealStartAt = performance.now();
         let revealMeshIndex = 0;
+        const selectedNodeNames = getRecipeSelectedNodeNames(recipe);
         if (variant === 'loadingBase') {
           const removeNodes = [];
           model.traverse((child) => {
             if (child.isMesh && !isLoadingBaseBodyMesh(child)) {
+              removeNodes.push(child);
+            }
+          });
+          for (const child of removeNodes) {
+            child.parent?.remove(child);
+            disposeObject(child);
+          }
+        } else if (selectedNodeNames.size > 0) {
+          const removeNodes = [];
+          model.traverse((child) => {
+            if (child.isMesh && !isMeshSelectedByRecipe(child, selectedNodeNames)) {
               removeNodes.push(child);
             }
           });
@@ -656,6 +698,15 @@ const AvatarThreeViewer = ({
           const materials = Array.isArray(child.material) ? child.material : [child.material].filter(Boolean);
           const nextMaterials = materials.map((material) => {
             const nextMaterial = makeSoftToonMaterial(material, { role: renderRole, variant });
+            const recipeColor = getRecipeColorForMesh(child, recipe?.colors, editableColorRole, renderRole);
+            if (recipeColor) {
+              try {
+                nextMaterial.color.set(recipeColor);
+                nextMaterial.map = null;
+              } catch {
+                // Keep source material color if the recipe color is malformed.
+              }
+            }
             nextMaterial.userData.editableColorRole = editableColorRole;
             nextMaterial.userData.clickableAvatarPartRole = clickableAvatarPartRole;
             nextMaterial.userData.editableOriginalColor = `#${nextMaterial.color.getHexString()}`;
@@ -715,6 +766,7 @@ const AvatarThreeViewer = ({
           },
           variant,
           src,
+          recipe,
         });
       },
       undefined,
@@ -795,7 +847,7 @@ const AvatarThreeViewer = ({
       renderer?.dispose();
       renderer?.domElement.remove();
     };
-  }, [distanceMultiplier, fitFullBounds, idleSway, src, variant]);
+  }, [distanceMultiplier, fitFullBounds, idleSway, recipe, src, variant]);
 
   return (
     <div
